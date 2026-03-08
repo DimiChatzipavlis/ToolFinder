@@ -1,10 +1,7 @@
 import os
-import json
 import pandas as pd
 import time
 import torch
-import faiss
-import numpy as np
 
 from mcp_router import NeuralMCPRouter
 
@@ -31,19 +28,7 @@ def run_zero_shot_eval():
     print(f"Total strictly unseen MCP tools in corpus: {len(unseen_corpus_schemas)}\n")
 
     print(f"Loading 109M Model on {( 'CUDA' if torch.cuda.is_available() else 'CPU')}...")
-    router = NeuralMCPRouter(model_path=model_path, dataset_path=dataset_v2_path)
-    minified_corpus_schemas = [
-        router._minify_schema_for_embedding(json.loads(schema))
-        for schema in unseen_corpus_schemas
-    ]
-
-    print("Embedding Unseen Corpus...")
-    with torch.inference_mode():
-        corpus_embeddings = router.model.encode(minified_corpus_schemas, convert_to_numpy=True)
-    corpus_embeddings = np.asarray(corpus_embeddings, dtype=np.float32)
-    faiss.normalize_L2(corpus_embeddings)
-    faiss_index = faiss.IndexFlatIP(corpus_embeddings.shape[1])
-    faiss_index.add(corpus_embeddings)
+    router = NeuralMCPRouter(dataset_path=dataset_v2_path)
     
     # 3. The Zero-Shot Loop
     print("Evaluating Zero-Shot Routing...")
@@ -57,19 +42,14 @@ def run_zero_shot_eval():
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         t0 = time.time()
-        with torch.inference_mode():
-            query_embedding = router.model.encode([query], convert_to_numpy=True)
-        query_embedding = np.asarray(query_embedding, dtype=np.float32)
-        faiss.normalize_L2(query_embedding)
-        _scores, top_indices = faiss_index.search(query_embedding, k=min(3, len(unseen_corpus_schemas)))
+        top_k_schemas = router.route_top_k(query, k=3)
         if torch.cuda.is_available():
             torch.cuda.synchronize()
 
         latencies.append((time.time() - t0) * 1000)
 
-        ranked_indices = top_indices[0].tolist()
-        top_1_schema = unseen_corpus_schemas[ranked_indices[0]]
-        top_3_schemas = [unseen_corpus_schemas[i] for i in ranked_indices]
+        top_1_schema = top_k_schemas[0]
+        top_3_schemas = top_k_schemas
         
         if true_schema == top_1_schema: recall_1 += 1
         if true_schema in top_3_schemas: recall_3 += 1

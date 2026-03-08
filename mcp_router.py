@@ -20,21 +20,21 @@ class NeuralMCPRouter:
         )
 
     def _minify_schema_for_embedding(self, schema_dict):
-        def strip_descriptions(value):
-            if isinstance(value, dict):
-                return {
-                    key: strip_descriptions(subvalue)
-                    for key, subvalue in value.items()
-                    if key != "description"
-                }
-            if isinstance(value, list):
-                return [strip_descriptions(item) for item in value]
-            return value
-
-        minified = strip_descriptions(schema_dict)
+        minified = json.loads(json.dumps(schema_dict))
+        input_properties = minified.get("inputSchema", {}).get("properties", {})
+        for property_schema in input_properties.values():
+            if isinstance(property_schema, dict):
+                property_schema.pop("description", None)
         return json.dumps(minified, sort_keys=True, separators=(",", ":"))
 
-    def __init__(self, model_path, dataset_path):
+    def __init__(self, model_path=None, dataset_path=None):
+        if dataset_path is None:
+            raise ValueError("dataset_path is required")
+
+        if model_path is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            model_path = os.path.join(base_dir, "models", "best_mcp_router")
+
         self.model_path = os.fspath(model_path)
         self.dataset_path = os.fspath(dataset_path)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -52,8 +52,11 @@ class NeuralMCPRouter:
         ]
 
         if os.path.isdir(self.model_path):
-            self.faiss_cache_path = os.path.join(self.model_path, "corpus_faiss.index")
-            self.cache_meta_path = os.path.join(self.model_path, "corpus_embeddings_meta.json")
+            dataset_name = os.path.basename(self.dataset_path)
+            cache_name = dataset_name.replace('.csv', '_faiss.index')
+            meta_name = dataset_name.replace('.csv', '_faiss_meta.json')
+            self.faiss_cache_path = os.path.join(self.model_path, cache_name)
+            self.cache_meta_path = os.path.join(self.model_path, meta_name)
 
         corpus_signature = hashlib.sha256(
             "\n".join(self.corpus_schemas).encode("utf-8")
@@ -97,23 +100,29 @@ class NeuralMCPRouter:
                         meta_file,
                     )
 
-    def search(self, query, k=1):
+    def route_top_k(self, query, k=3):
+        if k < 1:
+            raise ValueError("k must be at least 1")
+
         if self.device == "cuda":
             torch.cuda.synchronize()
-        t0 = time.time()
         with torch.inference_mode():
             query_embedding = self.model.encode([query], convert_to_numpy=True)
         query_embedding = np.asarray(query_embedding, dtype=np.float32)
         faiss.normalize_L2(query_embedding)
-        scores, indices = self.faiss_index.search(query_embedding, k=k)
+        _scores, indices = self.faiss_index.search(query_embedding, k=min(k, len(self.corpus_schemas)))
         if self.device == "cuda":
             torch.cuda.synchronize()
-        matched = [json.loads(self.corpus_schemas[index]) for index in indices[0] if index >= 0]
-        return matched, scores[0].tolist(), (time.time() - t0) * 1000
+        return [self.corpus_schemas[index] for index in indices[0] if index >= 0]
 
     def route(self, query):
-        matches, _scores, latency_ms = self.search(query, k=1)
-        return matches[0], latency_ms
+        return json.loads(self.route_top_k(query, k=1)[0])
 
     def route_with_latency(self, query):
-        return self.route(query)
+        if self.device == "cuda":
+            torch.cuda.synchronize()
+        t0 = time.time()
+        schema = self.route(query)
+        if self.device == "cuda":
+            torch.cuda.synchronize()
+        return schema, (time.time() - t0) * 1000
