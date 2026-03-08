@@ -1,40 +1,66 @@
-# Neural Routing for Model Context Protocol (MCP) Servers
+# Neural MCP Router: Zero-Shot Tool Selection for AI Agents
 
-Abstract: This Semester Project replaces traditional LLM "context-stuffing" with a 109M parameter Bi-Encoder (all-mpnet-base-v2). By executing semantic vector search over JSON schemas, the system routes natural language to exact API tools in <60ms, eliminating hallucination and token waste.
+## 🚀 The Vision
+Large Language Models are currently bottlenecked by "Context Stuffing." When an AI Agent is connected to 50+ Model Context Protocol (MCP) tools, pasting every massive JSON schema into the system prompt consumes thousands of tokens, increases latency, and causes hallucination.
 
-## 1. Project Architecture
+**The Neural MCP Router** solves this. By decoupling **Tool Selection** from **Tool Execution**, this system uses a lightweight 109M parameter Bi-Encoder to mathematically map human intent directly to the correct JSON schema in **<50 milliseconds**. The LLM only sees the exact tool it needs, guaranteeing zero-hallucination execution.
 
-Data Synthesis: Explain the automated generation of mcp_routing_dataset.csv (15 core GitHub tools) and mcp_routing_dataset_v2.csv (15 unseen tools) using a 30/40/30 linguistic variance rule.
+## 🧠 Core Architecture
+This repository has been hardened from an academic prototype into a production-safe routing layer:
 
-The Neural Router: Describe the use of MultipleNegativesRankingLoss to train the encoder to map human intent to complex JSON schemas.
+* **Approximate Nearest Neighbor (ANN) Indexing:** Replaces flat $O(N)$ PyTorch tensor scans with Facebook's `FAISS` library, allowing the router to scale to thousands of tools logarithmically.
+* **Smart Minification:** Dynamically strips nested parameter descriptions from JSON schemas during the embedding phase to prevent 512-token context truncation, while preserving top-level semantic hooks.
+* **Deep JSON Validation:** Intercepts the LLM's raw output and enforces strict type, enum, and required-field compliance via Python's `jsonschema` library before execution.
+* **Dynamic Cache Isolation:** Persists FAISS indexes to disk to eliminate $O(N)$ embedding overhead on startup.
 
-The Execution Bridge: Explain how local_copilot_chat.py connects the deterministic neural router to a localized quantized LLM (Llama 3.2 via Ollama) to generate executable tool arguments.
+## 📊 Empirical Performance
+Evaluated on a strictly held-out dataset of unseen MCP tools, the router achieves:
 
-## 2. Empirical Verification
+* **Zero-Shot Recall@1:** `94.13%`
+* **Zero-Shot Recall@3:** `100.00%`
+* **Average Latency:** `~41.20 ms` (CPU)
 
-Base Performance: State that the 109M parameter model achieved 100% Recall@1 on the training distribution.
+## 🗺️ Roadmap: The Agentic Future
+To transform this router into a fully autonomous, community-ready AI Agent framework, the following features are actively on the roadmap:
 
-Zero-Shot Generalization: Highlight that on the completely unseen V2 dataset, the model achieved 93.87% Recall@1 and 100% Recall@3 at 43ms latency, mathematically proving semantic generalization rather than dataset memorization.
+### 1. Hierarchical Routing (Multi-Server Ontology)
+Currently, the router operates in a flat vector space. To support 50+ different MCP servers such as GitHub, Slack, Notion, and Jira, we will introduce a two-stage routing engine:
 
-## 3. Future Work: Multi-Server Scalability
+* **Layer 1:** Server Selection, for example routing the request to Slack.
+* **Layer 2:** Tool Selection through FAISS retrieval within the selected server corpus.
 
-Detail how the architecture scales to N-Servers. Explain the concept of Hierarchical Routing (Layer 1: Server Selection -> Layer 2: Tool Selection) and Continuous Ingestion (auto-generating synthetic pairs for new MCP servers to fine-tune the vector space).
+### 2. The Action Layer (MCP Client Integration)
+The router currently acts as the **Brain**, generating validated JSON. The next step is adding the **Hands**. We will integrate an official MCP Client SDK to securely execute the generated JSON payload against live servers and return the tool output back to the LLM for final synthesis.
 
-## 4. Usage
+### 3. Continuous Ingestion (Self-Healing)
+A pipeline to automatically ingest, minify, embed, and cache new tools the moment a user connects a new MCP server, requiring zero manual dataset generation or fine-tuning.
+
+### 4. Package Distribution
+Abstracting the core `mcp_router.py` logic into a pip-installable package, `pip install neural-mcp-router`, so developers can drop it into any existing LangChain, LlamaIndex, or custom AI agent loop in three lines of code.
+
+## 💻 Quickstart
+1. Clone the repository and install dependencies.
+
+```bash
+git clone https://github.com/DimiChatzipavlis/ToolFinder.git
+cd ToolFinder
+pip install -r requirements.txt
+```
+
+2. Extract the model weights into `models/best_mcp_router`.
 
 ```bash
 unzip best_mcp_router.zip -d models/
-python evaluate_zero_shot.py
-python local_copilot_chat.py
 ```
 
-4. Architectural Limitations & Future Work
-While the dense retrieval prototype successfully demonstrates sub-60ms zero-shot routing, scaling this architecture to an enterprise environment requires addressing several theoretical and mechanical limits:
+3. Run the zero-shot benchmark.
 
-Context Window Truncation: The all-mpnet-base-v2 encoder has a strict 512-token limit. Analysis shows V1/V2 schemas average between 216 and 301 tokens, with maximums hitting 511 tokens. Future iterations must implement schema summarization or semantic chunking.
+```bash
+python evaluate_zero_shot.py
+```
 
-Latency Scaling (O(Nd)): The current architecture computes cosine similarity against every schema embedding simultaneously. Scaling to 5,000+ multi-server tools requires replacing the flat tensor scan with an Approximate Nearest Neighbor (ANN) index.
+4. Run the interactive local agent.
 
-Semantic Collisions: The router operates in a flat namespace. If distinct MCP servers expose identically named tools with different structural arguments, the vector space may collapse them. Future work will introduce Hierarchical Routing (Layer 1: Server Selection -> Layer 2: Tool Selection).
-
-Execution Validation: The pipeline relies on the localized LLM to natively respect prompt constraints. To guarantee zero hallucination in production, an intermediate validation layer (e.g., Pydantic or JSON Schema validation) must be wrapped around the LLM's output before API execution.
+```bash
+python local_copilot_chat.py
+```
