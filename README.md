@@ -1,29 +1,29 @@
-# ToolFinder: Neural Routing for MCP Servers
+# Neural Routing for Model Context Protocol (MCP) Servers
 
-This is a Semester Project demonstrating how a Bi-Encoder neural network can replace standard LLM context-stuffing by routing natural language to specific Model Context Protocol (MCP) JSON schemas.
+Abstract: This Semester Project replaces traditional LLM "context-stuffing" with a 109M parameter Bi-Encoder (all-mpnet-base-v2). By executing semantic vector search over JSON schemas, the system routes natural language to exact API tools in <60ms, eliminating hallucination and token waste.
 
 ## 1. Project Architecture
 
-Data Generation: Synthesized 750 rows of training data (15 distinct GitHub MCP tools) using live server schemas.
+Data Synthesis: Explain the automated generation of mcp_routing_dataset.csv (15 core GitHub tools) and mcp_routing_dataset_v2.csv (15 unseen tools) using a 30/40/30 linguistic variance rule.
 
-Neural Router: Trained using sentence-transformers and MultipleNegativesRankingLoss.
+The Neural Router: Describe the use of MultipleNegativesRankingLoss to train the encoder to map human intent to complex JSON schemas.
 
-Agent Bridge: A local execution script (agent_bridge.py) that maps user queries to schemas in < 60ms and generates token-optimized prompts for SLMs.
+The Execution Bridge: Explain how local_copilot_chat.py connects the deterministic neural router to a localized quantized LLM (Llama 3.2 via Ollama) to generate executable tool arguments.
 
-## 2. Benchmarking Results
+## 2. Empirical Verification
 
-| Model | Params | Train Time (s) | Recall@1 (%) | Recall@3 (%) | Latency (ms) |
-| :--- | :--- | ---: | ---: | ---: | ---: |
-| all-MiniLM-L6-v2 | 22M | 13.68 | 98.67 | 100 | 8.4 |
-| bge-small-en-v1.5 | 33M | 36.98 | 99.33 | 100 | 14.73 |
-| all-mpnet-base-v2 | 109M | 94.15 | 100.00 | 100 | 17.66 |
+Base Performance: State that the 109M parameter model achieved 100% Recall@1 on the training distribution.
 
-Note: all-mpnet-base-v2 was selected for the final deployment due to achieving mathematically perfect Recall@1.
+Zero-Shot Generalization: Highlight that on the completely unseen V2 dataset, the model achieved 93.87% Recall@1 and 100% Recall@3 at 43ms latency, mathematically proving semantic generalization rather than dataset memorization.
 
-## 3. How to Run Locally
+## 3. Future Work: Multi-Server Scalability
 
-Clone the repo and run pip install -r requirements.txt.
+Detail how the architecture scales to N-Servers. Explain the concept of Hierarchical Routing (Layer 1: Server Selection -> Layer 2: Tool Selection) and Continuous Ingestion (auto-generating synthetic pairs for new MCP servers to fine-tune the vector space).
 
-Ensure the best_mcp_router model is extracted into models/best_mcp_router/.
+## 4. Usage
 
-Run python agent_bridge.py to process a query and generate the optimized SLM prompt.
+```bash
+unzip best_mcp_router.zip -d models/
+python evaluate_zero_shot.py
+python local_copilot_chat.py
+```
