@@ -27,3 +27,14 @@ unzip best_mcp_router.zip -d models/
 python evaluate_zero_shot.py
 python local_copilot_chat.py
 ```
+
+4. Architectural Limitations & Future Work
+While the dense retrieval prototype successfully demonstrates sub-60ms zero-shot routing, scaling this architecture to an enterprise environment requires addressing several theoretical and mechanical limits:
+
+Context Window Truncation: The all-mpnet-base-v2 encoder has a strict 512-token limit. Analysis shows V1/V2 schemas average between 216 and 301 tokens, with maximums hitting 511 tokens. Future iterations must implement schema summarization or semantic chunking.
+
+Latency Scaling (O(Nd)): The current architecture computes cosine similarity against every schema embedding simultaneously. Scaling to 5,000+ multi-server tools requires replacing the flat tensor scan with an Approximate Nearest Neighbor (ANN) index.
+
+Semantic Collisions: The router operates in a flat namespace. If distinct MCP servers expose identically named tools with different structural arguments, the vector space may collapse them. Future work will introduce Hierarchical Routing (Layer 1: Server Selection -> Layer 2: Tool Selection).
+
+Execution Validation: The pipeline relies on the localized LLM to natively respect prompt constraints. To guarantee zero hallucination in production, an intermediate validation layer (e.g., Pydantic or JSON Schema validation) must be wrapped around the LLM's output before API execution.

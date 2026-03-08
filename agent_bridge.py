@@ -1,6 +1,8 @@
 import json
 import os
 
+import jsonschema
+
 from mcp_router import NeuralMCPRouter
 
 def generate_slm_prompt(user_query, target_schema):
@@ -16,6 +18,12 @@ AUTHORIZED TOOL SCHEMA:
 
 INSTRUCTION: Output strictly the JSON arguments required to call this tool. Do not explain your reasoning.
 """
+
+
+def validate_generated_arguments(generated_json_str, target_schema):
+    parsed = json.loads(generated_json_str)
+    jsonschema.validate(instance=parsed, schema=target_schema["inputSchema"])
+    return parsed
 
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))

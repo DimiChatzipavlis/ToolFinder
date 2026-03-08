@@ -1,8 +1,10 @@
 import os
+import json
 import pandas as pd
 import time
 import torch
-from sentence_transformers import util
+import faiss
+import numpy as np
 
 from mcp_router import NeuralMCPRouter
 
@@ -19,17 +21,29 @@ def run_zero_shot_eval():
 
     # 2. Load Model & Unseen Data
     df_v2 = pd.read_csv(dataset_v2_path)
-    
+
     # Extract the 15 NEW tools to form a totally blind corpus
-    unseen_corpus_schemas = df_v2['positive_schema'].unique().tolist()
+    unseen_corpus_schemas = [
+        NeuralMCPRouter.canonicalize_schema(schema)
+        for schema in df_v2['positive_schema'].unique().tolist()
+    ]
     print(f"Total rows in V2: {len(df_v2)}")
     print(f"Total strictly unseen MCP tools in corpus: {len(unseen_corpus_schemas)}\n")
-    
+
     print(f"Loading 109M Model on {( 'CUDA' if torch.cuda.is_available() else 'CPU')}...")
     router = NeuralMCPRouter(model_path=model_path, dataset_path=dataset_v2_path)
+    minified_corpus_schemas = [
+        router._minify_schema_for_embedding(json.loads(schema))
+        for schema in unseen_corpus_schemas
+    ]
 
     print("Embedding Unseen Corpus...")
-    corpus_embeddings = router.model.encode(unseen_corpus_schemas, convert_to_tensor=True)
+    with torch.inference_mode():
+        corpus_embeddings = router.model.encode(minified_corpus_schemas, convert_to_numpy=True)
+    corpus_embeddings = np.asarray(corpus_embeddings, dtype=np.float32)
+    faiss.normalize_L2(corpus_embeddings)
+    faiss_index = faiss.IndexFlatIP(corpus_embeddings.shape[1])
+    faiss_index.add(corpus_embeddings)
     
     # 3. The Zero-Shot Loop
     print("Evaluating Zero-Shot Routing...")
@@ -38,20 +52,24 @@ def run_zero_shot_eval():
     
     for _, row in df_v2.iterrows():
         query = row['anchor']
-        true_schema = row['positive_schema']
+        true_schema = NeuralMCPRouter.canonicalize_schema(row['positive_schema'])
         
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         t0 = time.time()
-        query_embedding = router.model.encode(query, convert_to_tensor=True)
-        cos_scores = util.cos_sim(query_embedding, corpus_embeddings)[0]
-        
-        # Get Top 3
-        top_results = torch.topk(cos_scores, k=min(3, len(unseen_corpus_schemas)))
-        top_indices = top_results[1].cpu().tolist()
-        
+        with torch.inference_mode():
+            query_embedding = router.model.encode([query], convert_to_numpy=True)
+        query_embedding = np.asarray(query_embedding, dtype=np.float32)
+        faiss.normalize_L2(query_embedding)
+        _scores, top_indices = faiss_index.search(query_embedding, k=min(3, len(unseen_corpus_schemas)))
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+
         latencies.append((time.time() - t0) * 1000)
-        
-        top_1_schema = unseen_corpus_schemas[top_indices[0]]
-        top_3_schemas = [unseen_corpus_schemas[i] for i in top_indices]
+
+        ranked_indices = top_indices[0].tolist()
+        top_1_schema = unseen_corpus_schemas[ranked_indices[0]]
+        top_3_schemas = [unseen_corpus_schemas[i] for i in ranked_indices]
         
         if true_schema == top_1_schema: recall_1 += 1
         if true_schema in top_3_schemas: recall_3 += 1
