@@ -1,66 +1,42 @@
-# Neural MCP Router: Zero-Shot Tool Selection for AI Agents
+# Neural MCP Router & Autonomous Execution Agent
 
-## 🚀 The Vision
-Large Language Models are currently bottlenecked by "Context Stuffing." When an AI Agent is connected to 50+ Model Context Protocol (MCP) tools, pasting every massive JSON schema into the system prompt consumes thousands of tokens, increases latency, and causes hallucination.
+**Abstract:**
+A two-phase system designed to resolve the LLM context-stuffing bottleneck for Model Context Protocol (MCP) integrations. It transitions from a static dense-retrieval prototype to a fully autonomous, multi-server ReAct agent capable of zero-shot tool execution.
 
-**The Neural MCP Router** solves this. By decoupling **Tool Selection** from **Tool Execution**, this system uses a lightweight 109M parameter Bi-Encoder to mathematically map human intent directly to the correct JSON schema in **<50 milliseconds**. The LLM only sees the exact tool it needs, guaranteeing zero-hallucination execution.
+## Phase 1: The Academic Prototype (Semester Project)
+This phase established the semantic routing baseline used to map natural-language requests to MCP tool schemas without exposing all tool definitions to the language model.
 
-## 🧠 Core Architecture
-This repository has been hardened from an academic prototype into a production-safe routing layer:
+- **Methodology:** Contrastive learning using `MultipleNegativesRankingLoss` on a synthetic dataset of 1,500 queries mapping to GitHub MCP schemas.
+- **Model:** 109M parameter Bi-Encoder (`all-mpnet-base-v2`).
+- **Empirical Validation:** 94.13% Zero-Shot Recall@1 on held-out tools with <50ms latency.
+- **Limitations Identified:** $O(N \cdot d)$ retrieval scaling, static CSV dependency, and absence of execution-layer schema validation.
 
-* **Approximate Nearest Neighbor (ANN) Indexing:** Replaces flat $O(N)$ PyTorch tensor scans with Facebook's `FAISS` library, allowing the router to scale to thousands of tools logarithmically.
-* **Smart Minification:** Dynamically strips nested parameter descriptions from JSON schemas during the embedding phase to prevent 512-token context truncation, while preserving top-level semantic hooks.
-* **Deep JSON Validation:** Intercepts the LLM's raw output and enforces strict type, enum, and required-field compliance via Python's `jsonschema` library before execution.
-* **Dynamic Cache Isolation:** Persists FAISS indexes to disk to eliminate $O(N)$ embedding overhead on startup.
+## Phase 2: Scalable Middleware (Enterprise Architecture)
+This phase refactors the routing prototype into a runtime system that can discover tools dynamically, route across multiple MCP servers, and validate execution requests before dispatch.
 
-## 📊 Empirical Performance
-Evaluated on a strictly held-out dataset of unseen MCP tools, the router achieves:
+- **Dynamic Ingestion (stdio):** Bypasses static datasets by connecting to ephemeral MCP servers over standard I/O, normalizing `tools/list` payloads at runtime.
+- **Logarithmic Scaling (FAISS):** Replaces flat tensor scans with a FAISS Inner Product index for N-server scalability.
+- **Strict Validation Boundary:** Recursively injects `{"additionalProperties": false}` into dynamically ingested schemas. Intercepts LLM outputs via Regex and enforces compliance via `jsonschema` prior to JSON-RPC dispatch, ensuring zero-hallucination execution.
+- **ReAct State Machine:** Implements a multi-iteration Reason+Act loop. Utilizes "Semantic Anchoring" (Goal + Last Observation) to prevent vector dilution during dense retrieval, enabling cross-server workflow execution (e.g., read from SQLite $\rightarrow$ write to Memory).
 
-* **Zero-Shot Recall@1:** `94.13%`
-* **Zero-Shot Recall@3:** `100.00%`
-* **Average Latency:** `~41.20 ms` (CPU)
-
-## 🗺️ Roadmap: The Agentic Future
-To transform this router into a fully autonomous, community-ready AI Agent framework, the following features are actively on the roadmap:
-
-### 1. Hierarchical Routing (Multi-Server Ontology)
-Currently, the router operates in a flat vector space. To support 50+ different MCP servers such as GitHub, Slack, Notion, and Jira, we will introduce a two-stage routing engine:
-
-* **Layer 1:** Server Selection, for example routing the request to Slack.
-* **Layer 2:** Tool Selection through FAISS retrieval within the selected server corpus.
-
-### 2. The Action Layer (MCP Client Integration)
-The router currently acts as the **Brain**, generating validated JSON. The next step is adding the **Hands**. We will integrate an official MCP Client SDK to securely execute the generated JSON payload against live servers and return the tool output back to the LLM for final synthesis.
-
-### 3. Continuous Ingestion (Self-Healing)
-A pipeline to automatically ingest, minify, embed, and cache new tools the moment a user connects a new MCP server, requiring zero manual dataset generation or fine-tuning.
-
-### 4. Package Distribution
-Abstracting the core `mcp_router.py` logic into a pip-installable package, `pip install neural-mcp-router`, so developers can drop it into any existing LangChain, LlamaIndex, or custom AI agent loop in three lines of code.
-
-## 💻 Quickstart
-1. Clone the repository and install dependencies.
+## Usage & Quickstart
+Install dependencies from the repository root before running either workflow.
 
 ```bash
-git clone https://github.com/DimiChatzipavlis/ToolFinder.git
 cd ToolFinder
 pip install -r requirements.txt
 ```
 
-2. Extract the model weights into `models/best_mcp_router`.
+1. The Zero-Shot Academic Benchmark (`evaluate_zero_shot.py`).
 
 ```bash
-unzip best_mcp_router.zip -d models/
-```
-
-3. Run the zero-shot benchmark.
-
-```bash
+cd ToolFinder
 python evaluate_zero_shot.py
 ```
 
-4. Run the interactive local agent.
+2. The Dynamic Multi-Server ReAct Agent (`verify_discovery.py`).
 
 ```bash
-python local_copilot_chat.py
+cd ToolFinder
+python scalable_router/verify_discovery.py
 ```
