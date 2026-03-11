@@ -171,9 +171,10 @@ class AutonomousMCPAgent:
         scratchpad = Scratchpad(user_query)
         steps: list[ReActStep] = []
         iteration = 1
+        last_thought: str | None = None
 
         while iteration <= self.max_iterations:
-            routing_query = self._build_routing_query(user_query, scratchpad)
+            routing_query = last_thought if last_thought else user_query
             routing_started = time.perf_counter()
             candidates = self.router.route_top_k(routing_query, k=5)
             routing_latency_ms = (time.perf_counter() - routing_started) * 1000.0
@@ -211,18 +212,22 @@ class AutonomousMCPAgent:
 
             try:
                 decision = extract_and_parse_json(raw_model_output)
+                thought = decision.get("thought")
+                if not isinstance(thought, str) or not thought.strip():
+                    raise ValidationError("Model response must include a non-empty thought field.")
+                last_thought = thought.strip()
+
                 status = decision.get("status")
                 if status == "complete":
                     answer = decision.get("answer")
                     if not isinstance(answer, str) or not answer.strip():
                         raise ValidationError("Completion payload must include a non-empty answer.")
 
-                    thought = str(decision.get("thought", "")).strip()
                     scratchpad.add("assistant", {"status": "complete", "answer": answer}, iteration=iteration)
                     steps.append(
                         ReActStep(
                             iteration=iteration,
-                            thought=thought,
+                            thought=last_thought,
                             action="complete",
                             server_name=None,
                             tool_name=None,
@@ -240,9 +245,10 @@ class AutonomousMCPAgent:
                         scratchpad=scratchpad.entries(),
                     )
 
-                if status != "tool_call":
+                action = decision.get("action")
+                if action != "call_tool":
                     raise ValidationError(
-                        "Model response must be either {'status':'tool_call', ...} or {'status':'complete', ...}."
+                        "Model response must be either {'thought': '...', 'action': 'call_tool', ...} or {'thought': '...', 'status': 'complete', ...}."
                     )
 
                 selected_candidate = self._select_candidate(decision, candidates)
@@ -258,15 +264,14 @@ class AutonomousMCPAgent:
                     ensure_ascii=True,
                     sort_keys=True,
                 )
-                thought = str(decision.get("thought", "")).strip()
-
                 scratchpad.add(
                     "assistant",
                     {
-                        "status": "tool_call",
+                        "action": "call_tool",
                         "server_name": selected_candidate.server_name,
                         "tool_name": selected_candidate.tool_name,
                         "arguments": arguments,
+                        "thought": last_thought,
                     },
                     iteration=iteration,
                 )
@@ -283,7 +288,7 @@ class AutonomousMCPAgent:
                 steps.append(
                     ReActStep(
                         iteration=iteration,
-                        thought=thought,
+                        thought=last_thought,
                         action="tool_call",
                         server_name=selected_candidate.server_name,
                         tool_name=selected_candidate.tool_name,
@@ -348,10 +353,6 @@ class AutonomousMCPAgent:
             with contextlib.suppress(Exception):
                 await client.close()
 
-    def _build_routing_query(self, user_query: str, scratchpad: Scratchpad) -> str:
-        last_observation_text = scratchpad.last_observation_text()
-        return f"Original Goal: {user_query}. Recent Observation: {last_observation_text}"
-
     def _serialize_candidates(self, candidates: list[RouteResult]) -> list[JsonDict]:
         return [
             {
@@ -366,12 +367,17 @@ class AutonomousMCPAgent:
 
     def _build_prompt(self, user_query: str, faiss_top_k_schemas: list[JsonDict], scratchpad: Scratchpad) -> str:
         return (
-            f"Goal: {user_query}\n"
-            f"Available Tools: {json.dumps(faiss_top_k_schemas, ensure_ascii=True)}\n"
-            f"History: {scratchpad.render()}\n"
-            "Output strictly a JSON object to call a tool, or return {'status': 'complete', 'answer': '...'}\n"
-            "When calling a tool, return {'status': 'tool_call', 'server_name': '...', 'tool_name': '...', 'arguments': {...}, 'thought': '...'}\n"
-            "Choose only from Available Tools. Use exactly one tool call per iteration."
+            f"OVERARCHING GOAL: {user_query}\n\n"
+            "PREVIOUS ACTIONS AND OBSERVATIONS: \n"
+            f"{scratchpad.render()}\n\n"
+            "CRITICAL INSTRUCTION: Review the Previous Actions. DO NOT repeat a tool call you have already successfully executed. If you have the information you need, formulate your next step to achieve the overarching goal.\n\n"
+            "AVAILABLE TOOLS FOR THIS STEP:\n"
+            f"{json.dumps(faiss_top_k_schemas, ensure_ascii=True)}\n\n"
+            "You MUST respond with a valid JSON object matching EXACTLY one of these two formats:\n"
+            "Format 1 (To take an action):\n"
+            '{"thought": "Explain what you learned from the observations and what you must do next.", "action": "call_tool", "server_name": "<server>", "tool_name": "<tool>", "arguments": {...}}\n\n'
+            "Format 2 (If the overarching goal is completely finished):\n"
+            '{"thought": "Explain why the goal is met.", "status": "complete", "answer": "Final summary to the user."}'
         )
 
     async def _call_ollama_async(self, prompt: str) -> str:
