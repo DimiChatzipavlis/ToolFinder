@@ -121,12 +121,12 @@ class AutonomousMCPAgent:
         model_name: str = "sentence-transformers/all-mpnet-base-v2",
         ollama_model: str = "llama3.2",
         ollama_url: str = "http://127.0.0.1:11434/api/generate",
-        max_iterations: int = 7,
+        max_iterations: int = 15,
     ) -> None:
         self.router = UniversalMCPRouter(model_name=model_name)
         self.ollama_model = ollama_model
         self.ollama_url = ollama_url
-        self.max_iterations = min(max_iterations, 7)
+        self.max_iterations = max(15, max_iterations)
         self.clients: dict[str, DynamicMCPClient] = {}
         self._owned_clients: list[DynamicMCPClient] = []
 
@@ -172,6 +172,7 @@ class AutonomousMCPAgent:
         steps: list[ReActStep] = []
         iteration = 1
         last_thought: str | None = None
+        executed_actions: set[str] = set()
 
         while iteration <= self.max_iterations:
             routing_query = last_thought if last_thought else user_query
@@ -186,7 +187,15 @@ class AutonomousMCPAgent:
                 json.dumps(available_tools, ensure_ascii=True, sort_keys=True),
             )
 
-            prompt = self._build_prompt(user_query, available_tools, scratchpad)
+            history_entries = scratchpad.entries()
+            # Keep only the latest turns to cap context growth per iteration.
+            recent_history = history_entries[-4:] if len(history_entries) > 4 else history_entries
+            history_text = "\n".join(
+                f"{msg.get('role', 'unknown')}: "
+                f"{json.dumps(msg.get('content'), ensure_ascii=True, sort_keys=True) if isinstance(msg.get('content'), (dict, list)) else msg.get('content')}"
+                for msg in recent_history
+            )
+            prompt = self._build_prompt(user_query, available_tools, history_text)
             try:
                 raw_model_output = await self._call_ollama_async(prompt)
             except (TimeoutError, urllib.error.URLError, socket.timeout) as exc:
@@ -212,14 +221,15 @@ class AutonomousMCPAgent:
 
             try:
                 decision = extract_and_parse_json(raw_model_output)
-                thought = decision.get("thought")
+                parsed_json = decision
+                thought = parsed_json.get("thought")
                 if not isinstance(thought, str) or not thought.strip():
                     raise ValidationError("Model response must include a non-empty thought field.")
                 last_thought = thought.strip()
 
-                status = decision.get("status")
+                status = parsed_json.get("status")
                 if status == "complete":
-                    answer = decision.get("answer")
+                    answer = parsed_json.get("answer")
                     if not isinstance(answer, str) or not answer.strip():
                         raise ValidationError("Completion payload must include a non-empty answer.")
 
@@ -245,25 +255,48 @@ class AutonomousMCPAgent:
                         scratchpad=scratchpad.entries(),
                     )
 
-                action = decision.get("action")
+                action = parsed_json.get("action")
                 if action != "call_tool":
                     raise ValidationError(
                         "Model response must be either {'thought': '...', 'action': 'call_tool', ...} or {'thought': '...', 'status': 'complete', ...}."
                     )
 
-                selected_candidate = self._select_candidate(decision, candidates)
-                arguments = decision.get("arguments")
+                selected_candidate = self._select_candidate(parsed_json, candidates)
+                arguments = parsed_json.get("arguments")
                 if not isinstance(arguments, dict):
                     raise ValidationError("Tool call payload must include an object 'arguments' field.")
 
+                action_signature = (
+                    f"{parsed_json.get('server_name')}:"
+                    f"{parsed_json.get('tool_name')}:"
+                    f"{str(parsed_json.get('arguments'))}"
+                )
+                if action_signature in executed_actions:
+                    scratchpad.add(
+                        "system",
+                        (
+                            f"Observation: ERROR. You already executed {action_signature}. "
+                            "DO NOT REPEAT IT. Look at the data and move to the next logical step."
+                        ),
+                        iteration=iteration,
+                    )
+                    iteration += 1
+                    continue
+                executed_actions.add(action_signature)
+
                 validate(instance=arguments, schema=selected_candidate.schema.get("inputSchema", {}))
 
-                tool_result = await self._execute_tool(selected_candidate, arguments)
-                observation_text = extract_text_from_tool_result(tool_result) or json.dumps(
-                    tool_result,
+                execution_result = await self._execute_tool(selected_candidate, arguments)
+                observation_text = extract_text_from_tool_result(execution_result) or json.dumps(
+                    execution_result,
                     ensure_ascii=True,
                     sort_keys=True,
                 )
+                raw_result = str(execution_result)
+                if len(raw_result) > 800:
+                    safe_result = raw_result[:800] + "\n...[TRUNCATED TO PROTECT VRAM]"
+                else:
+                    safe_result = raw_result
                 scratchpad.add(
                     "assistant",
                     {
@@ -275,16 +308,7 @@ class AutonomousMCPAgent:
                     },
                     iteration=iteration,
                 )
-                scratchpad.add(
-                    "observation",
-                    {
-                        "server_name": selected_candidate.server_name,
-                        "tool_name": selected_candidate.tool_name,
-                        "text": observation_text,
-                        "raw": tool_result,
-                    },
-                    iteration=iteration,
-                )
+                scratchpad.add("system", f"Observation: {safe_result}", iteration=iteration)
                 steps.append(
                     ReActStep(
                         iteration=iteration,
@@ -365,19 +389,20 @@ class AutonomousMCPAgent:
             for candidate in candidates
         ]
 
-    def _build_prompt(self, user_query: str, faiss_top_k_schemas: list[JsonDict], scratchpad: Scratchpad) -> str:
+    def _build_prompt(self, user_query: str, faiss_top_k: list[JsonDict], history_text: str) -> str:
         return (
-            f"OVERARCHING GOAL: {user_query}\n\n"
-            "PREVIOUS ACTIONS AND OBSERVATIONS: \n"
-            f"{scratchpad.render()}\n\n"
-            "CRITICAL INSTRUCTION: Review the Previous Actions. DO NOT repeat a tool call you have already successfully executed. If you have the information you need, formulate your next step to achieve the overarching goal.\n\n"
-            "AVAILABLE TOOLS FOR THIS STEP:\n"
-            f"{json.dumps(faiss_top_k_schemas, ensure_ascii=True)}\n\n"
-            "You MUST respond with a valid JSON object matching EXACTLY one of these two formats:\n"
-            "Format 1 (To take an action):\n"
-            '{"thought": "Explain what you learned from the observations and what you must do next.", "action": "call_tool", "server_name": "<server>", "tool_name": "<tool>", "arguments": {...}}\n\n'
-            "Format 2 (If the overarching goal is completely finished):\n"
-            '{"thought": "Explain why the goal is met.", "status": "complete", "answer": "Final summary to the user."}'
+            f"GOAL: {user_query}\n\n"
+            "RECENT HISTORY:\n"
+            f"{history_text}\n\n"
+            "AVAILABLE TOOLS:\n"
+            f"{json.dumps(faiss_top_k, ensure_ascii=True)}\n\n"
+            "INSTRUCTIONS:\n"
+            "You are an autonomous agent. You must output EXACTLY ONE valid JSON object and nothing else. Do not use markdown formatting.\n\n"
+            "EXAMPLE VALID OUTPUT (To take an action):\n"
+            "{\"thought\": \"I need to fetch the data first.\", \"action\": \"call_tool\", \"server_name\": \"fetch\", \"tool_name\": \"fetch_json\", \"arguments\": {\"url\": \"https://example.com/data.json\"}}\n\n"
+            "EXAMPLE VALID OUTPUT (To finish the goal):\n"
+            "{\"thought\": \"I have inserted the data and created the note.\", \"status\": \"complete\", \"answer\": \"The pipeline is finished.\"}\n\n"
+            "YOUR TURN. Output only JSON:"
         )
 
     async def _call_ollama_async(self, prompt: str) -> str:
@@ -392,21 +417,32 @@ class AutonomousMCPAgent:
                 "temperature": 0,
             },
         }
+        prompt_bytes = json.dumps(payload).encode("utf-8")
         request = urllib.request.Request(
             self.ollama_url,
-            data=json.dumps(payload).encode("utf-8"),
+            data=prompt_bytes,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
 
+        print(f"\n[SYSTEM] Sending prompt to local Ollama (Context Size: {len(prompt_bytes)} bytes)...")
+        start_time = time.time()
         try:
-            with urllib.request.urlopen(request, timeout=45) as response:
+            with urllib.request.urlopen(request, timeout=300) as response:
                 raw_response = response.read().decode("utf-8")
+            elapsed = time.time() - start_time
+            print(f"[SYSTEM] Ollama responded in {elapsed:.2f} seconds.")
         except TimeoutError:
+            elapsed = time.time() - start_time
+            print(f"[SYSTEM] Ollama request failed after {elapsed:.2f} seconds.")
             raise
         except socket.timeout as exc:
+            elapsed = time.time() - start_time
+            print(f"[SYSTEM] Ollama request failed after {elapsed:.2f} seconds.")
             raise TimeoutError("Ollama request timed out.") from exc
         except urllib.error.URLError:
+            elapsed = time.time() - start_time
+            print(f"[SYSTEM] Ollama request failed after {elapsed:.2f} seconds.")
             raise
 
         parsed_response = json.loads(raw_response)
