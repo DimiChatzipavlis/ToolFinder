@@ -13,3 +13,9 @@ env/
 .idea/
 examples/langgraph_integration/sandbox/hello.txt
 examples/langgraph_integration/sandbox/hello_baseline.txt
+
+# Sandbox and Execution Ephemera
+examples/langgraph_integration/sandbox/*
+!examples/langgraph_integration/sandbox/.gitkeep
+*.log
+eval_toolfinder_output*.txt

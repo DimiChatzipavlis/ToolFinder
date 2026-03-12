@@ -35,12 +35,57 @@ class UniversalMCPRouter:
         self.model = SentenceTransformer(self.model_name, device=self.device)
         embedding_dim = int(self.model.get_sentence_embedding_dimension())
 
-        self.faiss_index = faiss.IndexFlatIP(embedding_dim)
+        self._embedding_dim = embedding_dim
+        self.faiss_index = faiss.IndexFlatIP(self._embedding_dim)
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
+        self._staged_tools: list[tuple[str, ToolSchema]] = []
+        self._compat_mode = False
 
     @staticmethod
     def canonicalize_schema(schema: ToolSchema) -> str:
         return json.dumps(schema, sort_keys=True, separators=(",", ":"))
+
+    def add_tool(self, tool: ToolSchema, server_name: str = "external") -> None:
+        resolved_server_name = str(tool.get("server_name", server_name))
+        tool_name = str(tool.get("tool_name") or tool.get("name") or "")
+        if not tool_name:
+            raise ValueError("tool must include tool_name or name")
+
+        strict_schema = self._inject_additional_properties_false(
+            copy.deepcopy(tool.get("inputSchema") or tool.get("parameters") or {})
+        )
+        normalized_tool = {
+            "tool_name": tool_name,
+            "description": str(tool.get("description", "")),
+            "inputSchema": strict_schema,
+        }
+        self._staged_tools.append((resolved_server_name, normalized_tool))
+
+    def build_index(self) -> int:
+        if not self._staged_tools:
+            return 0
+
+        self.faiss_index = faiss.IndexFlatIP(self._embedding_dim)
+        self.metadata.clear()
+
+        grouped_tools: dict[str, list[ToolSchema]] = {}
+        for default_server_name, raw_tool in self._staged_tools:
+            resolved_server_name = str(raw_tool.get("server_name", default_server_name))
+            normalized_tool = {
+                "tool_name": str(raw_tool["tool_name"]),
+                "description": str(raw_tool.get("description", "")),
+                "inputSchema": self._inject_additional_properties_false(
+                    copy.deepcopy(raw_tool.get("inputSchema", {}))
+                ),
+            }
+            grouped_tools.setdefault(resolved_server_name, []).append(normalized_tool)
+
+        ingested_count = 0
+        for grouped_server_name, grouped_list in grouped_tools.items():
+            ingested_count += self.ingest_server(grouped_server_name, grouped_list)
+
+        self._compat_mode = True
+        return ingested_count
 
     def ingest_server(self, server_name: str, tools_list: list[ToolSchema]) -> int:
         if not tools_list:
@@ -78,7 +123,7 @@ class UniversalMCPRouter:
 
         return len(normalized_tools)
 
-    def route_top_k(self, query: str, k: int = 3) -> list[RouteResult]:
+    def route_top_k(self, query: str, k: int = 3) -> list[RouteResult] | list[dict[str, Any]]:
         if k < 1:
             raise ValueError("k must be at least 1")
         if self.faiss_index.ntotal == 0:
@@ -108,10 +153,39 @@ class UniversalMCPRouter:
                     score=float(score),
                 )
             )
+        if self._compat_mode:
+            return [self._format_bindable_tool_schema(match) for match in matches]
         return matches
 
-    def route(self, query: str) -> RouteResult:
+    def route(self, query: str) -> RouteResult | dict[str, Any]:
         return self.route_top_k(query, k=1)[0]
+
+    @staticmethod
+    def _format_bindable_tool_schema(result: RouteResult) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": result.tool_name,
+                "description": result.schema.get("description", ""),
+                "parameters": copy.deepcopy(result.schema.get("inputSchema", {})),
+            },
+        }
+
+    def _inject_additional_properties_false(self, node: Any) -> Any:
+        if isinstance(node, dict):
+            normalized_node: dict[str, Any] = {}
+            for key, value in node.items():
+                normalized_node[key] = self._inject_additional_properties_false(value)
+
+            if normalized_node.get("type") == "object":
+                normalized_node["additionalProperties"] = False
+
+            return normalized_node
+
+        if isinstance(node, list):
+            return [self._inject_additional_properties_false(item) for item in node]
+
+        return node
 
     def _minify_schema_for_embedding(self, schema: ToolSchema) -> str:
         minified = {

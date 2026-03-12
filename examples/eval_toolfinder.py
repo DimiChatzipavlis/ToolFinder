@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import sys
 import time
@@ -57,6 +58,24 @@ PREFERRED_TOOL_NAME = {
     "write_file": "write_file",
     "list_directory": "list_directory",
 }
+
+
+def setup_sandbox() -> None:
+    """Bootstraps the test environment."""
+    os.makedirs(SANDBOX_DIR, exist_ok=True)
+    input_path = os.path.join(SANDBOX_DIR, "input.txt")
+    with open(input_path, "w", encoding="utf-8") as file_handle:
+        file_handle.write("The scalable router is working perfectly.")
+    print("[SYSTEM] Sandbox bootstrapped with input.txt")
+
+
+def teardown_sandbox() -> None:
+    """Cleans up the test environment to prevent git contamination."""
+    for filename in ["input.txt", "output.txt"]:
+        filepath = os.path.join(SANDBOX_DIR, filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    print("[SYSTEM] Sandbox cleaned up.")
 
 
 def schema_type_to_annotation(schema: dict[str, Any]) -> Any:
@@ -522,68 +541,79 @@ async def run_benchmark() -> None:
     print(f"Tasks: {len(TEST_SUITE)}")
     print("==================================================")
 
-    print("[SYSTEM] Booting Filesystem MCP Server...")
-    client = DynamicMCPClient(
-        server_name="filesystem",
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-filesystem", str(SANDBOX_DIR)],
-        cwd=str(REPO_ROOT),
-        startup_timeout_s=90.0,
-        request_timeout_s=45.0,
-    )
-    all_tools = await client.initialize_and_get_tools()
+    setup_sandbox()
 
-    print("[SYSTEM] Indexing tools in ToolFinder (FAISS)...")
-    router = UniversalMCPRouter(model_name="sentence-transformers/all-mpnet-base-v2")
-    router.ingest_server(client.server_name, all_tools)
-
-    all_langchain_tools = [build_langchain_tool(tool_schema, client) for tool_schema in all_tools]
-    llm = ChatOllama(model=MODEL_NAME, temperature=0)
-
-    def bind_naive(query: str) -> tuple[list[BaseTool], int]:
-        del query
-        context_size = len(json.dumps(all_tools, ensure_ascii=True, sort_keys=True))
-        return all_langchain_tools, context_size
-
-    def bind_toolfinder(query: str) -> tuple[list[BaseTool], int]:
-        route_start = time.time()
-        top_k = router.route_top_k(query, k=2)
-        route_time = time.time() - route_start
-        print(f"[ROUTER] FAISS Search completed in {route_time * 1000:.2f} ms")
-        top_k_payload = [route_result_to_schema(result) for result in top_k]
-        context_size = len(json.dumps(top_k_payload, ensure_ascii=True, sort_keys=True))
-        tools = [build_langchain_tool(schema, client) for schema in top_k_payload]
-        return tools, context_size
-
-    naive_results: list[dict[str, Any]] = []
-    tf_results: list[dict[str, Any]] = []
-
-    reset_sandbox()
-    for test_case in TEST_SUITE:
-        naive_results.append(
-            await measure_execution("Naive (Context Stuffing)", bind_naive, llm, test_case)
+    client: DynamicMCPClient | None = None
+    try:
+        print("[SYSTEM] Booting Filesystem MCP Server...")
+        client = DynamicMCPClient(
+            server_name="filesystem",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", str(SANDBOX_DIR)],
+            cwd=str(REPO_ROOT),
+            startup_timeout_s=90.0,
+            request_timeout_s=45.0,
         )
+        all_tools = await client.initialize_and_get_tools()
 
-    reset_sandbox()
-    for test_case in TEST_SUITE:
-        tf_results.append(
-            await measure_execution("ToolFinder (Semantic Routing)", bind_toolfinder, llm, test_case)
-        )
+        print("[SYSTEM] Indexing tools in ToolFinder (FAISS)...")
+        router = UniversalMCPRouter(model_name="sentence-transformers/all-mpnet-base-v2")
+        router.ingest_server(client.server_name, all_tools)
 
-    naive_metrics = summarize_results("Naive (Context Stuffing)", naive_results)
-    tf_metrics = summarize_results("ToolFinder (Semantic Routing)", tf_results)
-    detail_table = make_task_detail_table(naive_results, tf_results)
-    cli_table = make_cli_table(naive_metrics, tf_metrics)
-    markdown_table = make_markdown_table(naive_metrics, tf_metrics)
-    update_readme(build_readme_block(markdown_table, naive_results, tf_results))
+        all_langchain_tools = [build_langchain_tool(tool_schema, client) for tool_schema in all_tools]
+        llm = ChatOllama(model=MODEL_NAME, temperature=0)
 
-    print(f"\n{detail_table}")
-    print(f"\n{cli_table}")
-    print("\nMarkdown Table:\n")
-    print(markdown_table)
-    print(f"\n[README] Updated benchmark block in {README_PATH}")
+        def bind_naive(query: str) -> tuple[list[BaseTool], int]:
+            del query
+            context_size = len(json.dumps(all_tools, ensure_ascii=True, sort_keys=True))
+            return all_langchain_tools, context_size
 
-    await client.close()
+        def bind_toolfinder(query: str) -> tuple[list[BaseTool], int]:
+            route_start = time.time()
+            top_k = router.route_top_k(query, k=2)
+            route_time = time.time() - route_start
+            print(f"[ROUTER] FAISS Search completed in {route_time * 1000:.2f} ms")
+            top_k_payload = [route_result_to_schema(result) for result in top_k]
+            context_size = len(json.dumps(top_k_payload, ensure_ascii=True, sort_keys=True))
+            tools = [build_langchain_tool(schema, client) for schema in top_k_payload]
+            return tools, context_size
+
+        naive_results: list[dict[str, Any]] = []
+        tf_results: list[dict[str, Any]] = []
+
+        reset_sandbox()
+        for test_case in TEST_SUITE:
+            naive_results.append(
+                await measure_execution("Naive (Context Stuffing)", bind_naive, llm, test_case)
+            )
+
+        reset_sandbox()
+        for test_case in TEST_SUITE:
+            tf_results.append(
+                await measure_execution(
+                    "ToolFinder (Semantic Routing)",
+                    bind_toolfinder,
+                    llm,
+                    test_case,
+                )
+            )
+
+        naive_metrics = summarize_results("Naive (Context Stuffing)", naive_results)
+        tf_metrics = summarize_results("ToolFinder (Semantic Routing)", tf_results)
+        detail_table = make_task_detail_table(naive_results, tf_results)
+        cli_table = make_cli_table(naive_metrics, tf_metrics)
+        markdown_table = make_markdown_table(naive_metrics, tf_metrics)
+        update_readme(build_readme_block(markdown_table, naive_results, tf_results))
+
+        print(f"\n{detail_table}")
+        print(f"\n{cli_table}")
+        print("\nMarkdown Table:\n")
+        print(markdown_table)
+        print(f"\n[README] Updated benchmark block in {README_PATH}")
+    finally:
+        if client is not None:
+            await client.close()
+        teardown_sandbox()
 
 
 if __name__ == "__main__":
