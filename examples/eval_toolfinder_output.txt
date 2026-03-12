@@ -1,0 +1,49 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+==================================================
+TOOLFINDER vs. NAIVE SLM BENCHMARK
+Task: Read the contents of 'input.txt', summarize it, and write the summary to a new file named 'output.txt'.
+==================================================
+[SYSTEM] Booting Filesystem MCP Server...
+[SYSTEM] Indexing tools in ToolFinder (FAISS)...
+
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]
+Loading weights:  24%|##4       | 48/199 [00:00<00:00, 475.46it/s]
+Loading weights: 100%|##########| 199/199 [00:00<00:00, 1781.65it/s]
+MPNetModel LOAD REPORT from: sentence-transformers/all-mpnet-base-v2
+Key                     | Status     |  | 
+------------------------+------------+--+-
+embeddings.position_ids | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+
+--- [STARTING RUN: Naive (Context Stuffing)] ---
+[SYSTEM] Prompting llama3.2 with 14 tools (Context size: 9106 chars)...
+
+--- [STARTING RUN: ToolFinder (Semantic Routing)] ---
+[ROUTER] FAISS Search completed in 101.00 ms
+[SYSTEM] Prompting llama3.2 with 2 tools (Context size: 1831 chars)...
+
+==================================================
+FINAL BENCHMARK TELEMETRY REPORT
+==================================================
+Metric                    | Naive Baseline       | ToolFinder Enabled  
+--------------------------------------------------------------------------
+Tools In Context          | 14                   | 2                   
+Context Payload (Chars)   | 9106                 | 1831                
+Total Latency (s)         | 84.3                 | 13.44               
+Inference Latency (s)     | 84.26                | 13.33               
+Successful Tool Call      | True                 | True                
+Action Attempted          | read_text_file       | read_text_file      
+==================================================
+
+Markdown Table:
+
+| Metric | Naive Baseline | ToolFinder Enabled |
+| --- | --- | --- |
+| Tools In Context | 14 | 2 |
+| Context Payload (Chars) | 9106 | 1831 |
+| Total Latency (s) | 84.3 | 13.44 |
+| Inference Latency (s) | 84.26 | 13.33 |
+| Successful Tool Call | True | True |
+| Action Attempted | read_text_file | read_text_file |
