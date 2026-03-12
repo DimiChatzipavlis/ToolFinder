@@ -20,6 +20,28 @@ In practical MCP environments, this means a simple task like listing a directory
 
 The repository includes a direct LangGraph comparison between two agents that solve the same filesystem task inside a sandboxed MCP filesystem server.
 
+### Auto-Generated Evaluation Snapshot
+
+<!-- EVAL_TABLE_START -->
+_Last auto-updated: 2026-03-12 18:42:11_
+
+| Metric | Naive Baseline | ToolFinder Enabled |
+| --- | --- | --- |
+| Tasks Run | 3 | 3 |
+| Average Tools In Context | 14 | 2 |
+| Average Context Payload (Chars) | 9106 | 1450 |
+| Average Total Latency (s) | 26.72 | 14.28 |
+| Average Inference Latency (s) | 26.64 | 14.19 |
+| Successful Tool Calls | 3/3 | 2/3 |
+| Expected Tool Matches | 3/3 | 2/3 |
+| State Verified | 3/3 | 2/3 |
+
+Task outcomes:
+- T1_READ: naive=`read_text_file` verified=`True`, toolfinder=`read_text_file` verified=`True`
+- T2_WRITE: naive=`write_file` verified=`True`, toolfinder=`None (Hallucination/Text)` verified=`False`
+- T3_LIST: naive=`list_directory` verified=`True`, toolfinder=`list_directory` verified=`True`
+<!-- EVAL_TABLE_END -->
+
 Task:
 
 `List the files in the sandbox directory. Then write a new file.`
