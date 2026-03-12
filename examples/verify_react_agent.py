@@ -5,15 +5,17 @@ import asyncio
 import contextlib
 import json
 import sqlite3
+import sys
 import tempfile
 from pathlib import Path
 
-if __package__ in {None, ""}:
-    from autonomous_agent import AutonomousMCPAgent, extract_text_from_tool_result
-    from mcp_adapter import DynamicMCPClient, ServerProcessConfig
-else:
-    from .autonomous_agent import AutonomousMCPAgent, extract_text_from_tool_result
-    from .mcp_adapter import DynamicMCPClient, ServerProcessConfig
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from toolfinder import AutonomousMCPAgent  # noqa: E402
+from toolfinder.autonomous_agent import extract_text_from_tool_result  # noqa: E402
+from toolfinder.mcp_adapter import DynamicMCPClient, ServerProcessConfig  # noqa: E402
 
 
 def seed_sqlite_database(db_path: Path) -> None:

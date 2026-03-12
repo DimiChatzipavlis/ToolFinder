@@ -9,8 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from scalable_router import AutonomousMCPAgent, DynamicMCPClient
-from scalable_router.mcp_adapter import MCPClientError, ServerProcessConfig
+from toolfinder import AutonomousMCPAgent, DynamicMCPClient
+from toolfinder.mcp_adapter import MCPClientError, ServerProcessConfig
 
 
 GOAL = "Fetch the JSON from 'https://raw.githubusercontent.com/modelcontextprotocol/specification/main/package.json'. Create a table in sqlite named 'metadata' with a 'description' text column. Insert the description found in the fetched JSON into the table. Finally, create a memory note stating the metadata extraction is complete."

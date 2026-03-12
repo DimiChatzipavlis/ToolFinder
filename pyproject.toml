@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toolfinder-mcp"
+version = "0.1.0"
+description = "A Neural Semantic Router and Execution Middleware for the Model Context Protocol (MCP)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Your Name", email = "your.email@example.com"}]
+dependencies = [
+    "faiss-cpu>=1.7.0",
+    "sentence-transformers>=2.2.0",
+    "jsonschema>=4.0.0",
+    "httpx>=0.25.0",
+    "pydantic>=2.0.0"
+]
+
+[project.optional-dependencies]
+langgraph = ["langchain", "langgraph", "langchain-ollama"]
+
+[tool.setuptools.packages.find]
+include = ["toolfinder*"]

@@ -17,12 +17,12 @@ from langgraph.prebuilt import ToolNode
 from pydantic import Field, create_model
 
 INTEGRATION_DIR = Path(__file__).resolve().parent
-TOOLFINDER_DIR = Path(__file__).resolve().parents[1]
-if str(TOOLFINDER_DIR) not in sys.path:
-    sys.path.insert(0, str(TOOLFINDER_DIR))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-from scalable_router import DynamicMCPClient, UniversalMCPRouter  # noqa: E402
-from scalable_router.mcp_adapter import MCPClientError  # noqa: E402
+from toolfinder import DynamicMCPClient, UniversalMCPRouter  # noqa: E402
+from toolfinder.mcp_adapter import MCPClientError  # noqa: E402
 
 
 USER_QUERY = (
@@ -171,8 +171,8 @@ def normalize_sandbox_path(path_value: str) -> str:
     sandbox_root = (INTEGRATION_DIR / "sandbox").resolve()
     normalized = path_value.replace("\\", "/")
     relative_prefixes = [
-        "./langgraph_integration/sandbox",
-        "langgraph_integration/sandbox",
+        "./examples/langgraph_integration/sandbox",
+        "examples/langgraph_integration/sandbox",
     ]
 
     for prefix in relative_prefixes:
@@ -285,8 +285,8 @@ async def main() -> None:
     client = DynamicMCPClient(
         server_name="filesystem",
         command="npx",
-        args=["-y", "@modelcontextprotocol/server-filesystem", "./langgraph_integration/sandbox"],
-        cwd=str(TOOLFINDER_DIR),
+        args=["-y", "@modelcontextprotocol/server-filesystem", "./examples/langgraph_integration/sandbox"],
+        cwd=str(REPO_ROOT),
         startup_timeout_s=90.0,
         request_timeout_s=45.0,
     )
@@ -416,7 +416,7 @@ async def main() -> None:
                     SystemMessage(
                         content=(
                             "You are operating inside an MCP filesystem sandbox rooted at "
-                            "./langgraph_integration/sandbox. Use only relative paths inside "
+                            "./examples/langgraph_integration/sandbox. Use only relative paths inside "
                             "that sandbox. Use '.' to list the sandbox contents and 'hello.txt' "
                             "to write the file. "
                             "Do not claim success unless a tool result confirms it."

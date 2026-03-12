@@ -11,5 +11,5 @@ env/
 *.log
 .vscode/
 .idea/
-langgraph_integration/sandbox/hello.txt
-langgraph_integration/sandbox/hello_baseline.txt
+examples/langgraph_integration/sandbox/hello.txt
+examples/langgraph_integration/sandbox/hello_baseline.txt

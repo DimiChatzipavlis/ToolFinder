@@ -81,7 +81,7 @@ pip install -r requirements.txt
 ```python
 import asyncio
 
-from scalable_router import AutonomousMCPAgent, DynamicMCPClient
+from toolfinder import AutonomousMCPAgent, DynamicMCPClient
 
 
 async def main() -> None:
@@ -110,14 +110,14 @@ ToolFinder-routed LangGraph benchmark:
 
 ```bash
 cd ToolFinder
-python -u langgraph_integration/benchmark_agent.py
+python -u examples/langgraph_integration/benchmark_agent.py
 ```
 
 Naive all-tools baseline:
 
 ```bash
 cd ToolFinder
-python -u langgraph_integration/baseline_agent.py
+python -u examples/langgraph_integration/baseline_agent.py
 ```
 
 Minimal dynamic-binding pattern:
@@ -126,7 +126,7 @@ Minimal dynamic-binding pattern:
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph
 
-from scalable_router import UniversalMCPRouter
+from toolfinder import UniversalMCPRouter
 
 router = UniversalMCPRouter(model_name="sentence-transformers/all-mpnet-base-v2")
 candidates = router.route_top_k("write a file in the sandbox", k=2)
@@ -139,10 +139,10 @@ graph = StateGraph(State)
 
 ## Repository Highlights
 
-- `scalable_router/`: runtime MCP ingestion, FAISS routing, schema validation, autonomous execution.
-- `langgraph_integration/benchmark_agent.py`: ToolFinder-enabled LangGraph benchmark.
-- `langgraph_integration/baseline_agent.py`: naive control-group benchmark with full tool binding.
-- `prove_scalability.py`: tri-server autonomous execution proof across fetch, sqlite, and memory MCP servers.
+- `toolfinder/`: runtime MCP ingestion, FAISS routing, schema validation, autonomous execution.
+- `examples/langgraph_integration/benchmark_agent.py`: ToolFinder-enabled LangGraph benchmark.
+- `examples/langgraph_integration/baseline_agent.py`: naive control-group benchmark with full tool binding.
+- `examples/prove_scalability.py`: tri-server autonomous execution proof across fetch, sqlite, and memory MCP servers.
 
 ## Engineering Takeaway
 
