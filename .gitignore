@@ -2,6 +2,14 @@ models/
 *.zip
 __pycache__/
 *.pyc
+.pyo
+.pyd
 .env
 .venv/
-.log
+venv/
+env/
+*.log
+.vscode/
+.idea/
+langgraph_integration/sandbox/hello.txt
+langgraph_integration/sandbox/hello_baseline.txt

@@ -103,7 +103,11 @@ class DynamicMCPClient:
             self._started = True
 
         self._tools_cache = await self._list_tools()
-        logger.debug("Initialized MCP server %s with %s tools", self.server_name, len(self._tools_cache))
+        logger.debug(
+            "Initialized MCP server %s with %s tools",
+            self.server_name,
+            len(self._tools_cache),
+        )
         return copy.deepcopy(self._tools_cache)
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -123,7 +127,8 @@ class DynamicMCPClient:
 
         if result.get("isError") is True:
             raise MCPClientError(
-                f"{self.server_name}: tool {tool_name} returned an execution error: {json.dumps(result, ensure_ascii=True)}"
+                f"{self.server_name}: tool {tool_name} returned an execution error: "
+                f"{json.dumps(result, ensure_ascii=True)}"
             )
 
         return result
@@ -151,8 +156,14 @@ class DynamicMCPClient:
         if self.process.stdout is None or self.process.stdin is None or self.process.stderr is None:
             raise MCPClientError(f"{self.server_name}: failed to open stdio pipes")
 
-        self._stdout_task = asyncio.create_task(self._stdout_loop(), name=f"{self.server_name}-stdout")
-        self._stderr_task = asyncio.create_task(self._stderr_loop(), name=f"{self.server_name}-stderr")
+        self._stdout_task = asyncio.create_task(
+            self._stdout_loop(),
+            name=f"{self.server_name}-stdout",
+        )
+        self._stderr_task = asyncio.create_task(
+            self._stderr_loop(),
+            name=f"{self.server_name}-stderr",
+        )
 
     def _build_spawn_command(self) -> list[str]:
         resolved_command = shutil.which(self.command) or self.command
@@ -205,8 +216,16 @@ class DynamicMCPClient:
         if not isinstance(result, dict):
             raise MCPClientError(f"{self.server_name}: initialize response missing result")
 
-        self._server_info = result.get("serverInfo") if isinstance(result.get("serverInfo"), dict) else None
-        self._server_capabilities = result.get("capabilities") if isinstance(result.get("capabilities"), dict) else None
+        self._server_info = (
+            result.get("serverInfo")
+            if isinstance(result.get("serverInfo"), dict)
+            else None
+        )
+        self._server_capabilities = (
+            result.get("capabilities")
+            if isinstance(result.get("capabilities"), dict)
+            else None
+        )
         await self._notify("notifications/initialized")
 
     async def _request(
@@ -243,7 +262,10 @@ class DynamicMCPClient:
         if "error" in response:
             error = response["error"]
             if isinstance(error, dict):
-                raise MCPResponseError(f"{self.server_name}: {error.get('message', 'unknown MCP error')}", error)
+                raise MCPResponseError(
+                    f"{self.server_name}: {error.get('message', 'unknown MCP error')}",
+                    error,
+                )
             raise MCPClientError(f"{self.server_name}: malformed error response for {method}")
 
         return response
@@ -297,7 +319,9 @@ class DynamicMCPClient:
 
             description = raw_tool.get("description")
             input_schema = raw_tool.get("inputSchema")
-            strict_schema = self._inject_additional_properties_false(input_schema if isinstance(input_schema, dict) else {})
+            strict_schema = self._inject_additional_properties_false(
+                input_schema if isinstance(input_schema, dict) else {}
+            )
 
             normalized.append(
                 {
@@ -371,7 +395,8 @@ class DynamicMCPClient:
                 await self.process.wait()
             self._fail_pending_requests(
                 MCPClientError(
-                    f"{self.server_name}: server exited with code {self.process.returncode}; stderr tail: {' | '.join(self.stderr_tail[-10:])}"
+                    f"{self.server_name}: server exited with code {self.process.returncode}; "
+                    f"stderr tail: {' | '.join(self.stderr_tail[-10:])}"
                 )
             )
 

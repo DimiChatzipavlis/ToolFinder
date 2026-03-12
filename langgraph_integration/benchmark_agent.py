@@ -25,7 +25,12 @@ from scalable_router import DynamicMCPClient, UniversalMCPRouter  # noqa: E402
 from scalable_router.mcp_adapter import MCPClientError  # noqa: E402
 
 
-USER_QUERY = "List the files in the sandbox directory. Then write a new file named 'hello.txt' containing the word 'success'."
+USER_QUERY = (
+    "List the files in the sandbox directory. Then write a new file named "
+    "'hello.txt' containing the word 'success'."
+)
+
+ToolLookup = dict[str, str]
 
 
 class GraphState(TypedDict):
@@ -85,7 +90,10 @@ def build_langchain_tool(candidate: Any, client: DynamicMCPClient) -> Structured
         clean_kwargs = {key: value for key, value in kwargs.items() if value is not None}
         return await client.call_tool(candidate.tool_name, clean_kwargs)
 
-    description = candidate.schema.get("description") or f"{candidate.server_name}/{candidate.tool_name}"
+    description = (
+        candidate.schema.get("description")
+        or f"{candidate.server_name}/{candidate.tool_name}"
+    )
     return StructuredTool.from_function(
         coroutine=invoke_tool,
         name=candidate.tool_name,
@@ -146,11 +154,17 @@ def estimate_prompt_payload_chars(messages: list[BaseMessage]) -> int:
     return safe_json_size(serialized_messages)
 
 
-def resolve_tool_name(raw_name: str, active_tools: list[BaseTool]) -> str | None:
+def build_tool_lookup(active_tools: list[BaseTool]) -> ToolLookup:
+    tool_lookup: ToolLookup = {}
     for tool in active_tools:
-        if raw_name == tool.name or raw_name == tool.description:
-            return tool.name
-    return None
+        tool_lookup[tool.name] = tool.name
+        if tool.description:
+            tool_lookup[tool.description] = tool.name
+    return tool_lookup
+
+
+def resolve_tool_name(raw_name: str, tool_lookup: ToolLookup) -> str | None:
+    return tool_lookup.get(raw_name)
 
 
 def normalize_sandbox_path(path_value: str) -> str:
@@ -232,14 +246,18 @@ def extract_json_objects(raw_text: str) -> list[dict[str, Any]]:
     return objects
 
 
-def recover_tool_calls_from_content(content: str, active_tools: list[BaseTool]) -> list[dict[str, Any]]:
+def recover_tool_calls_from_content(
+    content: str,
+    active_tools: list[BaseTool],
+) -> list[dict[str, Any]]:
     recovered_tool_calls: list[dict[str, Any]] = []
+    tool_lookup = build_tool_lookup(active_tools)
     for position, payload in enumerate(extract_json_objects(content), start=1):
         raw_name = payload.get("name") or payload.get("tool_name")
         raw_arguments = payload.get("parameters") or payload.get("arguments") or {}
         if not isinstance(raw_name, str) or not isinstance(raw_arguments, dict):
             continue
-        resolved_name = resolve_tool_name(raw_name, active_tools)
+        resolved_name = resolve_tool_name(raw_name, tool_lookup)
         if resolved_name is None:
             continue
         recovered_tool_calls.append(
@@ -306,7 +324,8 @@ async def main() -> None:
             )
             print(
                 f"[ROUTER] Query='{query}' | Top-2={routed_tool_names} | "
-                f"Context Window Saved={context_saved} chars | FAISS Latency={routing_latency_ms:.2f} ms"
+                f"Context Window Saved={context_saved} chars | "
+                f"FAISS Latency={routing_latency_ms:.2f} ms"
             )
             return {"active_tools": active_tools, "telemetry": telemetry}
 
@@ -317,17 +336,24 @@ async def main() -> None:
             response = await llm.bind_tools(state["active_tools"]).ainvoke(state["messages"])
             llm_latency_ms = (time.perf_counter() - started) * 1000.0
             if not response.tool_calls and isinstance(response.content, str):
-                recovered_tool_calls = recover_tool_calls_from_content(response.content, state["active_tools"])
+                recovered_tool_calls = recover_tool_calls_from_content(
+                    response.content,
+                    state["active_tools"],
+                )
                 if recovered_tool_calls:
                     response = AIMessage(content="", tool_calls=recovered_tool_calls)
-                    print(f"[LLM] Recovered {len(recovered_tool_calls)} tool call(s) from plain JSON output.")
+                    print(
+                        f"[LLM] Recovered {len(recovered_tool_calls)} tool call(s) "
+                        "from plain JSON output."
+                    )
             telemetry = append_telemetry(
                 state["telemetry"],
                 prompt_payload_chars=prompt_chars,
                 llm_latencies_ms=round(llm_latency_ms, 2),
             )
             print(
-                f"[LLM] Prompt Payload={prompt_chars} chars | Inference Latency={llm_latency_ms:.2f} ms"
+                f"[LLM] Prompt Payload={prompt_chars} chars | "
+                f"Inference Latency={llm_latency_ms:.2f} ms"
             )
             return {"messages": [response], "telemetry": telemetry}
 
@@ -340,7 +366,11 @@ async def main() -> None:
                 telemetry = append_telemetry(state["telemetry"], hallucination_events=str(exc))
                 print(f"[TOOLS] Hallucination Event: {exc}")
                 last_ai_message = next(
-                    (message for message in reversed(state["messages"]) if isinstance(message, AIMessage)),
+                    (
+                        message
+                        for message in reversed(state["messages"])
+                        if isinstance(message, AIMessage)
+                    ),
                     None,
                 )
                 tool_call_id = None
@@ -354,7 +384,12 @@ async def main() -> None:
                     }
 
                 return {
-                    "messages": [ToolMessage(content=f"Hallucination Event: {exc}", tool_call_id=tool_call_id)],
+                    "messages": [
+                        ToolMessage(
+                            content=f"Hallucination Event: {exc}",
+                            tool_call_id=tool_call_id,
+                        )
+                    ],
                     "telemetry": telemetry,
                 }
 
@@ -381,8 +416,9 @@ async def main() -> None:
                     SystemMessage(
                         content=(
                             "You are operating inside an MCP filesystem sandbox rooted at "
-                            "./langgraph_integration/sandbox. Use only relative paths inside that sandbox. "
-                            "Use '.' to list the sandbox contents and 'hello.txt' to write the file. "
+                            "./langgraph_integration/sandbox. Use only relative paths inside "
+                            "that sandbox. Use '.' to list the sandbox contents and 'hello.txt' "
+                            "to write the file. "
                             "Do not claim success unless a tool result confirms it."
                         )
                     ),
@@ -399,7 +435,10 @@ async def main() -> None:
             if isinstance(message.content, str):
                 print(f"[{message.type}] {message.content}")
             else:
-                print(f"[{message.type}] {json.dumps(message.content, ensure_ascii=True, default=str)}")
+                print(
+                    f"[{message.type}] "
+                    f"{json.dumps(message.content, ensure_ascii=True, default=str)}"
+                )
 
         telemetry = final_state["telemetry"]
         print("\n=== Telemetry Report ===")

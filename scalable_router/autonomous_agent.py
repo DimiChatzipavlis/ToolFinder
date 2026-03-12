@@ -96,6 +96,12 @@ class Scratchpad:
         return ""
 
 
+def _render_history_content(content: Any) -> str:
+    if isinstance(content, (dict, list)):
+        return json.dumps(content, ensure_ascii=True, sort_keys=True)
+    return str(content)
+
+
 def extract_text_from_tool_result(payload: Any) -> str:
     fragments: list[str] = []
 
@@ -158,7 +164,10 @@ class AutonomousMCPAgent:
 
     async def register_server(self, server_name: str, client: DynamicMCPClient) -> list[JsonDict]:
         if server_name != client.server_name:
-            raise ValueError(f"server name mismatch: registry={server_name}, client={client.server_name}")
+            raise ValueError(
+                f"server name mismatch: registry={server_name}, "
+                f"client={client.server_name}"
+            )
         if server_name in self.clients:
             raise ValueError(f"server already registered: {server_name}")
 
@@ -191,15 +200,17 @@ class AutonomousMCPAgent:
             # Keep only the latest turns to cap context growth per iteration.
             recent_history = history_entries[-4:] if len(history_entries) > 4 else history_entries
             history_text = "\n".join(
-                f"{msg.get('role', 'unknown')}: "
-                f"{json.dumps(msg.get('content'), ensure_ascii=True, sort_keys=True) if isinstance(msg.get('content'), (dict, list)) else msg.get('content')}"
+                f"{msg.get('role', 'unknown')}: {_render_history_content(msg.get('content'))}"
                 for msg in recent_history
             )
             prompt = self._build_prompt(user_query, available_tools, history_text)
             try:
                 raw_model_output = await self._call_ollama_async(prompt)
             except (TimeoutError, urllib.error.URLError, socket.timeout) as exc:
-                timeout_observation = "Observation: The LLM API timed out. Please try your thought again."
+                timeout_observation = (
+                    "Observation: The LLM API timed out. "
+                    "Please try your thought again."
+                )
                 scratchpad.add("system", timeout_observation)
                 steps.append(
                     ReActStep(
@@ -233,7 +244,11 @@ class AutonomousMCPAgent:
                     if not isinstance(answer, str) or not answer.strip():
                         raise ValidationError("Completion payload must include a non-empty answer.")
 
-                    scratchpad.add("assistant", {"status": "complete", "answer": answer}, iteration=iteration)
+                    scratchpad.add(
+                        "assistant",
+                        {"status": "complete", "answer": answer},
+                        iteration=iteration,
+                    )
                     steps.append(
                         ReActStep(
                             iteration=iteration,
@@ -258,18 +273,23 @@ class AutonomousMCPAgent:
                 action = parsed_json.get("action")
                 if action != "call_tool":
                     raise ValidationError(
-                        "Model response must be either {'thought': '...', 'action': 'call_tool', ...} or {'thought': '...', 'status': 'complete', ...}."
+                        "Model response must be either {'thought': '...', 'action': "
+                        "'call_tool', ...} or {'thought': '...', 'status': 'complete', ...}."
                     )
 
                 selected_candidate = self._select_candidate(parsed_json, candidates)
                 arguments = parsed_json.get("arguments")
                 if not isinstance(arguments, dict):
-                    raise ValidationError("Tool call payload must include an object 'arguments' field.")
+                    raise ValidationError(
+                        "Tool call payload must include an object 'arguments' field."
+                    )
 
-                action_signature = (
-                    f"{parsed_json.get('server_name')}:"
-                    f"{parsed_json.get('tool_name')}:"
-                    f"{str(parsed_json.get('arguments'))}"
+                action_signature = ":".join(
+                    (
+                        str(parsed_json.get("server_name")),
+                        str(parsed_json.get("tool_name")),
+                        str(parsed_json.get("arguments")),
+                    )
                 )
                 if action_signature in executed_actions:
                     scratchpad.add(
@@ -284,7 +304,10 @@ class AutonomousMCPAgent:
                     continue
                 executed_actions.add(action_signature)
 
-                validate(instance=arguments, schema=selected_candidate.schema.get("inputSchema", {}))
+                validate(
+                    instance=arguments,
+                    schema=selected_candidate.schema.get("inputSchema", {}),
+                )
 
                 execution_result = await self._execute_tool(selected_candidate, arguments)
                 observation_text = extract_text_from_tool_result(execution_result) or json.dumps(
@@ -397,11 +420,16 @@ class AutonomousMCPAgent:
             "AVAILABLE TOOLS:\n"
             f"{json.dumps(faiss_top_k, ensure_ascii=True)}\n\n"
             "INSTRUCTIONS:\n"
-            "You are an autonomous agent. You must output EXACTLY ONE valid JSON object and nothing else. Do not use markdown formatting.\n\n"
+            "You are an autonomous agent. You must output EXACTLY ONE valid JSON object "
+            "and nothing else. Do not use markdown formatting.\n\n"
             "EXAMPLE VALID OUTPUT (To take an action):\n"
-            "{\"thought\": \"I need to fetch the data first.\", \"action\": \"call_tool\", \"server_name\": \"fetch\", \"tool_name\": \"fetch_json\", \"arguments\": {\"url\": \"https://example.com/data.json\"}}\n\n"
+            "{\"thought\": \"I need to fetch the data first.\", \"action\": "
+            "\"call_tool\", \"server_name\": \"fetch\", \"tool_name\": "
+            "\"fetch_json\", \"arguments\": {\"url\": "
+            "\"https://example.com/data.json\"}}\n\n"
             "EXAMPLE VALID OUTPUT (To finish the goal):\n"
-            "{\"thought\": \"I have inserted the data and created the note.\", \"status\": \"complete\", \"answer\": \"The pipeline is finished.\"}\n\n"
+            "{\"thought\": \"I have inserted the data and created the note.\", "
+            "\"status\": \"complete\", \"answer\": \"The pipeline is finished.\"}\n\n"
             "YOUR TURN. Output only JSON:"
         )
 
@@ -425,7 +453,10 @@ class AutonomousMCPAgent:
             method="POST",
         )
 
-        print(f"\n[SYSTEM] Sending prompt to local Ollama (Context Size: {len(prompt_bytes)} bytes)...")
+        print(
+            f"\n[SYSTEM] Sending prompt to local Ollama "
+            f"(Context Size: {len(prompt_bytes)} bytes)..."
+        )
         start_time = time.time()
         try:
             with urllib.request.urlopen(request, timeout=300) as response:
@@ -455,7 +486,9 @@ class AutonomousMCPAgent:
         server_name = decision.get("server_name")
         tool_name = decision.get("tool_name")
         if not isinstance(server_name, str) or not isinstance(tool_name, str):
-            raise ValidationError("Tool call payload must include string server_name and tool_name fields.")
+            raise ValidationError(
+                "Tool call payload must include string server_name and tool_name fields."
+            )
 
         for candidate in candidates:
             if candidate.server_name == server_name and candidate.tool_name == tool_name:

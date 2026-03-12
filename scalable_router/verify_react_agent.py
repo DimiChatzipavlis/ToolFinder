@@ -51,7 +51,8 @@ def collect_database_summary(db_path: Path) -> tuple[list[str], list[str]]:
     try:
         cursor = connection.cursor()
         table_rows = cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name NOT LIKE 'sqlite_%' ORDER BY name"
         ).fetchall()
         table_names = [str(row[0]) for row in table_rows]
 
@@ -129,12 +130,17 @@ async def run_verification(model_name: str, ollama_model: str) -> None:
         memory_client = await connect_client(memory_config)
         sqlite_client = await connect_sqlite_client(sqlite_path)
 
-        async with AutonomousMCPAgent(model_name=model_name, ollama_model=ollama_model, max_iterations=8) as agent:
+        async with AutonomousMCPAgent(
+            model_name=model_name,
+            ollama_model=ollama_model,
+            max_iterations=8,
+        ) as agent:
             await agent.register_server("memory", memory_client)
             await agent.register_server("sqlite", sqlite_client)
 
             result = await agent.execute_task(
-                "List all tables in the sqlite database. If there is a table, read its contents. Then, create a memory note summarizing what you found."
+                "List all tables in the sqlite database. If there is a table, read its "
+                "contents. Then, create a memory note summarizing what you found."
             )
 
             print("=== ReAct Trace ===")
@@ -144,7 +150,8 @@ async def run_verification(model_name: str, ollama_model: str) -> None:
                 if step.action == "tool_call":
                     print(
                         "Tool Call: "
-                        f"{step.server_name}/{step.tool_name} {json.dumps(step.arguments or {}, ensure_ascii=True, sort_keys=True)}"
+                        f"{step.server_name}/{step.tool_name} "
+                        f"{json.dumps(step.arguments or {}, ensure_ascii=True, sort_keys=True)}"
                     )
                 else:
                     print("Tool Call: none")
@@ -156,18 +163,25 @@ async def run_verification(model_name: str, ollama_model: str) -> None:
 
             memory_graph = await memory_client.call_tool("read_graph", {})
             memory_text = extract_text_from_tool_result(memory_graph)
-            missing_tables = [table_name for table_name in expected_tables if table_name not in memory_text]
+            missing_tables = [
+                table_name for table_name in expected_tables if table_name not in memory_text
+            ]
             if missing_tables:
                 raise AssertionError(
                     "Expected memory note to mention discovered tables. "
                     f"Missing tables={missing_tables}, memory_text={memory_text}"
                 )
 
-            representative_fragments = [fragment for fragment in expected_fragments if fragment and not fragment.isdigit()]
+            representative_fragments = [
+                fragment
+                for fragment in expected_fragments
+                if fragment and not fragment.isdigit()
+            ]
             if representative_fragments:
                 if not any(fragment in memory_text for fragment in representative_fragments):
                     raise AssertionError(
-                        "Expected memory note to mention at least one value from the discovered table contents. "
+                        "Expected memory note to mention at least one value from the "
+                        "discovered table contents. "
                         f"Candidates={representative_fragments}, memory_text={memory_text}"
                     )
     finally:
@@ -182,7 +196,9 @@ async def run_verification(model_name: str, ollama_model: str) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Verify the multi-server ReAct autonomous MCP agent.")
+    parser = argparse.ArgumentParser(
+        description="Verify the multi-server ReAct autonomous MCP agent."
+    )
     parser.add_argument(
         "--model-name",
         default="sentence-transformers/all-mpnet-base-v2",

@@ -90,7 +90,10 @@ class UniversalMCPRouter:
         query_embedding = np.asarray(query_embedding, dtype=np.float32)
         faiss.normalize_L2(query_embedding)
 
-        scores, indices = self.faiss_index.search(query_embedding, k=min(k, int(self.faiss_index.ntotal)))
+        scores, indices = self.faiss_index.search(
+            query_embedding,
+            k=min(k, int(self.faiss_index.ntotal)),
+        )
 
         matches: list[RouteResult] = []
         for score, index_id in zip(scores[0], indices[0], strict=True):
@@ -122,22 +125,46 @@ class UniversalMCPRouter:
         }
         return json.dumps(minified, sort_keys=True, separators=(",", ":"))
 
-    def _strip_nested_descriptions(self, node: Any, prune_nested_descriptions: bool) -> Any:
+    def _strip_nested_descriptions(
+        self,
+        node: Any,
+        prune_nested_descriptions: bool,
+    ) -> Any:
         if isinstance(node, dict):
             cleaned: dict[str, Any] = {}
             for key, value in node.items():
                 if key == "description" and prune_nested_descriptions:
                     continue
 
-                if key in {"properties", "patternProperties", "$defs", "definitions", "dependentSchemas"} and isinstance(value, dict):
+                if key in {
+                    "properties",
+                    "patternProperties",
+                    "$defs",
+                    "definitions",
+                    "dependentSchemas",
+                } and isinstance(value, dict):
                     cleaned[key] = {
-                        child_key: self._strip_nested_descriptions(child_value, prune_nested_descriptions=True)
+                        child_key: self._strip_nested_descriptions(
+                            child_value,
+                            prune_nested_descriptions=True,
+                        )
                         for child_key, child_value in value.items()
                     }
                     continue
 
-                if key in {"items", "additionalProperties", "contains", "if", "then", "else", "not"}:
-                    cleaned[key] = self._strip_nested_descriptions(value, prune_nested_descriptions=True)
+                if key in {
+                    "items",
+                    "additionalProperties",
+                    "contains",
+                    "if",
+                    "then",
+                    "else",
+                    "not",
+                }:
+                    cleaned[key] = self._strip_nested_descriptions(
+                        value,
+                        prune_nested_descriptions=True,
+                    )
                     continue
 
                 if key in {"allOf", "anyOf", "oneOf", "prefixItems"} and isinstance(value, list):
@@ -147,11 +174,20 @@ class UniversalMCPRouter:
                     ]
                     continue
 
-                cleaned[key] = self._strip_nested_descriptions(value, prune_nested_descriptions=prune_nested_descriptions)
+                cleaned[key] = self._strip_nested_descriptions(
+                    value,
+                    prune_nested_descriptions=prune_nested_descriptions,
+                )
 
             return cleaned
 
         if isinstance(node, list):
-            return [self._strip_nested_descriptions(item, prune_nested_descriptions=prune_nested_descriptions) for item in node]
+            return [
+                self._strip_nested_descriptions(
+                    item,
+                    prune_nested_descriptions=prune_nested_descriptions,
+                )
+                for item in node
+            ]
 
         return node
