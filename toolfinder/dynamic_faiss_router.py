@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,6 +10,9 @@ import faiss
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
+
+
+logger = logging.getLogger(__name__)
 
 
 ToolSchema = dict[str, Any]
@@ -123,7 +127,21 @@ class UniversalMCPRouter:
 
         return len(normalized_tools)
 
-    def route_top_k(self, query: str, k: int = 3) -> list[RouteResult] | list[dict[str, Any]]:
+    def route_top_k(self, query: str, k: int = 3, min_score: float = 0.15) -> list[RouteResult] | list[dict[str, Any]]:
+        """Route a query to the top-k matching tools.
+
+        Args:
+            query: The natural language query to route.
+            k: Maximum number of results to return.
+            min_score: ALGY-2 FIX - Minimum similarity score threshold (0.0-1.0).
+                       Tools below this threshold are filtered out to prevent
+                       out-of-distribution queries from returning irrelevant tools.
+                       Calibrated to 0.15 to reduce false negatives on in-distribution queries.
+
+        Returns:
+            List of matching tools (RouteResult or dict depending on compat_mode).
+            Returns empty list if no tools meet the min_score threshold.
+        """
         if k < 1:
             raise ValueError("k must be at least 1")
         if self.faiss_index.ntotal == 0:
@@ -145,6 +163,17 @@ class UniversalMCPRouter:
             if index_id < 0:
                 continue
             server_name, tool_name, schema = self.metadata[int(index_id)]
+            # ALGY-2 FIX: Filter out tools below minimum similarity threshold
+            if float(score) < min_score:
+                logger.debug(
+                    "Filtered tool %s/%s (score=%.4f < min_score=%.2f)",
+                    server_name, tool_name, float(score), min_score,
+                )
+                continue
+            logger.info(
+                "Matched tool %s/%s with score=%.4f (threshold=%.2f)",
+                server_name, tool_name, float(score), min_score,
+            )
             matches.append(
                 RouteResult(
                     server_name=server_name,
@@ -171,11 +200,20 @@ class UniversalMCPRouter:
             },
         }
 
-    def _inject_additional_properties_false(self, node: Any) -> Any:
+    def _inject_additional_properties_false(self, node: Any, depth: int = 0, max_depth: int = 100) -> Any:
+        # ALGY-4 FIX: Prevent stack overflow on deeply nested / circular schemas
+        if depth > max_depth:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Schema depth exceeded %d; returning node unmodified to prevent stack overflow",
+                max_depth,
+            )
+            return node
+
         if isinstance(node, dict):
             normalized_node: dict[str, Any] = {}
             for key, value in node.items():
-                normalized_node[key] = self._inject_additional_properties_false(value)
+                normalized_node[key] = self._inject_additional_properties_false(value, depth + 1, max_depth)
 
             if normalized_node.get("type") == "object":
                 normalized_node["additionalProperties"] = False
@@ -183,7 +221,7 @@ class UniversalMCPRouter:
             return normalized_node
 
         if isinstance(node, list):
-            return [self._inject_additional_properties_false(item) for item in node]
+            return [self._inject_additional_properties_false(item, depth + 1, max_depth) for item in node]
 
         return node
 

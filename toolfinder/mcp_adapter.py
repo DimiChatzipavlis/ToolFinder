@@ -334,11 +334,20 @@ class DynamicMCPClient:
 
         return normalized
 
-    def _inject_additional_properties_false(self, node: Any) -> Any:
+    def _inject_additional_properties_false(self, node: Any, depth: int = 0, max_depth: int = 100) -> Any:
+        # ALGY-4 FIX: Prevent stack overflow on deeply nested / circular schemas
+        if depth > max_depth:
+            logger.warning(
+                "%s: schema depth exceeded %d; returning node unmodified to prevent stack overflow",
+                self.server_name,
+                max_depth,
+            )
+            return node
+
         if isinstance(node, dict):
             normalized_node: dict[str, Any] = {}
             for key, value in node.items():
-                normalized_node[key] = self._inject_additional_properties_false(value)
+                normalized_node[key] = self._inject_additional_properties_false(value, depth + 1, max_depth)
 
             if normalized_node.get("type") == "object":
                 normalized_node["additionalProperties"] = False
@@ -346,7 +355,7 @@ class DynamicMCPClient:
             return normalized_node
 
         if isinstance(node, list):
-            return [self._inject_additional_properties_false(item) for item in node]
+            return [self._inject_additional_properties_false(item, depth + 1, max_depth) for item in node]
 
         return node
 
@@ -423,6 +432,15 @@ class DynamicMCPClient:
             return
         self._closed = True
 
+        # CRIT-1 FIX: Cancel and drain stdio tasks BEFORE closing stdin to prevent deadlocks
+        for task in (self._stdout_task, self._stderr_task):
+            if task is not None and not task.done():
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=1.0)
+                except (asyncio.CancelledError, asyncio.TimeoutError):
+                    pass
+
         process = self.process
         if process is not None and process.stdin is not None:
             with contextlib.suppress(Exception):
@@ -440,11 +458,5 @@ class DynamicMCPClient:
                     with contextlib.suppress(ProcessLookupError):
                         process.kill()
                     await process.wait()
-
-        for task in (self._stdout_task, self._stderr_task):
-            if task is not None and not task.done():
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
 
         self._fail_pending_requests(MCPClientError(f"{self.server_name}: client closed"))

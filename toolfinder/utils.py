@@ -16,11 +16,31 @@ class LLMOutputParsingError(RuntimeError):
         self.raw_text = raw_text
 
 
+def _count_nesting_depth(text: str) -> int:
+    """ALGY-1 FIX: Count maximum nesting depth to prevent RecursionError in ast.literal_eval."""
+    max_depth = 0
+    current_depth = 0
+    for char in text:
+        if char in "{[(":
+            current_depth += 1
+            max_depth = max(max_depth, current_depth)
+        elif char in "}])":
+            current_depth = max(0, current_depth - 1)
+    return max_depth
+
+
 def _parse_json_object(candidate: str, raw_text: str, decoder: json.JSONDecoder) -> dict[str, Any]:
     stripped = candidate.strip().strip("`").strip()
     try:
         parsed, _ = decoder.raw_decode(stripped)
     except json.JSONDecodeError:
+        # ALGY-1 FIX: Check nesting depth before ast.literal_eval to prevent DoS
+        nesting_depth = _count_nesting_depth(stripped)
+        if nesting_depth > 100:
+            raise LLMOutputParsingError(
+                f"Nesting depth {nesting_depth} exceeds limit of 100; refusing to parse.",
+                raw_text,
+            )
         try:
             parsed = ast.literal_eval(stripped)
         except (SyntaxError, ValueError) as exc:

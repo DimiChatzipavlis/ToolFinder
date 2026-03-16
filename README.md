@@ -51,15 +51,15 @@ The repository contains two proof surfaces:
 The block below is maintained by `python examples/eval_toolfinder.py`. Preserve the markers so the automated suite can continue injecting the latest metrics.
 
 <!-- EVAL_TABLE_START -->
-_Last auto-updated: 2026-03-12 19:20:44_
+_Last auto-updated: 2026-03-16 17:01:57_
 
 | Metric | Naive Baseline | ToolFinder Enabled |
 | --- | --- | --- |
 | Tasks Run | 3 | 3 |
 | Average Tools In Context | 14 | 2 |
 | Average Context Payload (Chars) | 9106 | 1450 |
-| Average Total Latency (s) | 49.98 | 22.69 |
-| Average Inference Latency (s) | 49.9 | 22.57 |
+| Average Total Latency (s) | 57.51 | 14.47 |
+| Average Inference Latency (s) | 57.47 | 14.39 |
 | Successful Tool Calls | 3/3 | 3/3 |
 | Expected Tool Matches | 3/3 | 3/3 |
 | State Verified | 3/3 | 3/3 |

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import logging
 import socket
@@ -284,13 +285,15 @@ class AutonomousMCPAgent:
                         "Tool call payload must include an object 'arguments' field."
                     )
 
-                action_signature = ":".join(
+                # CRIT-2 FIX: Hash the signature to cap memory footprint of idempotency lock
+                raw_signature = ":".join(
                     (
                         str(parsed_json.get("server_name")),
                         str(parsed_json.get("tool_name")),
                         str(parsed_json.get("arguments")),
                     )
                 )
+                action_signature = hashlib.sha256(raw_signature.encode()).hexdigest()
                 if action_signature in executed_actions:
                     scratchpad.add(
                         "system",
