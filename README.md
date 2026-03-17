@@ -89,10 +89,14 @@ ToolFinder hardens both selection and execution.
 
 ## ⚡ Quickstart & Integration
 
-Install the package in editable mode from the repository root:
+Install PyTorch first with the wheel that matches your hardware acceleration profile (for example CUDA), then install ToolFinder:
 
 ```bash
-pip install -e .
+# 1. Install PyTorch with your specific hardware acceleration (e.g., CUDA)
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# 2. Install ToolFinder
+pip install toolfinder-mcp
 ```
 
 Minimal integration with LangChain or LangGraph:
