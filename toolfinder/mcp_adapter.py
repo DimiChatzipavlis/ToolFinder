@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Dynamic stdio MCP client adapter with process lifecycle management."""
+
 import asyncio
 import contextlib
 import copy
@@ -21,10 +23,14 @@ RequestId = int | str
 
 
 class MCPClientError(RuntimeError):
+    """Base exception for dynamic MCP client failures."""
+
     pass
 
 
 class MCPResponseError(MCPClientError):
+    """Raised when an MCP JSON-RPC response contains an error object."""
+
     def __init__(self, message: str, error: JsonDict) -> None:
         super().__init__(message)
         self.error = error
@@ -32,6 +38,8 @@ class MCPResponseError(MCPClientError):
 
 @dataclass(frozen=True)
 class ServerProcessConfig:
+    """Configuration used to spawn a managed MCP server process."""
+
     server_name: str
     command: str
     args: tuple[str, ...] = ()
@@ -40,6 +48,12 @@ class ServerProcessConfig:
 
 
 class DynamicMCPClient:
+    """Manage one MCP server process over stdio using JSON-RPC.
+
+    The client handles startup, initialize/list/call requests, pagination, and
+    robust teardown while capturing stderr context for diagnostics.
+    """
+
     def __init__(
         self,
         server_name: str,
@@ -51,14 +65,26 @@ class DynamicMCPClient:
         startup_timeout_s: float = 45.0,
         request_timeout_s: float = 30.0,
     ) -> None:
-        self.server_name = server_name
-        self.command = command
-        self.args = tuple(args or ())
-        self.env = dict(env) if env is not None else None
-        self.cwd = cwd
-        self.protocol_version = protocol_version
-        self.startup_timeout_s = startup_timeout_s
-        self.request_timeout_s = request_timeout_s
+        """Initialize a dynamic MCP client.
+
+        Args:
+            server_name: Logical server identifier.
+            command: Executable or shim command used to spawn the process.
+            args: Optional command arguments.
+            env: Optional environment override map.
+            cwd: Optional process working directory.
+            protocol_version: MCP protocol version sent during initialize.
+            startup_timeout_s: Timeout for initialize/list handshake.
+            request_timeout_s: Default timeout for RPC requests.
+        """
+        self.server_name: str = server_name
+        self.command: str = command
+        self.args: tuple[str, ...] = tuple(args or ())
+        self.env: dict[str, str] | None = dict(env) if env is not None else None
+        self.cwd: str | None = cwd
+        self.protocol_version: str = protocol_version
+        self.startup_timeout_s: float = startup_timeout_s
+        self.request_timeout_s: float = request_timeout_s
 
         self.process: asyncio.subprocess.Process | None = None
         self._stdout_task: asyncio.Task[None] | None = None
@@ -73,14 +99,17 @@ class DynamicMCPClient:
 
     @property
     def stderr_tail(self) -> list[str]:
+        """Return recent stderr lines captured from the server process."""
         return list(self._stderr_lines)
 
     @property
     def server_info(self) -> JsonDict | None:
+        """Return MCP server info discovered during initialize."""
         return self._server_info
 
     @property
     def server_capabilities(self) -> JsonDict | None:
+        """Return MCP capabilities discovered during initialize."""
         return self._server_capabilities
 
     async def __aenter__(self) -> DynamicMCPClient:
@@ -90,6 +119,14 @@ class DynamicMCPClient:
         await self.close()
 
     async def initialize_and_get_tools(self) -> list[NormalizedTool]:
+        """Start the process, run MCP initialize, and return normalized tools.
+
+        Returns:
+            Deep-copied list of normalized tool payloads.
+
+        Edge cases:
+            Caches tools after first successful call and returns copies on repeat.
+        """
         if self._tools_cache is not None:
             return copy.deepcopy(self._tools_cache)
 
@@ -111,6 +148,18 @@ class DynamicMCPClient:
         return copy.deepcopy(self._tools_cache)
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Invoke one MCP tool and return the result payload.
+
+        Args:
+            tool_name: Tool name to call on the server.
+            arguments: JSON-compatible argument object.
+
+        Returns:
+            The `result` object from `tools/call`.
+
+        Raises:
+            MCPClientError: If protocol/result shape is invalid or tool reports error.
+        """
         if not self._started:
             await self.initialize_and_get_tools()
 
@@ -428,6 +477,7 @@ class DynamicMCPClient:
             self._pending_requests.pop(request_id, None)
 
     async def close(self) -> None:
+        """Close the client, stop tasks, terminate process, and fail pending RPCs."""
         if self._closed:
             return
         self._closed = True

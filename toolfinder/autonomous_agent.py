@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Autonomous MCP agent orchestration with ReAct-style tool execution."""
+
 import asyncio
 import contextlib
 import hashlib
@@ -31,6 +33,8 @@ JsonDict = dict[str, Any]
 
 @dataclass(frozen=True)
 class ReActStep:
+    """Single iteration record for the agent's ReAct loop."""
+
     iteration: int
     thought: str
     action: str
@@ -45,6 +49,8 @@ class ReActStep:
 
 @dataclass(frozen=True)
 class AgentExecutionResult:
+    """Final outcome and trace for an autonomous execution run."""
+
     status: str
     answer: str
     steps: list[ReActStep]
@@ -52,6 +58,8 @@ class AgentExecutionResult:
 
 
 class Scratchpad:
+    """Tracks compact conversation state used across ReAct iterations."""
+
     def __init__(self, user_query: str) -> None:
         self._entries: list[JsonDict] = [
             {"role": "system", "content": "Structured ReAct scratchpad."},
@@ -59,18 +67,22 @@ class Scratchpad:
         ]
 
     def add(self, role: str, content: Any, *, iteration: int | None = None) -> None:
+        """Append a role/content pair to the scratchpad."""
         entry: JsonDict = {"role": role, "content": content}
         if iteration is not None:
             entry["iteration"] = iteration
         self._entries.append(entry)
 
     def render(self) -> str:
+        """Render scratchpad entries as deterministic JSON text."""
         return json.dumps(self._entries, ensure_ascii=True, sort_keys=True)
 
     def entries(self) -> list[JsonDict]:
+        """Return a shallow copy of scratchpad entries."""
         return list(self._entries)
 
     def recent_observations(self, limit: int = 2) -> list[str]:
+        """Return up to `limit` most recent observation texts."""
         observations: list[str] = []
         for entry in reversed(self._entries):
             if entry.get("role") != "observation":
@@ -82,6 +94,7 @@ class Scratchpad:
         return observations
 
     def last_observation_text(self) -> str:
+        """Return the latest observation as plain text for retry prompts."""
         for entry in reversed(self._entries):
             if entry.get("role") != "observation":
                 continue
@@ -104,6 +117,7 @@ def _render_history_content(content: Any) -> str:
 
 
 def extract_text_from_tool_result(payload: Any) -> str:
+    """Flatten a nested tool result into newline-separated text fragments."""
     fragments: list[str] = []
 
     def walk(node: Any) -> None:
@@ -123,6 +137,12 @@ def extract_text_from_tool_result(payload: Any) -> str:
 
 
 class AutonomousMCPAgent:
+    """Autonomous ReAct agent that routes and executes MCP tools.
+
+    The agent uses semantic retrieval to pick candidate tools, validates model
+    outputs against JSON schema, and iterates until completion or iteration cap.
+    """
+
     def __init__(
         self,
         model_name: str = "sentence-transformers/all-mpnet-base-v2",
@@ -130,10 +150,18 @@ class AutonomousMCPAgent:
         ollama_url: str = "http://127.0.0.1:11434/api/generate",
         max_iterations: int = 15,
     ) -> None:
-        self.router = UniversalMCPRouter(model_name=model_name)
-        self.ollama_model = ollama_model
-        self.ollama_url = ollama_url
-        self.max_iterations = max(15, max_iterations)
+        """Construct an autonomous agent with routing and LLM settings.
+
+        Args:
+            model_name: Embedding model passed to `UniversalMCPRouter`.
+            ollama_model: Target Ollama model identifier.
+            ollama_url: Ollama `/api/generate` endpoint.
+            max_iterations: Requested max ReAct loops; clamped to at least 15.
+        """
+        self.router: UniversalMCPRouter = UniversalMCPRouter(model_name=model_name)
+        self.ollama_model: str = ollama_model
+        self.ollama_url: str = ollama_url
+        self.max_iterations: int = max(15, max_iterations)
         self.clients: dict[str, DynamicMCPClient] = {}
         self._owned_clients: list[DynamicMCPClient] = []
 
@@ -144,6 +172,17 @@ class AutonomousMCPAgent:
         await self.close()
 
     async def add_server(self, config: ServerProcessConfig) -> list[JsonDict]:
+        """Spawn, initialize, and register a server client owned by this agent.
+
+        Args:
+            config: Server process configuration.
+
+        Returns:
+            Normalized tools discovered during initialization.
+
+        Edge cases:
+            If registration fails, the spawned client is closed before re-raising.
+        """
         client = DynamicMCPClient(
             server_name=config.server_name,
             command=config.command,
@@ -164,6 +203,18 @@ class AutonomousMCPAgent:
         return tools
 
     async def register_server(self, server_name: str, client: DynamicMCPClient) -> list[JsonDict]:
+        """Register an already-created MCP client and ingest its tools.
+
+        Args:
+            server_name: Registry key used for routing and execution.
+            client: Initialized or initializable dynamic MCP client.
+
+        Returns:
+            Tool schemas returned by the MCP server.
+
+        Raises:
+            ValueError: If names mismatch or the server was already registered.
+        """
         if server_name != client.server_name:
             raise ValueError(
                 f"server name mismatch: registry={server_name}, "
@@ -178,6 +229,18 @@ class AutonomousMCPAgent:
         return tools_list
 
     async def execute_task(self, user_query: str) -> AgentExecutionResult:
+        """Execute a user query using iterative ReAct planning and tool calls.
+
+        Args:
+            user_query: The final task objective for the agent.
+
+        Returns:
+            Structured execution result containing status, answer, and trace.
+
+        Edge cases:
+            Returns `status="failed"` when iteration limits are reached.
+            Handles malformed LLM output, timeouts, and tool failures by recovery.
+        """
         scratchpad = Scratchpad(user_query)
         steps: list[ReActStep] = []
         iteration = 1
@@ -233,15 +296,14 @@ class AutonomousMCPAgent:
 
             try:
                 decision = extract_and_parse_json(raw_model_output)
-                parsed_json = decision
-                thought = parsed_json.get("thought")
+                thought = decision.get("thought")
                 if not isinstance(thought, str) or not thought.strip():
                     raise ValidationError("Model response must include a non-empty thought field.")
                 last_thought = thought.strip()
 
-                status = parsed_json.get("status")
+                status = decision.get("status")
                 if status == "complete":
-                    answer = parsed_json.get("answer")
+                    answer = decision.get("answer")
                     if not isinstance(answer, str) or not answer.strip():
                         raise ValidationError("Completion payload must include a non-empty answer.")
 
@@ -271,15 +333,15 @@ class AutonomousMCPAgent:
                         scratchpad=scratchpad.entries(),
                     )
 
-                action = parsed_json.get("action")
+                action = decision.get("action")
                 if action != "call_tool":
                     raise ValidationError(
                         "Model response must be either {'thought': '...', 'action': "
                         "'call_tool', ...} or {'thought': '...', 'status': 'complete', ...}."
                     )
 
-                selected_candidate = self._select_candidate(parsed_json, candidates)
-                arguments = parsed_json.get("arguments")
+                selected_candidate = self._select_candidate(decision, candidates)
+                arguments = decision.get("arguments")
                 if not isinstance(arguments, dict):
                     raise ValidationError(
                         "Tool call payload must include an object 'arguments' field."
@@ -288,9 +350,9 @@ class AutonomousMCPAgent:
                 # CRIT-2 FIX: Hash the signature to cap memory footprint of idempotency lock
                 raw_signature = ":".join(
                     (
-                        str(parsed_json.get("server_name")),
-                        str(parsed_json.get("tool_name")),
-                        str(parsed_json.get("arguments")),
+                        str(decision.get("server_name")),
+                        str(decision.get("tool_name")),
+                        str(decision.get("arguments")),
                     )
                 )
                 action_signature = hashlib.sha256(raw_signature.encode()).hexdigest()
@@ -398,6 +460,7 @@ class AutonomousMCPAgent:
         )
 
     async def close(self) -> None:
+        """Close all clients owned by this agent and suppress close-time errors."""
         while self._owned_clients:
             client = self._owned_clients.pop()
             with contextlib.suppress(Exception):
@@ -456,27 +519,27 @@ class AutonomousMCPAgent:
             method="POST",
         )
 
-        print(
-            f"\n[SYSTEM] Sending prompt to local Ollama "
-            f"(Context Size: {len(prompt_bytes)} bytes)..."
+        logger.info(
+            "Sending prompt to local Ollama (context_size_bytes=%s)",
+            len(prompt_bytes),
         )
         start_time = time.time()
         try:
             with urllib.request.urlopen(request, timeout=300) as response:
                 raw_response = response.read().decode("utf-8")
             elapsed = time.time() - start_time
-            print(f"[SYSTEM] Ollama responded in {elapsed:.2f} seconds.")
+            logger.info("Ollama responded in %.2f seconds.", elapsed)
         except TimeoutError:
             elapsed = time.time() - start_time
-            print(f"[SYSTEM] Ollama request failed after {elapsed:.2f} seconds.")
+            logger.warning("Ollama request failed after %.2f seconds.", elapsed)
             raise
         except socket.timeout as exc:
             elapsed = time.time() - start_time
-            print(f"[SYSTEM] Ollama request failed after {elapsed:.2f} seconds.")
+            logger.warning("Ollama request failed after %.2f seconds.", elapsed)
             raise TimeoutError("Ollama request timed out.") from exc
         except urllib.error.URLError:
             elapsed = time.time() - start_time
-            print(f"[SYSTEM] Ollama request failed after {elapsed:.2f} seconds.")
+            logger.warning("Ollama request failed after %.2f seconds.", elapsed)
             raise
 
         parsed_response = json.loads(raw_response)

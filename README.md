@@ -89,6 +89,8 @@ ToolFinder hardens both selection and execution.
 
 ## ⚡ Quickstart & Integration
 
+CRITICAL: Install PyTorch with your required hardware acceleration (e.g., CUDA) before installing this package to avoid defaulting to slow CPU inference. Example: pip install torch --index-url https://download.pytorch.org/whl/cu121
+
 Install PyTorch first with the wheel that matches your hardware acceleration profile (for example CUDA), then install ToolFinder:
 
 ```bash

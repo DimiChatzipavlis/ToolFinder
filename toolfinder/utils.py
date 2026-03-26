@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Utility helpers for resilient JSON extraction from model output."""
+
 import ast
 import json
 import re
@@ -11,6 +13,8 @@ _JSON_OBJECT_START_RE = re.compile(r"\{")
 
 
 class LLMOutputParsingError(RuntimeError):
+    """Raised when no valid JSON object can be parsed from model output."""
+
     def __init__(self, message: str, raw_text: str) -> None:
         super().__init__(message)
         self.raw_text = raw_text
@@ -55,6 +59,18 @@ def _parse_json_object(candidate: str, raw_text: str, decoder: json.JSONDecoder)
 
 
 def extract_and_parse_json(text: str) -> dict[str, Any]:
+    """Extract and parse the first valid JSON-like object from free-form text.
+
+    Args:
+        text: Raw LLM output that may include markdown fences or extra prose.
+
+    Returns:
+        Parsed JSON object as a Python dictionary.
+
+    Edge cases:
+        Attempts strict JSON first, then `ast.literal_eval` recovery.
+        Rejects payloads exceeding nesting-depth safety limits.
+    """
     decoder = json.JSONDecoder()
     raw_text = text.strip()
     last_error: LLMOutputParsingError | None = None

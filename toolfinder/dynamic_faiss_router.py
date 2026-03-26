@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Semantic routing for MCP tools backed by FAISS similarity search."""
+
 import copy
 import json
 import logging
@@ -20,6 +22,8 @@ ToolSchema = dict[str, Any]
 
 @dataclass(frozen=True)
 class RouteResult:
+    """Represents a routed tool candidate with its similarity score."""
+
     server_name: str
     tool_name: str
     schema: ToolSchema
@@ -27,29 +31,53 @@ class RouteResult:
 
 
 class UniversalMCPRouter:
+    """Route natural-language queries to MCP tools using dense retrieval.
+
+    The router ingests tool schemas, builds embeddings, and queries a FAISS index.
+    It can return either `RouteResult` objects or OpenAI-compatible bindable tool
+    schemas when compatibility mode is enabled through `build_index()`.
+    """
+
     def __init__(
         self,
         model_name: str = "sentence-transformers/all-mpnet-base-v2",
         device: str | None = None,
         batch_size: int = 32,
     ) -> None:
-        self.model_name = model_name
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.batch_size = batch_size
-        self.model = SentenceTransformer(self.model_name, device=self.device)
+        """Initialize the router and allocate the FAISS index.
+
+        Args:
+            model_name: SentenceTransformer model used for embeddings.
+            device: Explicit device override. Uses CUDA when available, else CPU.
+            batch_size: Batch size used for embedding generation.
+        """
+        self.model_name: str = model_name
+        self.device: str = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.batch_size: int = batch_size
+        self.model: SentenceTransformer = SentenceTransformer(self.model_name, device=self.device)
         embedding_dim = int(self.model.get_sentence_embedding_dimension())
 
-        self._embedding_dim = embedding_dim
-        self.faiss_index = faiss.IndexFlatIP(self._embedding_dim)
+        self._embedding_dim: int = embedding_dim
+        self.faiss_index: faiss.IndexFlatIP = faiss.IndexFlatIP(self._embedding_dim)
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
         self._staged_tools: list[tuple[str, ToolSchema]] = []
-        self._compat_mode = False
+        self._compat_mode: bool = False
 
     @staticmethod
     def canonicalize_schema(schema: ToolSchema) -> str:
+        """Serialize a schema into a canonical JSON string."""
         return json.dumps(schema, sort_keys=True, separators=(",", ":"))
 
     def add_tool(self, tool: ToolSchema, server_name: str = "external") -> None:
+        """Stage a tool for index construction.
+
+        Args:
+            tool: Raw MCP-like tool payload containing name/description/schema fields.
+            server_name: Fallback server name when the tool payload omits one.
+
+        Raises:
+            ValueError: If no usable tool name is present.
+        """
         resolved_server_name = str(tool.get("server_name", server_name))
         tool_name = str(tool.get("tool_name") or tool.get("name") or "")
         if not tool_name:
@@ -66,6 +94,14 @@ class UniversalMCPRouter:
         self._staged_tools.append((resolved_server_name, normalized_tool))
 
     def build_index(self) -> int:
+        """Build the FAISS index from staged tools.
+
+        Returns:
+            Number of tools ingested into the index.
+
+        Edge cases:
+            Returns `0` when no tools have been staged.
+        """
         if not self._staged_tools:
             return 0
 
@@ -92,6 +128,18 @@ class UniversalMCPRouter:
         return ingested_count
 
     def ingest_server(self, server_name: str, tools_list: list[ToolSchema]) -> int:
+        """Ingest all tools from one server directly into the FAISS index.
+
+        Args:
+            server_name: Source MCP server identifier.
+            tools_list: List of normalized tool payloads.
+
+        Returns:
+            Number of tools added for the server.
+
+        Edge cases:
+            Returns `0` when `tools_list` is empty.
+        """
         if not tools_list:
             return 0
 
@@ -127,7 +175,12 @@ class UniversalMCPRouter:
 
         return len(normalized_tools)
 
-    def route_top_k(self, query: str, k: int = 3, min_score: float = 0.15) -> list[RouteResult] | list[dict[str, Any]]:
+    def route_top_k(
+        self,
+        query: str,
+        k: int = 3,
+        min_score: float = 0.15,
+    ) -> list[RouteResult] | list[dict[str, Any]]:
         """Route a query to the top-k matching tools.
 
         Args:
@@ -187,6 +240,17 @@ class UniversalMCPRouter:
         return matches
 
     def route(self, query: str) -> RouteResult | dict[str, Any]:
+        """Return the single highest-ranked tool candidate for a query.
+
+        Args:
+            query: Natural language query to route.
+
+        Returns:
+            The best matching tool as `RouteResult` or bindable schema.
+
+        Edge cases:
+            Propagates `IndexError` if no result survives threshold filtering.
+        """
         return self.route_top_k(query, k=1)[0]
 
     @staticmethod
@@ -203,8 +267,7 @@ class UniversalMCPRouter:
     def _inject_additional_properties_false(self, node: Any, depth: int = 0, max_depth: int = 100) -> Any:
         # ALGY-4 FIX: Prevent stack overflow on deeply nested / circular schemas
         if depth > max_depth:
-            import logging
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "Schema depth exceeded %d; returning node unmodified to prevent stack overflow",
                 max_depth,
             )
