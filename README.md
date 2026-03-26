@@ -91,7 +91,7 @@ ToolFinder hardens both selection and execution.
 
 CRITICAL: Install PyTorch with your required hardware acceleration (e.g., CUDA) before installing this package to avoid defaulting to slow CPU inference. Example: pip install torch --index-url https://download.pytorch.org/whl/cu121
 
-Install PyTorch first with the wheel that matches your hardware acceleration profile (for example CUDA), then install ToolFinder:
+Then install ToolFinder:
 
 ```bash
 # 1. Install PyTorch with your specific hardware acceleration (e.g., CUDA)
@@ -106,9 +106,17 @@ Minimal integration with LangChain or LangGraph:
 ```python
 from toolfinder.dynamic_faiss_router import UniversalMCPRouter
 from langchain_ollama import ChatOllama
-router = UniversalMCPRouter(); [router.add_tool(tool) for tool in mcp_server_tools]; router.build_index()
+
+# Initialize and ingest tools
+router = UniversalMCPRouter()
+for tool in mcp_server_tools:
+    router.add_tool(tool)
+router.build_index()
+
+# Route and bind
 llm = ChatOllama(model="llama3.2")
-response = llm.bind_tools(router.route_top_k("Write a summary to output.txt", k=2)).invoke("Write a summary to output.txt")
+top_tools = router.route_top_k("Write a summary to output.txt", k=2)
+response = llm.bind_tools(top_tools).invoke("Write a summary to output.txt")
 ```
 
 For a complete end-to-end proof, run:
