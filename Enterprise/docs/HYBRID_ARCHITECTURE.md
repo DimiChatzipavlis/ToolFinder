@@ -34,6 +34,60 @@ A retrieval-first gate minimizes selection error before the planner reasons abou
 
 - `Enterprise/examples/run_hybrid_demo.py`: deterministic local demo run.
 - `Enterprise/examples/run_realtime_openclaw.py`: real-time OpenClaw-connected runtime loop.
+- `Enterprise/examples/run_e2e_hybrid.py`: full end-to-end hybrid pipeline demo.
+
+## End-to-End Hybrid Pipeline
+
+The `OpenClawHybridPipeline` provides a unified execution path that combines
+ToolFinder's retrieval gate with OpenClaw's native agent capabilities:
+
+```
+User Query
+    │
+    ▼
+┌──────────────────────────┐
+│  1. Semantic Routing     │  ToolFinder retrieval gate
+│     (HybridToolRegistry) │  picks top-k tools
+└──────────┬───────────────┘
+           │
+           ▼
+┌──────────────────────────┐
+│  2. Tool Manifest        │  Converts ToolCandidates
+│     (OpenClawToolManifest│  into OpenClaw format
+└──────────┬───────────────┘
+           │
+           ▼
+┌──────────────────────────┐
+│  3. OpenClaw Agent       │  Full agent session with
+│     (OpenClawSession     │  multi-step reasoning
+│      Driver)             │  and tool calls
+└──────────┬───────────────┘
+           │
+     ┌─────┴─────┐
+     │ success?  │
+     └─┬───────┬─┘
+   yes │       │ no
+       ▼       ▼
+┌──────────┐ ┌──────────────────┐
+│  Return  │ │  4. Fallback     │
+│  Result  │ │  (Heuristic      │
+└──────────┘ │   Orchestrator)  │
+             └──────────────────┘
+```
+
+### When to use which
+
+| Use case | Entry point |
+|---|---|
+| Deterministic offline demo | `run_hybrid_demo.py` → `HybridEnterpriseOrchestrator` |
+| Real-time workspace loop | `run_realtime_openclaw.py` → orchestrator + poll loop |
+| Full OpenClaw agent reasoning + ToolFinder routing | `run_e2e_hybrid.py` → `OpenClawHybridPipeline` |
+
+### Fallback strategies
+
+- `heuristic_planner`: Falls back to the existing orchestrator if OpenClaw fails (default).
+- `error`: Returns an error immediately if OpenClaw fails.
+- `best_effort`: Returns partial results from OpenClaw even on failure.
 
 ## Production Hardening Recommendations
 

@@ -1,0 +1,659 @@
+from __future__ import annotations
+
+"""End-to-end hybrid pipeline: ToolFinder retrieval gate + OpenClaw agent execution.
+
+This module provides a unified pipeline that:
+1. Uses ToolFinder's semantic retrieval to pre-filter tools for a query.
+2. Converts the filtered candidates into an OpenClaw tool manifest.
+3. Launches an OpenClaw agent session with the constrained tool set.
+4. Falls back to the existing heuristic orchestrator if openclaw fails.
+"""
+
+import asyncio
+import copy
+import json
+import time
+from typing import Any
+
+from .config import EnterpriseConfig
+from .contracts import (
+    HybridPipelineResult,
+    OpenClawAgentRequest,
+    OpenClawAgentResponse,
+    PipelinePhase,
+    ToolCallRecord,
+    ToolCandidate,
+)
+from .event_bus import EnterpriseEventBus
+from .executor import HybridToolExecutor
+from .openclaw_backend import OpenClawCliBackend, OpenClawHttpBackend
+from .orchestrator import HybridEnterpriseOrchestrator
+from .registry import HybridToolRegistry
+from .telemetry import TelemetryCollector
+
+
+# ---------------------------------------------------------------------------
+# Tool manifest builder
+# ---------------------------------------------------------------------------
+
+
+class OpenClawToolManifest:
+    """Converts ToolCandidate objects into the OpenClaw tool definition format.
+
+    OpenClaw expects a tool manifest as a JSON array, where each tool has:
+        - name: Fully qualified tool name (server/tool).
+        - description: Human-readable purpose.
+        - parameters: JSON Schema for inputs.
+        - metadata: Extra routing info (server_name, score).
+    """
+
+    @staticmethod
+    def from_candidates(candidates: list[ToolCandidate]) -> list[dict[str, Any]]:
+        """Build an OpenClaw-compatible tool manifest from routed candidates."""
+        manifest: list[dict[str, Any]] = []
+        for candidate in candidates:
+            manifest.append(
+                {
+                    "name": f"{candidate.server_name}/{candidate.tool_name}",
+                    "description": candidate.description,
+                    "parameters": copy.deepcopy(candidate.input_schema),
+                    "metadata": {
+                        "server_name": candidate.server_name,
+                        "tool_name": candidate.tool_name,
+                        "routing_score": round(candidate.score, 6),
+                    },
+                }
+            )
+        return manifest
+
+    @staticmethod
+    def render_json(manifest: list[dict[str, Any]]) -> str:
+        """Serialize manifest to a compact JSON string for CLI/HTTP payloads."""
+        return json.dumps(manifest, ensure_ascii=True, indent=None,  sort_keys=True)
+
+
+# ---------------------------------------------------------------------------
+# OpenClaw session driver
+# ---------------------------------------------------------------------------
+
+
+class OpenClawSessionDriver:
+    """Manages an OpenClaw agent session over HTTP or CLI backends.
+
+    Unlike the existing plan-only usage, this driver sends a full agent
+    request with embedded tool manifest so OpenClaw can handle multi-step
+    reasoning and tool calls internally.
+    """
+
+    def __init__(
+        self,
+        backend: OpenClawHttpBackend | OpenClawCliBackend,
+        timeout_s: float = 90.0,
+    ) -> None:
+        self._backend = backend
+        self._timeout_s = timeout_s
+
+    async def run_agent(self, request: OpenClawAgentRequest) -> OpenClawAgentResponse:
+        """Execute a full OpenClaw agent session and parse the response."""
+        prompt = self._build_agent_prompt(request)
+        try:
+            raw_output = await asyncio.wait_for(
+                self._backend.complete(prompt),
+                timeout=self._timeout_s,
+            )
+            return self._parse_agent_output(raw_output)
+        except TimeoutError:
+            return OpenClawAgentResponse(
+                answer="",
+                tool_calls=[],
+                raw_output="",
+                success=False,
+                error="OpenClaw agent session timed out",
+            )
+        except Exception as exc:
+            return OpenClawAgentResponse(
+                answer="",
+                tool_calls=[],
+                raw_output="",
+                success=False,
+                error=f"OpenClaw agent session failed: {exc}",
+            )
+
+    def _build_agent_prompt(self, request: OpenClawAgentRequest) -> str:
+        """Build an agent-mode prompt with embedded tool manifest."""
+        manifest_json = OpenClawToolManifest.render_json(request.tool_manifest)
+        return (
+            f"SESSION: {request.session_id}\n"
+            f"MODE: agent\n"
+            f"MAX_STEPS: {request.max_steps}\n\n"
+            "AVAILABLE_TOOLS (json):\n"
+            f"{manifest_json}\n\n"
+            f"GOAL: {request.query}\n\n"
+            "You are an agent that can use the tools listed above.\n"
+            "Execute the user's goal step by step.\n"
+            "For each step, if you need a tool, output a JSON action block:\n"
+            '{"thought":"...","action":"call_tool","tool":"server/tool","arguments":{...}}\n'
+            "When done, output a final JSON completion block:\n"
+            '{"thought":"...","status":"complete","answer":"..."}\n\n'
+            "If you can answer directly without tools, provide the completion block immediately.\n"
+            "Return all steps as a JSON array. Never include markdown code fences.\n"
+        )
+
+    def _parse_agent_output(self, raw_output: str) -> OpenClawAgentResponse:
+        """Parse OpenClaw agent output into a structured response."""
+        tool_calls: list[dict[str, Any]] = []
+        answer = ""
+
+        # Attempt to parse as a JSON array of steps.
+        try:
+            steps = json.loads(raw_output)
+            if isinstance(steps, list):
+                return self._extract_from_steps(steps, raw_output)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Attempt to parse as a single JSON object.
+        try:
+            payload = json.loads(raw_output)
+            if isinstance(payload, dict):
+                return self._extract_from_single(payload, raw_output)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # Attempt line-by-line JSON extraction (mixed output).
+        for line in raw_output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+                if not isinstance(obj, dict):
+                    continue
+                if obj.get("status") == "complete":
+                    answer = str(obj.get("answer", ""))
+                elif obj.get("action") == "call_tool":
+                    tool_calls.append(obj)
+            except (json.JSONDecodeError, ValueError):
+                continue
+
+        if answer or tool_calls:
+            return OpenClawAgentResponse(
+                answer=answer,
+                tool_calls=tool_calls,
+                raw_output=raw_output,
+                success=True,
+            )
+
+        # Last resort: treat entire output as a natural-language answer.
+        stripped = raw_output.strip()
+        if stripped:
+            return OpenClawAgentResponse(
+                answer=stripped,
+                tool_calls=[],
+                raw_output=raw_output,
+                success=True,
+                metadata={"parse_mode": "raw_text"},
+            )
+
+        return OpenClawAgentResponse(
+            answer="",
+            tool_calls=[],
+            raw_output=raw_output,
+            success=False,
+            error="OpenClaw agent returned empty output",
+        )
+
+    def _extract_from_steps(
+        self, steps: list[Any], raw_output: str
+    ) -> OpenClawAgentResponse:
+        """Extract answer and tool calls from a JSON array of agent steps."""
+        tool_calls: list[dict[str, Any]] = []
+        answer = ""
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            if step.get("status") == "complete":
+                answer = str(step.get("answer", ""))
+            elif step.get("action") == "call_tool":
+                tool_calls.append(step)
+        return OpenClawAgentResponse(
+            answer=answer,
+            tool_calls=tool_calls,
+            raw_output=raw_output,
+            success=True,
+            metadata={"parse_mode": "json_array", "step_count": len(steps)},
+        )
+
+    def _extract_from_single(
+        self, payload: dict[str, Any], raw_output: str
+    ) -> OpenClawAgentResponse:
+        """Extract answer from a single JSON completion object."""
+        if payload.get("status") == "complete":
+            return OpenClawAgentResponse(
+                answer=str(payload.get("answer", "")),
+                tool_calls=[],
+                raw_output=raw_output,
+                success=True,
+                metadata={"parse_mode": "json_single"},
+            )
+        if payload.get("action") == "call_tool":
+            return OpenClawAgentResponse(
+                answer="",
+                tool_calls=[payload],
+                raw_output=raw_output,
+                success=True,
+                metadata={"parse_mode": "json_single_action"},
+            )
+        # Unrecognized shape — try extracting common keys.
+        for key in ("answer", "response", "content", "output"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return OpenClawAgentResponse(
+                    answer=value.strip(),
+                    tool_calls=[],
+                    raw_output=raw_output,
+                    success=True,
+                    metadata={"parse_mode": f"json_field_{key}"},
+                )
+        return OpenClawAgentResponse(
+            answer="",
+            tool_calls=[],
+            raw_output=raw_output,
+            success=False,
+            error="Unrecognized OpenClaw agent response shape",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Hybrid fallback strategy
+# ---------------------------------------------------------------------------
+
+
+class FallbackStrategy:
+    """Controls what happens when the OpenClaw agent path fails."""
+
+    HEURISTIC_PLANNER = "heuristic_planner"
+    ERROR = "error"
+    BEST_EFFORT = "best_effort"
+
+    VALID = {HEURISTIC_PLANNER, ERROR, BEST_EFFORT}
+
+    @classmethod
+    def validate(cls, value: str) -> str:
+        if value not in cls.VALID:
+            raise ValueError(
+                f"invalid fallback strategy: {value!r}, must be one of {cls.VALID}"
+            )
+        return value
+
+
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
+
+
+class OpenClawHybridPipeline:
+    """End-to-end hybrid runtime: retrieval gate → OpenClaw agent → fallback.
+
+    This pipeline orchestrates the full hybrid flow:
+    1. Route user query through ToolFinder's semantic retrieval to get top-k tools.
+    2. Convert candidates into an OpenClaw tool manifest.
+    3. Launch an OpenClaw agent session with the constrained tool set.
+    4. If OpenClaw succeeds, map its tool calls back to MCP-server-specific
+       records and return a unified result.
+    5. If OpenClaw fails, fall back to the existing HybridEnterpriseOrchestrator
+       (retrieval → heuristic/planner → executor).
+    """
+
+    def __init__(
+        self,
+        registry: HybridToolRegistry,
+        session_driver: OpenClawSessionDriver,
+        fallback_orchestrator: HybridEnterpriseOrchestrator | None = None,
+        executor: HybridToolExecutor | None = None,
+        config: EnterpriseConfig | None = None,
+        event_bus: EnterpriseEventBus | None = None,
+        telemetry: TelemetryCollector | None = None,
+        fallback_strategy: str = FallbackStrategy.HEURISTIC_PLANNER,
+        max_agent_steps: int = 10,
+        model: str = "",
+    ) -> None:
+        self.registry = registry
+        self.session_driver = session_driver
+        self.fallback_orchestrator = fallback_orchestrator
+        self.executor = executor
+        self.config = config or EnterpriseConfig()
+        self.event_bus = event_bus or EnterpriseEventBus()
+        self.telemetry = telemetry or TelemetryCollector()
+        self.fallback_strategy = FallbackStrategy.validate(fallback_strategy)
+        self.max_agent_steps = max_agent_steps
+        self.model = model
+
+    async def run(self, session_id: str, user_query: str) -> HybridPipelineResult:
+        """Execute the full hybrid pipeline for a user query."""
+        phase_trace: list[str] = []
+        history: list[dict[str, Any]] = [{"role": "user", "content": user_query}]
+
+        # ── Phase 1: Semantic routing ──────────────────────────────────
+        phase_trace.append(PipelinePhase.ROUTING.value)
+        routing_started = time.perf_counter()
+        candidates = await self.registry.route(
+            user_query,
+            k=self.config.top_k,
+            min_score=self.config.min_score,
+        )
+        routing_ms = (time.perf_counter() - routing_started) * 1000.0
+        self.telemetry.record_latency("pipeline_routing", routing_ms)
+        await self._publish(
+            {
+                "type": "pipeline_routing",
+                "session_id": session_id,
+                "latency_ms": round(routing_ms, 3),
+                "candidate_count": len(candidates),
+            }
+        )
+
+        if not candidates:
+            self.telemetry.increment("pipeline_no_route")
+            phase_trace.append(PipelinePhase.COMPLETE.value)
+            return HybridPipelineResult(
+                status="failed",
+                answer="No tools met routing threshold.",
+                turns=0,
+                tool_calls=[],
+                telemetry=self.telemetry.to_dict(),
+                final_history=history,
+                phase_trace=phase_trace,
+                execution_path="direct",
+            )
+
+        # ── Phase 2: OpenClaw agent execution ─────────────────────────
+        phase_trace.append(PipelinePhase.OPENCLAW_AGENT.value)
+        manifest = OpenClawToolManifest.from_candidates(candidates)
+        agent_request = OpenClawAgentRequest(
+            query=user_query,
+            tool_manifest=manifest,
+            session_id=session_id,
+            model=self.model,
+            max_steps=self.max_agent_steps,
+        )
+
+        agent_started = time.perf_counter()
+        agent_response = await self.session_driver.run_agent(agent_request)
+        agent_ms = (time.perf_counter() - agent_started) * 1000.0
+        self.telemetry.record_latency("pipeline_openclaw_agent", agent_ms)
+        await self._publish(
+            {
+                "type": "pipeline_openclaw_agent",
+                "session_id": session_id,
+                "latency_ms": round(agent_ms, 3),
+                "success": agent_response.success,
+                "tool_call_count": len(agent_response.tool_calls),
+            }
+        )
+
+        if agent_response.success and agent_response.answer:
+            # ── OpenClaw succeeded ─────────────────────────────────────
+            self.telemetry.increment("pipeline_openclaw_success")
+            tool_records = self._map_tool_calls(agent_response.tool_calls, candidates)
+            history.append(
+                {
+                    "role": "assistant",
+                    "content": {
+                        "source": "openclaw_agent",
+                        "answer": agent_response.answer,
+                        "tool_calls": agent_response.tool_calls,
+                    },
+                }
+            )
+            phase_trace.append(PipelinePhase.COMPLETE.value)
+            return HybridPipelineResult(
+                status="complete",
+                answer=agent_response.answer,
+                turns=max(1, len(agent_response.tool_calls)),
+                tool_calls=tool_records,
+                telemetry=self.telemetry.to_dict(),
+                final_history=history,
+                phase_trace=phase_trace,
+                execution_path="openclaw",
+                openclaw_response=agent_response,
+            )
+
+        # ── OpenClaw agent execution with tool calls via executor ─────
+        if (
+            agent_response.success
+            and agent_response.tool_calls
+            and self.executor is not None
+        ):
+            self.telemetry.increment("pipeline_openclaw_tool_execution")
+            return await self._execute_openclaw_tool_calls(
+                session_id=session_id,
+                user_query=user_query,
+                agent_response=agent_response,
+                candidates=candidates,
+                history=history,
+                phase_trace=phase_trace,
+            )
+
+        # ── Phase 3: Fallback ─────────────────────────────────────────
+        self.telemetry.increment("pipeline_openclaw_failed")
+        await self._publish(
+            {
+                "type": "pipeline_openclaw_failed",
+                "session_id": session_id,
+                "error": agent_response.error,
+            }
+        )
+
+        if self.fallback_strategy == FallbackStrategy.ERROR:
+            phase_trace.append(PipelinePhase.COMPLETE.value)
+            return HybridPipelineResult(
+                status="failed",
+                answer=f"OpenClaw agent failed: {agent_response.error}",
+                turns=0,
+                tool_calls=[],
+                telemetry=self.telemetry.to_dict(),
+                final_history=history,
+                phase_trace=phase_trace,
+                execution_path="openclaw",
+                openclaw_response=agent_response,
+            )
+
+        if self.fallback_strategy == FallbackStrategy.BEST_EFFORT:
+            # Return whatever we got, even partial.
+            partial_answer = agent_response.answer or agent_response.raw_output or ""
+            tool_records = self._map_tool_calls(agent_response.tool_calls, candidates)
+            phase_trace.append(PipelinePhase.COMPLETE.value)
+            return HybridPipelineResult(
+                status="partial",
+                answer=partial_answer[:self.config.max_observation_chars],
+                turns=max(1, len(agent_response.tool_calls)),
+                tool_calls=tool_records,
+                telemetry=self.telemetry.to_dict(),
+                final_history=history,
+                phase_trace=phase_trace,
+                execution_path="openclaw",
+                openclaw_response=agent_response,
+            )
+
+        # ── HEURISTIC_PLANNER fallback ────────────────────────────────
+        phase_trace.append(PipelinePhase.FALLBACK.value)
+        if self.fallback_orchestrator is None:
+            phase_trace.append(PipelinePhase.COMPLETE.value)
+            return HybridPipelineResult(
+                status="failed",
+                answer="OpenClaw agent failed and no fallback orchestrator is configured.",
+                turns=0,
+                tool_calls=[],
+                telemetry=self.telemetry.to_dict(),
+                final_history=history,
+                phase_trace=phase_trace,
+                execution_path="fallback",
+                openclaw_response=agent_response,
+            )
+
+        self.telemetry.increment("pipeline_fallback")
+        await self._publish(
+            {
+                "type": "pipeline_fallback",
+                "session_id": session_id,
+                "strategy": self.fallback_strategy,
+            }
+        )
+
+        fallback_started = time.perf_counter()
+        fallback_result = await self.fallback_orchestrator.run(
+            session_id=f"{session_id}-fallback",
+            user_query=user_query,
+        )
+        fallback_ms = (time.perf_counter() - fallback_started) * 1000.0
+        self.telemetry.record_latency("pipeline_fallback", fallback_ms)
+
+        phase_trace.append(PipelinePhase.COMPLETE.value)
+        return HybridPipelineResult(
+            status=fallback_result.status,
+            answer=fallback_result.answer,
+            turns=fallback_result.turns,
+            tool_calls=fallback_result.tool_calls,
+            telemetry=self.telemetry.to_dict(),
+            final_history=fallback_result.final_history,
+            phase_trace=phase_trace,
+            execution_path="fallback",
+            openclaw_response=agent_response,
+        )
+
+    # -------------------------------------------------------------------
+    # Execute openclaw tool calls through the MCP executor
+    # -------------------------------------------------------------------
+
+    async def _execute_openclaw_tool_calls(
+        self,
+        *,
+        session_id: str,
+        user_query: str,
+        agent_response: OpenClawAgentResponse,
+        candidates: list[ToolCandidate],
+        history: list[dict[str, Any]],
+        phase_trace: list[str],
+    ) -> HybridPipelineResult:
+        """Execute tool calls from OpenClaw's plan through the MCP executor."""
+        assert self.executor is not None
+
+        tool_records: list[ToolCallRecord] = []
+        candidate_lookup = {
+            (c.server_name, c.tool_name): c for c in candidates
+        }
+        observations: list[str] = []
+
+        for idx, call in enumerate(agent_response.tool_calls, 1):
+            tool_ref = str(call.get("tool", ""))
+            arguments = call.get("arguments", {})
+            if not isinstance(arguments, dict):
+                arguments = {}
+
+            # Parse "server/tool" reference.
+            server_name, tool_name = self._parse_tool_ref(tool_ref)
+            candidate = candidate_lookup.get((server_name, tool_name))
+            if candidate is None:
+                observations.append(f"Tool {tool_ref} not found in routed candidates")
+                continue
+
+            try:
+                exec_started = time.perf_counter()
+                _, observation = await self.executor.execute(candidate, arguments)
+                exec_ms = (time.perf_counter() - exec_started) * 1000.0
+                self.telemetry.record_latency("pipeline_tool_execution", exec_ms)
+                self.telemetry.increment("pipeline_tool_calls")
+
+                tool_records.append(
+                    ToolCallRecord(
+                        turn_index=idx,
+                        server_name=server_name,
+                        tool_name=tool_name,
+                        arguments=dict(arguments),
+                        observation=observation,
+                    )
+                )
+                observations.append(observation)
+                await self._publish(
+                    {
+                        "type": "pipeline_tool_execution",
+                        "session_id": session_id,
+                        "turn": idx,
+                        "tool": tool_ref,
+                        "latency_ms": round(exec_ms, 3),
+                    }
+                )
+            except Exception as exc:
+                self.telemetry.increment("pipeline_tool_errors")
+                observations.append(f"Execution error for {tool_ref}: {exc}")
+
+        # Build answer from final observation or agent metadata.
+        answer = agent_response.answer
+        if not answer and observations:
+            answer = observations[-1]
+
+        history.append(
+            {
+                "role": "assistant",
+                "content": {
+                    "source": "openclaw_agent_executed",
+                    "tool_calls": [r.__dict__ for r in tool_records] if tool_records else [],
+                    "observations": observations,
+                },
+            }
+        )
+        phase_trace.append(PipelinePhase.COMPLETE.value)
+
+        return HybridPipelineResult(
+            status="complete",
+            answer=answer,
+            turns=len(tool_records) or 1,
+            tool_calls=tool_records,
+            telemetry=self.telemetry.to_dict(),
+            final_history=history,
+            phase_trace=phase_trace,
+            execution_path="openclaw",
+            openclaw_response=agent_response,
+        )
+
+    # -------------------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------------------
+
+    def _map_tool_calls(
+        self,
+        tool_calls: list[dict[str, Any]],
+        candidates: list[ToolCandidate],
+    ) -> list[ToolCallRecord]:
+        """Map OpenClaw tool call dicts back to typed ToolCallRecord."""
+        records: list[ToolCallRecord] = []
+        for idx, call in enumerate(tool_calls, 1):
+            tool_ref = str(call.get("tool", call.get("tool_name", "")))
+            server_name, tool_name = self._parse_tool_ref(tool_ref)
+            arguments = call.get("arguments", {})
+            if not isinstance(arguments, dict):
+                arguments = {}
+
+            records.append(
+                ToolCallRecord(
+                    turn_index=idx,
+                    server_name=server_name,
+                    tool_name=tool_name,
+                    arguments=dict(arguments),
+                    observation=str(call.get("observation", "")),
+                )
+            )
+        return records
+
+    @staticmethod
+    def _parse_tool_ref(tool_ref: str) -> tuple[str, str]:
+        """Parse 'server_name/tool_name' into a (server, tool) tuple."""
+        if "/" in tool_ref:
+            parts = tool_ref.split("/", 1)
+            return parts[0], parts[1]
+        return "", tool_ref
+
+    async def _publish(self, event: dict[str, Any]) -> None:
+        event["timestamp"] = time.time()
+        await self.event_bus.publish(event)

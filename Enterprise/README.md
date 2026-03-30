@@ -74,6 +74,29 @@ CLI backend smoke test:
 python Enterprise/examples/run_realtime_openclaw.py --backend-kind cli --max-cycles 2
 ```
 
+## End-to-End Hybrid Pipeline
+
+The new `OpenClawHybridPipeline` combines ToolFinder's semantic retrieval with
+OpenClaw's native agent execution for full end-to-end autonomy:
+
+```bash
+python Enterprise/examples/run_e2e_hybrid.py \
+	--endpoint http://127.0.0.1:11434/api/generate \
+	--model llama3.2 \
+	--api-mode ollama-generate \
+	--fallback-strategy heuristic_planner
+```
+
+Custom query:
+
+```bash
+python Enterprise/examples/run_e2e_hybrid.py \
+	--query "Read main.py and summarize its architecture" \
+	--max-agent-steps 5
+```
+
+Fallback strategies: `heuristic_planner` (default), `error`, `best_effort`.
+
 Live MCP filesystem mode:
 
 ```bash
