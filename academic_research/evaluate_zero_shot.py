@@ -12,9 +12,12 @@ def run_zero_shot_eval():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     model_path = os.path.join(base_dir, "models", "best_mcp_router")
     dataset_v2_path = os.path.join(base_dir, "mcp_routing_dataset_v2.csv")
-    
-    assert os.path.exists(os.path.join(model_path, "config.json")), f"CRITICAL FAULT: Model not found at {model_path}"
-    assert os.path.exists(dataset_v2_path), "CRITICAL FAULT: mcp_routing_dataset_v2.csv not found."
+
+    model_config_path = os.path.join(model_path, "config.json")
+    if not os.path.exists(model_config_path):
+        raise FileNotFoundError(f"CRITICAL FAULT: Model not found at {model_path}")
+    if not os.path.exists(dataset_v2_path):
+        raise FileNotFoundError("CRITICAL FAULT: mcp_routing_dataset_v2.csv not found.")
 
     # 2. Load Model & Unseen Data
     df_v2 = pd.read_csv(dataset_v2_path)

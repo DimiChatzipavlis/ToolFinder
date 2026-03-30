@@ -30,6 +30,12 @@ class RouteResult:
     score: float
 
 
+class RouteNotFoundError(LookupError):
+    """Raised when no tool satisfies routing constraints for a query."""
+
+    pass
+
+
 class UniversalMCPRouter:
     """Route natural-language queries to MCP tools using dense retrieval.
 
@@ -249,9 +255,15 @@ class UniversalMCPRouter:
             The best matching tool as `RouteResult` or bindable schema.
 
         Edge cases:
-            Propagates `IndexError` if no result survives threshold filtering.
+            Raises `RouteNotFoundError` if no result survives threshold filtering.
         """
-        return self.route_top_k(query, k=1)[0]
+        matches = self.route_top_k(query, k=1)
+        if not matches:
+            raise RouteNotFoundError(
+                "no route candidates met the similarity threshold; try lowering min_score "
+                "or rephrasing the query"
+            )
+        return matches[0]
 
     @staticmethod
     def _format_bindable_tool_schema(result: RouteResult) -> dict[str, Any]:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
@@ -535,7 +536,7 @@ def update_readme(markdown_block: str) -> None:
     README_PATH.write_text(pattern.sub(replacement, readme_text, count=1), encoding="utf-8")
 
 
-async def run_benchmark() -> None:
+async def run_benchmark(update_readme_block: bool = False) -> None:
     print("==================================================")
     print("TOOLFINDER vs. NAIVE SLM BENCHMARK")
     print(f"Tasks: {len(TEST_SUITE)}")
@@ -603,18 +604,36 @@ async def run_benchmark() -> None:
         detail_table = make_task_detail_table(naive_results, tf_results)
         cli_table = make_cli_table(naive_metrics, tf_metrics)
         markdown_table = make_markdown_table(naive_metrics, tf_metrics)
-        update_readme(build_readme_block(markdown_table, naive_results, tf_results))
+        if update_readme_block:
+            update_readme(build_readme_block(markdown_table, naive_results, tf_results))
+            print(f"\n[README] Updated benchmark block in {README_PATH}")
+        else:
+            print("\n[README] Skipped update (use --update-readme to enable mutation).")
 
         print(f"\n{detail_table}")
         print(f"\n{cli_table}")
         print("\nMarkdown Table:\n")
         print(markdown_table)
-        print(f"\n[README] Updated benchmark block in {README_PATH}")
     finally:
         if client is not None:
             await client.close()
         teardown_sandbox()
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run ToolFinder benchmark against naive context stuffing.")
+    parser.add_argument(
+        "--update-readme",
+        action="store_true",
+        help="Allow benchmark to rewrite README benchmark markers.",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    asyncio.run(run_benchmark(update_readme_block=args.update_readme))
+
+
 if __name__ == "__main__":
-    asyncio.run(run_benchmark())
+    main()

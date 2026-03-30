@@ -156,12 +156,12 @@ class AutonomousMCPAgent:
             model_name: Embedding model passed to `UniversalMCPRouter`.
             ollama_model: Target Ollama model identifier.
             ollama_url: Ollama `/api/generate` endpoint.
-            max_iterations: Requested max ReAct loops; clamped to at least 15.
+            max_iterations: Requested max ReAct loops; clamped to at least 1.
         """
         self.router: UniversalMCPRouter = UniversalMCPRouter(model_name=model_name)
         self.ollama_model: str = ollama_model
         self.ollama_url: str = ollama_url
-        self.max_iterations: int = max(15, max_iterations)
+        self.max_iterations: int = max(1, max_iterations)
         self.clients: dict[str, DynamicMCPClient] = {}
         self._owned_clients: list[DynamicMCPClient] = []
 
@@ -252,6 +252,28 @@ class AutonomousMCPAgent:
             routing_started = time.perf_counter()
             candidates = self.router.route_top_k(routing_query, k=5)
             routing_latency_ms = (time.perf_counter() - routing_started) * 1000.0
+            if not candidates:
+                observation = (
+                    "Observation: No tools exceeded the routing similarity threshold. "
+                    "Rephrase the query or continue by completing with an explanation."
+                )
+                scratchpad.add("observation", observation, iteration=iteration)
+                steps.append(
+                    ReActStep(
+                        iteration=iteration,
+                        thought=last_thought or "",
+                        action="no_route",
+                        server_name=None,
+                        tool_name=None,
+                        arguments=None,
+                        observation=observation,
+                        raw_model_output="",
+                        routing_latency_ms=routing_latency_ms,
+                        available_tools=[],
+                    )
+                )
+                iteration += 1
+                continue
             available_tools = self._serialize_candidates(candidates)
             logger.info(
                 "Iteration %s routed tools in %.2f ms: %s",
