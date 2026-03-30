@@ -48,7 +48,7 @@ The repository contains two proof surfaces:
 
 ### Auto-Updating Benchmark
 
-The block below is maintained by `python examples/eval_toolfinder.py`. Preserve the markers so the automated suite can continue injecting the latest metrics.
+The block below is updated only when you run `python examples/eval_toolfinder.py --update-readme`. Preserve the markers so the automated suite can continue injecting the latest metrics.
 
 <!-- EVAL_TABLE_START -->
 _Last auto-updated: 2026-03-16 17:01:57_
@@ -127,10 +127,67 @@ python -u examples/langgraph_integration/benchmark_agent.py
 python -u examples/langgraph_integration/baseline_agent.py
 ```
 
+## ▶️ Examples: Exact Run Instructions
+
+Use these exact commands from the repository root (`ToolFinder`).
+
+### 1) Prerequisites
+
+```bash
+# Python dependencies (core + langgraph integration + tests)
+pip install -e .[langgraph,dev]
+
+# Node.js runtime is required for MCP servers launched with npx.
+# Verify both commands are available:
+node --version
+npx --version
+
+# Ollama must be installed and running for LLM-backed examples.
+ollama --version
+ollama pull llama3.2
+```
+
+### 2) Interactive Notebook Walkthrough (recommended first)
+
+```bash
+jupyter lab examples/ToolFinder_StepByStep.ipynb
+```
+
+This notebook demonstrates semantic routing end-to-end with a small synthetic toolset, then points to the full script-based examples.
+
+### 3) Scripted Example Matrix
+
+```bash
+# A/B benchmark over filesystem MCP tools (does NOT mutate README by default)
+python examples/eval_toolfinder.py
+
+# If you want benchmark markers updated in README:
+python examples/eval_toolfinder.py --update-readme
+
+# LangGraph baseline (context stuffing)
+python -u examples/langgraph_integration/baseline_agent.py
+
+# LangGraph + ToolFinder routing
+python -u examples/langgraph_integration/benchmark_agent.py
+
+# Tri-server autonomous proof (memory + sqlite + fetch)
+python -u examples/prove_scalability.py
+
+# ReAct verification harness
+python -u examples/verify_react_agent.py
+```
+
+### 4) What to Expect
+
+- `examples/eval_toolfinder.py`: Prints per-task and aggregate telemetry. Sandbox files are created and cleaned under `examples/langgraph_integration/sandbox`.
+- `examples/langgraph_integration/*.py`: Prints routing/inference telemetry and tool-call traces.
+- `examples/prove_scalability.py`: Prints per-iteration action/observation trace and final scratchpad.
+- `examples/verify_react_agent.py`: Verifies sqlite discovery and memory-note persistence.
+
 ## 🗂️ Repository Structure
 
 - [toolfinder](toolfinder): Core package. FAISS routing, MCP ingestion, schema hardening, parsing recovery, and autonomous execution.
-- [examples](examples): Integration proofs. LangGraph benchmark, baseline comparison, self-bootstrapping evaluator, and orchestration demos.
+- [examples](examples): Integration proofs. LangGraph benchmark, baseline comparison, self-bootstrapping evaluator, orchestration demos, and a notebook walkthrough in `examples/ToolFinder_StepByStep.ipynb`.
 - [academic_research](academic_research): Semester project assets. Training data, notebooks, model artifacts, and evaluation code underpinning the semantic routing layer.
 
 ## 🔬 Why This Architecture Works
