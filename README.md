@@ -175,6 +175,18 @@ python -u examples/prove_scalability.py
 
 # ReAct verification harness
 python -u examples/verify_react_agent.py
+
+# Enterprise hybrid runtime demo
+python Enterprise/examples/run_hybrid_demo.py
+
+# Enterprise real-time OpenClaw runtime (HTTP backend, finite smoke run)
+python Enterprise/examples/run_realtime_openclaw.py --backend-kind http --max-cycles 2
+
+# Enterprise real-time OpenClaw runtime with live MCP filesystem server
+python Enterprise/examples/run_realtime_openclaw.py --backend-kind http --tool-runtime live --live-filesystem-root ./examples/langgraph_integration/sandbox
+
+# Enterprise real-time OpenClaw runtime with local OpenClaw CLI backend
+python Enterprise/examples/run_realtime_openclaw.py --backend-kind cli --max-cycles 2
 ```
 
 ### 4) What to Expect
@@ -189,6 +201,7 @@ python -u examples/verify_react_agent.py
 - [toolfinder](toolfinder): Core package. FAISS routing, MCP ingestion, schema hardening, parsing recovery, and autonomous execution.
 - [examples](examples): Integration proofs. LangGraph benchmark, baseline comparison, self-bootstrapping evaluator, orchestration demos, and a notebook walkthrough in `examples/ToolFinder_StepByStep.ipynb`.
 - [academic_research](academic_research): Semester project assets. Training data, notebooks, model artifacts, and evaluation code underpinning the semantic routing layer.
+- [Enterprise](Enterprise): Enterprise hybrid runtime with retrieval gate + OpenClaw-style planner abstraction + policy/telemetry/event-driven orchestration.
 
 ## 🔬 Why This Architecture Works
 
