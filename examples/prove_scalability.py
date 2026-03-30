@@ -89,7 +89,7 @@ async def connect_with_fallback(
 ) -> tuple[DynamicMCPClient, list[dict[str, Any]]]:
     try:
         return await connect_client(primary)
-    except (MCPClientError, Exception) as primary_exc:
+    except (MCPClientError, TimeoutError, OSError) as primary_exc:
         if fallback is None:
             raise
         logging.warning(
@@ -103,7 +103,7 @@ async def connect_with_fallback(
         )
         try:
             return await connect_client(fallback)
-        except (MCPClientError, Exception) as fallback_exc:
+        except (MCPClientError, TimeoutError, OSError) as fallback_exc:
             if second_fallback is None:
                 raise
             logging.warning(

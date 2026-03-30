@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from toolfinder import autonomous_agent as agent_module
@@ -14,12 +16,11 @@ class EmptyRouter:
         return []
 
 
-@pytest.mark.asyncio
-async def test_execute_task_handles_empty_routing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_execute_task_handles_empty_routing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(agent_module, "UniversalMCPRouter", EmptyRouter)
 
     agent = agent_module.AutonomousMCPAgent(model_name="dummy", max_iterations=1)
-    result = await agent.execute_task("do something")
+    result = asyncio.run(agent.execute_task("do something"))
 
     assert result.status == "failed"
     assert len(result.steps) == 1
