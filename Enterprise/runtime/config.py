@@ -16,6 +16,7 @@ class EnterpriseConfig:
     allow_unrouted_tool_calls: bool = False
     realtime_run_on_startup: bool = True
     realtime_error_backoff_s: float = 3.0
+    telemetry_sink_path: str = ""
 
     def __post_init__(self) -> None:
         if self.top_k < 1:
@@ -42,4 +43,5 @@ class EnterpriseConfig:
             allow_unrouted_tool_calls=os.getenv("ENTERPRISE_ALLOW_UNROUTED", "0") == "1",
             realtime_run_on_startup=os.getenv("ENTERPRISE_REALTIME_RUN_ON_STARTUP", "1") == "1",
             realtime_error_backoff_s=float(os.getenv("ENTERPRISE_REALTIME_ERROR_BACKOFF_S", "3")),
+            telemetry_sink_path=os.getenv("ENTERPRISE_TELEMETRY_SINK", ""),
         )

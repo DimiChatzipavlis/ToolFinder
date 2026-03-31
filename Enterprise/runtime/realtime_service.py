@@ -23,19 +23,24 @@ class WorkspaceChangeTracker:
         self.include_suffixes = include_suffixes or {".py", ".md", ".json", ".yaml", ".yml", ".toml"}
         self.exclude_dirs = exclude_dirs or {".git", "__pycache__", ".pytest_cache", ".venv", "venv"}
         self._last_fingerprint: str | None = None
+        self._last_snapshot: dict[str, tuple[int, int]] | None = None
 
     def detect_changes(self) -> tuple[bool, list[str]]:
         paths = self._collect_paths()
         fingerprint = self._fingerprint(paths)
+        snapshot = self._snapshot(paths)
         if self._last_fingerprint is None:
             self._last_fingerprint = fingerprint
+            self._last_snapshot = snapshot
             return False, []
 
         if fingerprint == self._last_fingerprint:
             return False, []
 
+        changed_paths = self._changed_paths(self._last_snapshot or {}, snapshot)
         self._last_fingerprint = fingerprint
-        return True, [str(path.relative_to(self.root)) for path in paths[:10]]
+        self._last_snapshot = snapshot
+        return True, changed_paths
 
     def _collect_paths(self) -> list[Path]:
         collected: list[Path] = []
@@ -58,6 +63,36 @@ class WorkspaceChangeTracker:
             digest.update(str(stat.st_mtime_ns).encode("utf-8"))
             digest.update(str(stat.st_size).encode("utf-8"))
         return digest.hexdigest()
+
+    def _snapshot(self, paths: list[Path]) -> dict[str, tuple[int, int]]:
+        snapshot: dict[str, tuple[int, int]] = {}
+        for path in paths:
+            relative = str(path.relative_to(self.root))
+            stat = path.stat()
+            snapshot[relative] = (int(stat.st_mtime_ns), int(stat.st_size))
+        return snapshot
+
+    @staticmethod
+    def _changed_paths(
+        previous: dict[str, tuple[int, int]],
+        current: dict[str, tuple[int, int]],
+        max_paths: int = 25,
+    ) -> list[str]:
+        changed: list[str] = []
+
+        for relative, metadata in current.items():
+            if relative not in previous:
+                changed.append(relative)
+                continue
+            if previous[relative] != metadata:
+                changed.append(relative)
+
+        for relative in previous:
+            if relative not in current:
+                changed.append(f"deleted:{relative}")
+
+        changed.sort()
+        return changed[:max_paths]
 
 
 class RealTimeHybridService:

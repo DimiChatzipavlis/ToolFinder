@@ -54,6 +54,25 @@ def test_workspace_change_tracker_detects_modification(tmp_path: Path) -> None:
     assert "sample.py" in touched
 
 
+def test_workspace_change_tracker_reports_precise_changed_files(tmp_path: Path) -> None:
+    file_a = tmp_path / "a.py"
+    file_b = tmp_path / "b.py"
+    file_a.write_text("print('a')", encoding="utf-8")
+    file_b.write_text("print('b')", encoding="utf-8")
+
+    tracker = WorkspaceChangeTracker(root=tmp_path)
+    changed, touched = tracker.detect_changes()
+    assert changed is False
+    assert touched == []
+
+    file_b.write_text("print('b2')", encoding="utf-8")
+    changed, touched = tracker.detect_changes()
+
+    assert changed is True
+    assert "b.py" in touched
+    assert "a.py" not in touched
+
+
 def test_build_openclaw_backend_http_mode() -> None:
     backend = build_openclaw_backend(
         backend_kind="http",

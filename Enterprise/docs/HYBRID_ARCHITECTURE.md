@@ -29,6 +29,8 @@ A retrieval-first gate minimizes selection error before the planner reasons abou
 	- `OpenClawCliBackend` for direct `openclaw` CLI execution.
 - Continuous workspace monitoring via `WorkspaceChangeTracker` and `RealTimeHybridService`.
 - Deterministic policy controls for security and compliance.
+- Precise changed-file deltas (added/modified/deleted) for realtime query shaping.
+- Optional durable telemetry snapshots via `ENTERPRISE_TELEMETRY_SINK`.
 
 ## Concrete Runtime Entry Points
 
@@ -88,6 +90,13 @@ User Query
 - `heuristic_planner`: Falls back to the existing orchestrator if OpenClaw fails (default).
 - `error`: Returns an error immediately if OpenClaw fails.
 - `best_effort`: Returns partial results from OpenClaw even on failure.
+
+### Safety Guarantees in Current Implementation
+
+- OpenClaw tool calls are executed under the same policy checks used by the orchestrator path.
+- The pipeline does not accept an OpenClaw final answer before executing planned tool calls.
+- Failed tool execution does not silently produce a successful completion.
+- Event bus subscribers are isolated so one failing handler does not stop runtime publishing.
 
 ## Production Hardening Recommendations
 

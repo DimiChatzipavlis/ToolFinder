@@ -20,6 +20,7 @@ from .contracts import (
     HybridPipelineResult,
     OpenClawAgentRequest,
     OpenClawAgentResponse,
+    PlannerDecision,
     PipelinePhase,
     ToolCallRecord,
     ToolCandidate,
@@ -28,6 +29,7 @@ from .event_bus import EnterpriseEventBus
 from .executor import HybridToolExecutor
 from .openclaw_backend import OpenClawCliBackend, OpenClawHttpBackend
 from .orchestrator import HybridEnterpriseOrchestrator
+from .policy import PolicyEngine, PolicyViolation
 from .registry import HybridToolRegistry
 from .telemetry import TelemetryCollector
 
@@ -311,23 +313,34 @@ class OpenClawHybridPipeline:
         session_driver: OpenClawSessionDriver,
         fallback_orchestrator: HybridEnterpriseOrchestrator | None = None,
         executor: HybridToolExecutor | None = None,
+        policy_engine: PolicyEngine | None = None,
         config: EnterpriseConfig | None = None,
         event_bus: EnterpriseEventBus | None = None,
         telemetry: TelemetryCollector | None = None,
         fallback_strategy: str = FallbackStrategy.HEURISTIC_PLANNER,
         max_agent_steps: int = 10,
         model: str = "",
+        require_all_tool_calls_success: bool = True,
     ) -> None:
         self.registry = registry
         self.session_driver = session_driver
         self.fallback_orchestrator = fallback_orchestrator
         self.executor = executor
         self.config = config or EnterpriseConfig()
+        if policy_engine is not None:
+            self.policy_engine = policy_engine
+        elif fallback_orchestrator is not None:
+            self.policy_engine = fallback_orchestrator.policy_engine
+        else:
+            self.policy_engine = PolicyEngine()
         self.event_bus = event_bus or EnterpriseEventBus()
         self.telemetry = telemetry or TelemetryCollector()
+        if not self.telemetry.sink_path and self.config.telemetry_sink_path:
+            self.telemetry.sink_path = self.config.telemetry_sink_path
         self.fallback_strategy = FallbackStrategy.validate(fallback_strategy)
         self.max_agent_steps = max_agent_steps
         self.model = model
+        self.require_all_tool_calls_success = require_all_tool_calls_success
 
     async def run(self, session_id: str, user_query: str) -> HybridPipelineResult:
         """Execute the full hybrid pipeline for a user query."""
@@ -356,7 +369,9 @@ class OpenClawHybridPipeline:
         if not candidates:
             self.telemetry.increment("pipeline_no_route")
             phase_trace.append(PipelinePhase.COMPLETE.value)
-            return HybridPipelineResult(
+            return self._finalize_result(
+                session_id,
+                HybridPipelineResult(
                 status="failed",
                 answer="No tools met routing threshold.",
                 turns=0,
@@ -365,6 +380,7 @@ class OpenClawHybridPipeline:
                 final_history=history,
                 phase_trace=phase_trace,
                 execution_path="direct",
+                ),
             )
 
         # ── Phase 2: OpenClaw agent execution ─────────────────────────
@@ -392,8 +408,39 @@ class OpenClawHybridPipeline:
             }
         )
 
+        if agent_response.success and agent_response.tool_calls:
+            if self.executor is None:
+                agent_response = OpenClawAgentResponse(
+                    answer=agent_response.answer,
+                    tool_calls=agent_response.tool_calls,
+                    raw_output=agent_response.raw_output,
+                    success=False,
+                    error="OpenClaw returned tool calls but no executor is configured.",
+                    metadata=dict(agent_response.metadata),
+                )
+            else:
+                self.telemetry.increment("pipeline_openclaw_tool_execution")
+                tool_execution_result = await self._execute_openclaw_tool_calls(
+                    session_id=session_id,
+                    user_query=user_query,
+                    agent_response=agent_response,
+                    candidates=candidates,
+                    history=history,
+                    phase_trace=phase_trace,
+                )
+                if tool_execution_result.status == "complete":
+                    return self._finalize_result(session_id, tool_execution_result)
+
+                agent_response = OpenClawAgentResponse(
+                    answer=agent_response.answer,
+                    tool_calls=agent_response.tool_calls,
+                    raw_output=agent_response.raw_output,
+                    success=False,
+                    error=tool_execution_result.answer,
+                    metadata=dict(agent_response.metadata),
+                )
+
         if agent_response.success and agent_response.answer:
-            # ── OpenClaw succeeded ─────────────────────────────────────
             self.telemetry.increment("pipeline_openclaw_success")
             tool_records = self._map_tool_calls(agent_response.tool_calls, candidates)
             history.append(
@@ -407,32 +454,19 @@ class OpenClawHybridPipeline:
                 }
             )
             phase_trace.append(PipelinePhase.COMPLETE.value)
-            return HybridPipelineResult(
-                status="complete",
-                answer=agent_response.answer,
-                turns=max(1, len(agent_response.tool_calls)),
-                tool_calls=tool_records,
-                telemetry=self.telemetry.to_dict(),
-                final_history=history,
-                phase_trace=phase_trace,
-                execution_path="openclaw",
-                openclaw_response=agent_response,
-            )
-
-        # ── OpenClaw agent execution with tool calls via executor ─────
-        if (
-            agent_response.success
-            and agent_response.tool_calls
-            and self.executor is not None
-        ):
-            self.telemetry.increment("pipeline_openclaw_tool_execution")
-            return await self._execute_openclaw_tool_calls(
-                session_id=session_id,
-                user_query=user_query,
-                agent_response=agent_response,
-                candidates=candidates,
-                history=history,
-                phase_trace=phase_trace,
+            return self._finalize_result(
+                session_id,
+                HybridPipelineResult(
+                    status="complete",
+                    answer=agent_response.answer,
+                    turns=max(1, len(agent_response.tool_calls)),
+                    tool_calls=tool_records,
+                    telemetry=self.telemetry.to_dict(),
+                    final_history=history,
+                    phase_trace=phase_trace,
+                    execution_path="openclaw",
+                    openclaw_response=agent_response,
+                ),
             )
 
         # ── Phase 3: Fallback ─────────────────────────────────────────
@@ -447,7 +481,9 @@ class OpenClawHybridPipeline:
 
         if self.fallback_strategy == FallbackStrategy.ERROR:
             phase_trace.append(PipelinePhase.COMPLETE.value)
-            return HybridPipelineResult(
+            return self._finalize_result(
+                session_id,
+                HybridPipelineResult(
                 status="failed",
                 answer=f"OpenClaw agent failed: {agent_response.error}",
                 turns=0,
@@ -457,6 +493,7 @@ class OpenClawHybridPipeline:
                 phase_trace=phase_trace,
                 execution_path="openclaw",
                 openclaw_response=agent_response,
+                ),
             )
 
         if self.fallback_strategy == FallbackStrategy.BEST_EFFORT:
@@ -464,7 +501,9 @@ class OpenClawHybridPipeline:
             partial_answer = agent_response.answer or agent_response.raw_output or ""
             tool_records = self._map_tool_calls(agent_response.tool_calls, candidates)
             phase_trace.append(PipelinePhase.COMPLETE.value)
-            return HybridPipelineResult(
+            return self._finalize_result(
+                session_id,
+                HybridPipelineResult(
                 status="partial",
                 answer=partial_answer[:self.config.max_observation_chars],
                 turns=max(1, len(agent_response.tool_calls)),
@@ -474,13 +513,16 @@ class OpenClawHybridPipeline:
                 phase_trace=phase_trace,
                 execution_path="openclaw",
                 openclaw_response=agent_response,
+                ),
             )
 
         # ── HEURISTIC_PLANNER fallback ────────────────────────────────
         phase_trace.append(PipelinePhase.FALLBACK.value)
         if self.fallback_orchestrator is None:
             phase_trace.append(PipelinePhase.COMPLETE.value)
-            return HybridPipelineResult(
+            return self._finalize_result(
+                session_id,
+                HybridPipelineResult(
                 status="failed",
                 answer="OpenClaw agent failed and no fallback orchestrator is configured.",
                 turns=0,
@@ -490,6 +532,7 @@ class OpenClawHybridPipeline:
                 phase_trace=phase_trace,
                 execution_path="fallback",
                 openclaw_response=agent_response,
+                ),
             )
 
         self.telemetry.increment("pipeline_fallback")
@@ -508,9 +551,12 @@ class OpenClawHybridPipeline:
         )
         fallback_ms = (time.perf_counter() - fallback_started) * 1000.0
         self.telemetry.record_latency("pipeline_fallback", fallback_ms)
+        self.telemetry.merge_snapshot(fallback_result.telemetry)
 
         phase_trace.append(PipelinePhase.COMPLETE.value)
-        return HybridPipelineResult(
+        return self._finalize_result(
+            session_id,
+            HybridPipelineResult(
             status=fallback_result.status,
             answer=fallback_result.answer,
             turns=fallback_result.turns,
@@ -520,6 +566,7 @@ class OpenClawHybridPipeline:
             phase_trace=phase_trace,
             execution_path="fallback",
             openclaw_response=agent_response,
+            ),
         )
 
     # -------------------------------------------------------------------
@@ -537,6 +584,7 @@ class OpenClawHybridPipeline:
         phase_trace: list[str],
     ) -> HybridPipelineResult:
         """Execute tool calls from OpenClaw's plan through the MCP executor."""
+        del user_query
         assert self.executor is not None
 
         tool_records: list[ToolCallRecord] = []
@@ -544,6 +592,9 @@ class OpenClawHybridPipeline:
             (c.server_name, c.tool_name): c for c in candidates
         }
         observations: list[str] = []
+        failed_messages: list[str] = []
+        successful_calls = 0
+        expected_calls = len(agent_response.tool_calls)
 
         for idx, call in enumerate(agent_response.tool_calls, 1):
             tool_ref = str(call.get("tool", ""))
@@ -555,15 +606,35 @@ class OpenClawHybridPipeline:
             server_name, tool_name = self._parse_tool_ref(tool_ref)
             candidate = candidate_lookup.get((server_name, tool_name))
             if candidate is None:
-                observations.append(f"Tool {tool_ref} not found in routed candidates")
+                self.telemetry.increment("pipeline_tool_errors")
+                message = f"Tool {tool_ref} not found in routed candidates"
+                observations.append(message)
+                failed_messages.append(message)
+                await self._publish(
+                    {
+                        "type": "pipeline_tool_error",
+                        "session_id": session_id,
+                        "turn": idx,
+                        "tool": tool_ref,
+                        "error": message,
+                    }
+                )
                 continue
 
             try:
+                policy_decision = self._build_policy_decision(server_name, tool_name, arguments)
+                self.policy_engine.enforce_call(
+                    policy_decision,
+                    candidate_lookup,
+                    allow_unrouted_tool_calls=self.config.allow_unrouted_tool_calls,
+                )
+
                 exec_started = time.perf_counter()
                 _, observation = await self.executor.execute(candidate, arguments)
                 exec_ms = (time.perf_counter() - exec_started) * 1000.0
                 self.telemetry.record_latency("pipeline_tool_execution", exec_ms)
                 self.telemetry.increment("pipeline_tool_calls")
+                successful_calls += 1
 
                 tool_records.append(
                     ToolCallRecord(
@@ -584,31 +655,79 @@ class OpenClawHybridPipeline:
                         "latency_ms": round(exec_ms, 3),
                     }
                 )
+            except PolicyViolation as exc:
+                self.telemetry.increment("pipeline_policy_violations")
+                message = f"Policy violation for {tool_ref}: {exc}"
+                observations.append(message)
+                failed_messages.append(message)
+                await self._publish(
+                    {
+                        "type": "pipeline_tool_error",
+                        "session_id": session_id,
+                        "turn": idx,
+                        "tool": tool_ref,
+                        "error": message,
+                    }
+                )
             except Exception as exc:
                 self.telemetry.increment("pipeline_tool_errors")
-                observations.append(f"Execution error for {tool_ref}: {exc}")
+                message = f"Execution error for {tool_ref}: {exc}"
+                observations.append(message)
+                failed_messages.append(message)
+                await self._publish(
+                    {
+                        "type": "pipeline_tool_error",
+                        "session_id": session_id,
+                        "turn": idx,
+                        "tool": tool_ref,
+                        "error": message,
+                    }
+                )
 
-        # Build answer from final observation or agent metadata.
-        answer = agent_response.answer
-        if not answer and observations:
-            answer = observations[-1]
+        failures = len(failed_messages)
+        all_calls_succeeded = successful_calls == expected_calls
+
+        if failures > 0 and self.require_all_tool_calls_success:
+            status = "failed"
+            answer = (
+                "OpenClaw tool execution failed: "
+                f"{failures} of {expected_calls} calls failed. "
+                f"Last error: {failed_messages[-1]}"
+            )
+        elif failures > 0 and not tool_records and not agent_response.answer:
+            status = "failed"
+            answer = failed_messages[-1]
+        else:
+            status = "complete"
+            answer = agent_response.answer
+            if not answer and observations:
+                answer = observations[-1]
+            if not answer:
+                answer = "Tool execution completed."
+
+        if failures > 0 and not all_calls_succeeded:
+            self.telemetry.increment("pipeline_openclaw_execution_failed")
+        elif status == "complete":
+            self.telemetry.increment("pipeline_openclaw_success")
 
         history.append(
             {
                 "role": "assistant",
                 "content": {
                     "source": "openclaw_agent_executed",
+                    "status": status,
                     "tool_calls": [r.__dict__ for r in tool_records] if tool_records else [],
                     "observations": observations,
+                    "errors": failed_messages,
                 },
             }
         )
         phase_trace.append(PipelinePhase.COMPLETE.value)
 
         return HybridPipelineResult(
-            status="complete",
+            status=status,
             answer=answer,
-            turns=len(tool_records) or 1,
+            turns=max(1, len(tool_records) or expected_calls),
             tool_calls=tool_records,
             telemetry=self.telemetry.to_dict(),
             final_history=history,
@@ -653,6 +772,34 @@ class OpenClawHybridPipeline:
             parts = tool_ref.split("/", 1)
             return parts[0], parts[1]
         return "", tool_ref
+
+    @staticmethod
+    def _build_policy_decision(
+        server_name: str,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> PlannerDecision:
+        return PlannerDecision(
+            action="call_tool",
+            thought="openclaw tool call",
+            server_name=server_name,
+            tool_name=tool_name,
+            arguments=dict(arguments),
+        )
+
+    def _finalize_result(self, session_id: str, result: HybridPipelineResult) -> HybridPipelineResult:
+        try:
+            self.telemetry.persist_snapshot(
+                {
+                    "session_id": session_id,
+                    "status": result.status,
+                    "execution_path": result.execution_path,
+                }
+            )
+        except Exception:
+            # Telemetry persistence must never break request completion.
+            self.telemetry.increment("pipeline_telemetry_persist_errors")
+        return result
 
     async def _publish(self, event: dict[str, Any]) -> None:
         event["timestamp"] = time.time()

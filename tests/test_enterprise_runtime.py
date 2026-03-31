@@ -6,11 +6,13 @@ from pathlib import Path
 import pytest
 
 from Enterprise.runtime.contracts import PlannerDecision, PlannerTurnInput, ToolCandidate
+from Enterprise.runtime.event_bus import EnterpriseEventBus
 from Enterprise.runtime.orchestrator import HybridEnterpriseOrchestrator
 from Enterprise.runtime.planner import HeuristicPlanner, OpenClawPlanner
 from Enterprise.runtime.policy import PolicyEngine, PolicyViolation, ToolPolicy
 from Enterprise.runtime.realtime_service import RealTimeHybridService, WorkspaceChangeTracker
 from Enterprise.runtime.config import EnterpriseConfig
+from Enterprise.runtime.telemetry import TelemetryCollector
 
 
 class BrokenBackend:
@@ -96,6 +98,23 @@ def test_openclaw_planner_fallback_completes_with_observation() -> None:
     assert "files:" in (decision.answer or "")
 
 
+def test_openclaw_planner_fallback_retries_on_error_observation() -> None:
+    planner = OpenClawPlanner(backend=BrokenBackend())
+    turn_input = PlannerTurnInput(
+        session_id="s4",
+        user_query="list files",
+        history=[{"role": "observation", "content": "Execution error: filesystem unavailable"}],
+        candidates=[_candidate()],
+        turn_index=2,
+    )
+
+    decision = asyncio.run(planner.plan(turn_input))
+
+    assert decision.action == "call_tool"
+    assert decision.server_name == "filesystem"
+    assert decision.tool_name == "list_directory"
+
+
 class _Result:
     def __init__(self) -> None:
         self.status = "complete"
@@ -127,6 +146,26 @@ def test_realtime_service_runs_on_startup(tmp_path: Path) -> None:
 
     asyncio.run(service.run_for_cycles(1))
     assert orchestrator.calls == 1
+
+
+def test_event_bus_isolates_failing_handlers() -> None:
+    bus = EnterpriseEventBus()
+    events: list[str] = []
+
+    def _failing_handler(event: dict[str, object]) -> None:
+        del event
+        raise RuntimeError("subscriber broke")
+
+    def _recording_handler(event: dict[str, object]) -> None:
+        events.append(str(event.get("type", "")))
+
+    bus.subscribe(_failing_handler)
+    bus.subscribe(_recording_handler)
+
+    asyncio.run(bus.publish({"type": "runtime_event"}))
+
+    assert "runtime_event" in events
+    assert bus.recent_errors()
 
 
 class _StaticRegistry:
@@ -168,3 +207,39 @@ def test_orchestrator_loop_guard_completes_on_repeated_calls() -> None:
     assert result.turns == 2
     counters = result.telemetry.get("counters", {})
     assert counters.get("loop_guard_complete") == 1
+
+
+def test_telemetry_merge_snapshot() -> None:
+    telemetry = TelemetryCollector()
+    telemetry.increment("pipeline_fallback")
+    telemetry.record_latency("pipeline_routing", 10.0)
+
+    telemetry.merge_snapshot(
+        {
+            "counters": {"complete": 1},
+            "latencies_ms": {
+                "pipeline_routing": {"count": 2, "min": 5.0, "max": 15.0, "mean": 10.0}
+            },
+        }
+    )
+
+    snapshot = telemetry.to_dict()
+    counters = snapshot.get("counters", {})
+    latencies = snapshot.get("latencies_ms", {})
+
+    assert counters.get("pipeline_fallback") == 1
+    assert counters.get("complete") == 1
+    assert isinstance(latencies.get("pipeline_routing"), dict)
+    assert latencies["pipeline_routing"]["count"] == 3
+
+
+def test_telemetry_persist_snapshot(tmp_path: Path) -> None:
+    sink = tmp_path / "telemetry.jsonl"
+    telemetry = TelemetryCollector(sink_path=str(sink))
+    telemetry.increment("complete")
+
+    telemetry.persist_snapshot({"session_id": "s1", "status": "complete"})
+
+    persisted = sink.read_text(encoding="utf-8")
+    assert "session_id" in persisted
+    assert "telemetry" in persisted

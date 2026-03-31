@@ -34,6 +34,8 @@ class HybridEnterpriseOrchestrator:
         self.config = config or EnterpriseConfig()
         self.event_bus = event_bus or EnterpriseEventBus()
         self.telemetry = telemetry or TelemetryCollector()
+        if not self.telemetry.sink_path and self.config.telemetry_sink_path:
+            self.telemetry.sink_path = self.config.telemetry_sink_path
 
     async def run(self, session_id: str, user_query: str) -> SessionResult:
         history: list[dict[str, Any]] = [{"role": "user", "content": user_query}]
@@ -63,14 +65,14 @@ class HybridEnterpriseOrchestrator:
 
             if not candidates:
                 self.telemetry.increment("no_route")
-                return SessionResult(
+                return self._finalize_result(session_id, SessionResult(
                     status="failed",
                     answer="No tools met routing threshold.",
                     turns=turn_index,
                     tool_calls=tool_calls,
                     telemetry=self.telemetry.to_dict(),
                     final_history=history,
-                )
+                ))
 
             planner_input = PlannerTurnInput(
                 session_id=session_id,
@@ -99,14 +101,14 @@ class HybridEnterpriseOrchestrator:
 
             if decision.action == "complete":
                 self.telemetry.increment("complete")
-                return SessionResult(
+                return self._finalize_result(session_id, SessionResult(
                     status="complete",
                     answer=decision.answer or "",
                     turns=turn_index,
                     tool_calls=tool_calls,
                     telemetry=self.telemetry.to_dict(),
                     final_history=history,
-                )
+                ))
 
             if decision.action != "call_tool":
                 retries += 1
@@ -116,14 +118,14 @@ class HybridEnterpriseOrchestrator:
                     "content": f"Invalid planner action: {decision.action}",
                 })
                 if retries > self.config.max_retries:
-                    return SessionResult(
+                    return self._finalize_result(session_id, SessionResult(
                         status="failed",
                         answer="Planner produced invalid actions repeatedly.",
                         turns=turn_index,
                         tool_calls=tool_calls,
                         telemetry=self.telemetry.to_dict(),
                         final_history=history,
-                    )
+                    ))
                 continue
 
             candidate_lookup = self._build_candidate_lookup(candidates)
@@ -207,14 +209,14 @@ class HybridEnterpriseOrchestrator:
                             "tool": f"{selected.server_name}/{selected.tool_name}",
                         }
                     )
-                    return SessionResult(
+                    return self._finalize_result(session_id, SessionResult(
                         status="complete",
                         answer=f"Completed from repeated observation: {clipped_observation}",
                         turns=turn_index,
                         tool_calls=tool_calls,
                         telemetry=self.telemetry.to_dict(),
                         final_history=history,
-                    )
+                    ))
                 retries = 0
             except Exception as exc:
                 retries += 1
@@ -229,24 +231,24 @@ class HybridEnterpriseOrchestrator:
                     }
                 )
                 if retries > self.config.max_retries:
-                    return SessionResult(
+                    return self._finalize_result(session_id, SessionResult(
                         status="failed",
                         answer=f"Execution failed after retries: {exc}",
                         turns=turn_index,
                         tool_calls=tool_calls,
                         telemetry=self.telemetry.to_dict(),
                         final_history=history,
-                    )
+                    ))
 
         self.telemetry.increment("iteration_limit")
-        return SessionResult(
+        return self._finalize_result(session_id, SessionResult(
             status="failed",
             answer="Iteration limit reached before completion.",
             turns=self.config.max_turns,
             tool_calls=tool_calls,
             telemetry=self.telemetry.to_dict(),
             final_history=history,
-        )
+        ))
 
     def _build_candidate_lookup(
         self,
@@ -265,3 +267,17 @@ class HybridEnterpriseOrchestrator:
     async def _publish(self, event: dict[str, Any]) -> None:
         event["timestamp"] = time.time()
         await self.event_bus.publish(event)
+
+    def _finalize_result(self, session_id: str, result: SessionResult) -> SessionResult:
+        try:
+            self.telemetry.persist_snapshot(
+                {
+                    "session_id": session_id,
+                    "status": result.status,
+                    "turns": result.turns,
+                }
+            )
+        except Exception:
+            # Persistence failures are non-fatal for runtime execution.
+            self.telemetry.increment("telemetry_persist_errors")
+        return result

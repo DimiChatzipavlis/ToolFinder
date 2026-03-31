@@ -61,6 +61,7 @@ Environment variables:
 - `OPENCLAW_API_KEY`: optional bearer token for protected endpoints.
 - `OPENCLAW_CLI_BIN`: optional path/name for the CLI binary.
 - `ENTERPRISE_DISABLE_SEMANTIC_ROUTER`: set `1` to force keyword fallback routing (useful offline/air-gapped).
+- `ENTERPRISE_TELEMETRY_SINK`: optional JSONL file path for durable telemetry snapshots.
 
 Finite-cycle smoke test:
 
@@ -96,6 +97,12 @@ python Enterprise/examples/run_e2e_hybrid.py \
 ```
 
 Fallback strategies: `heuristic_planner` (default), `error`, `best_effort`.
+
+Pipeline safety defaults:
+
+- OpenClaw tool calls are policy-validated before execution.
+- Tool-call plans are executed before accepting a final OpenClaw answer.
+- If any planned tool call fails, the pipeline marks the OpenClaw path failed and applies fallback strategy.
 
 Live MCP filesystem mode:
 

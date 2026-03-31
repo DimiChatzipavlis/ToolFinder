@@ -86,6 +86,23 @@ class _ToolCallBackend:
         ])
 
 
+class _MemoryToolCallBackend:
+    async def complete(self, prompt: str) -> str:
+        return json.dumps([
+            {
+                "thought": "search memory",
+                "action": "call_tool",
+                "tool": "memory/search_nodes",
+                "arguments": {"query": "files"},
+            },
+            {
+                "thought": "done",
+                "status": "complete",
+                "answer": "Memory searched.",
+            },
+        ])
+
+
 class _FailingBackend:
     """Backend that always raises an error."""
 
@@ -286,6 +303,26 @@ def test_pipeline_openclaw_with_tool_execution() -> None:
     assert len(result.tool_calls) == 1
     assert result.tool_calls[0].server_name == "filesystem"
     assert result.tool_calls[0].tool_name == "list_directory"
+    assert "list_directory result" in result.tool_calls[0].observation
+
+
+def test_pipeline_policy_enforced_during_openclaw_tool_execution() -> None:
+    driver = OpenClawSessionDriver(backend=_MemoryToolCallBackend())
+    clients = {"memory": _MockExecutorClient()}
+    executor = HybridToolExecutor(clients)
+
+    pipeline = OpenClawHybridPipeline(
+        registry=_StaticRegistry([_candidate("memory", "search_nodes")]),
+        session_driver=driver,
+        executor=executor,
+        policy_engine=PolicyEngine(ToolPolicy(allowed_servers={"filesystem"})),
+        fallback_strategy=FallbackStrategy.ERROR,
+    )
+    result = asyncio.run(pipeline.run("session-policy", "search memory"))
+
+    assert result.status == "failed"
+    assert result.execution_path == "openclaw"
+    assert "policy violation" in result.answer.lower()
 
 
 def test_pipeline_fallback_on_openclaw_failure() -> None:
@@ -333,6 +370,8 @@ def test_pipeline_fallback_on_openclaw_failure() -> None:
     assert PipelinePhase.FALLBACK.value in result.phase_trace
     assert result.openclaw_response is not None
     assert result.openclaw_response.success is False
+    telemetry_counters = result.telemetry.get("counters", {})
+    assert telemetry_counters.get("complete", 0) >= 1
 
 
 def test_pipeline_error_strategy_returns_failed() -> None:

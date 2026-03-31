@@ -103,6 +103,22 @@ class OpenClawPlanner:
         observations = [entry for entry in turn_input.history if entry.get("role") == "observation"]
         if observations:
             last_observation = str(observations[-1].get("content", ""))
+            if self._is_error_observation(last_observation):
+                if turn_input.candidates:
+                    selected = turn_input.candidates[0]
+                    return PlannerDecision(
+                        action="call_tool",
+                        thought="Planner backend unavailable; latest observation indicates an execution error, retrying with top-ranked routed tool.",
+                        server_name=selected.server_name,
+                        tool_name=selected.tool_name,
+                        arguments=self._minimal_arguments(selected),
+                    )
+                return PlannerDecision(
+                    action="complete",
+                    thought="Planner backend unavailable and no routed tools are available to recover from an execution error.",
+                    answer="Execution failed and no candidate tools matched the query for recovery.",
+                )
+
             return PlannerDecision(
                 action="complete",
                 thought="Planner backend unavailable; completing from latest observation.",
@@ -158,6 +174,24 @@ class OpenClawPlanner:
 
         return defaults
 
+    @staticmethod
+    def _is_error_observation(observation: str) -> bool:
+        normalized = observation.strip().lower()
+        if not normalized:
+            return False
+        error_markers = (
+            "execution error",
+            "tool execution failed",
+            "policy violation",
+            "traceback",
+            "runtimeerror",
+            "valueerror",
+            "jsonschema",
+            "validationerror",
+            "timed out",
+        )
+        return any(marker in normalized for marker in error_markers)
+
 
 class HeuristicPlanner:
     """Deterministic local planner for smoke tests and offline demos."""
@@ -169,6 +203,18 @@ class HeuristicPlanner:
         observations = [entry for entry in turn_input.history if entry.get("role") == "observation"]
         if observations:
             last_observation = str(observations[-1].get("content", ""))
+            if OpenClawPlanner._is_error_observation(last_observation):
+                ranked_for_retry = list(turn_input.candidates)
+                ranked_for_retry.sort(key=lambda c: c.score, reverse=True)
+                if ranked_for_retry:
+                    selected_retry = ranked_for_retry[0]
+                    return PlannerDecision(
+                        action="call_tool",
+                        thought="Latest observation contains an execution error; retrying with top routed tool.",
+                        server_name=selected_retry.server_name,
+                        tool_name=selected_retry.tool_name,
+                        arguments=OpenClawPlanner._minimal_arguments(selected_retry),
+                    )
             return PlannerDecision(
                 action="complete",
                 thought="A tool observation is available; finishing deterministically.",
