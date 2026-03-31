@@ -187,6 +187,9 @@ python Enterprise/examples/run_realtime_openclaw.py --backend-kind http --tool-r
 
 # Enterprise real-time OpenClaw runtime with local OpenClaw CLI backend
 python Enterprise/examples/run_realtime_openclaw.py --backend-kind cli --max-cycles 2
+
+# Enterprise end-to-end hybrid pipeline (ToolFinder routing + OpenClaw agent)
+python Enterprise/examples/run_e2e_hybrid.py --max-cycles 1 --fallback-strategy heuristic_planner
 ```
 
 ### 4) What to Expect
@@ -195,6 +198,8 @@ python Enterprise/examples/run_realtime_openclaw.py --backend-kind cli --max-cyc
 - `examples/langgraph_integration/*.py`: Prints routing/inference telemetry and tool-call traces.
 - `examples/prove_scalability.py`: Prints per-iteration action/observation trace and final scratchpad.
 - `examples/verify_react_agent.py`: Verifies sqlite discovery and memory-note persistence.
+- `Enterprise/examples/run_e2e_hybrid.py`: Executes routing -> OpenClaw agent -> guarded tool execution with fallback strategy controls.
+- `Enterprise/examples/run_realtime_openclaw.py`: Runs finite or continuous workspace polling using precise changed-file deltas and policy-guarded execution.
 
 ## 🗂️ Repository Structure
 

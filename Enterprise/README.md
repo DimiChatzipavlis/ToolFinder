@@ -2,6 +2,21 @@
 
 This directory contains an enterprise-grade hybrid architecture built on ToolFinder's retrieval-first design.
 
+## Verified Status (2026-03-31)
+
+Current verdict: the Enterprise hybrid edition is working on this repository checkout.
+
+Verified on this machine:
+
+- Enterprise-focused tests passed: `pytest -q tests/test_enterprise_runtime.py tests/test_hybrid_pipeline.py tests/test_enterprise_backend.py`
+- Deterministic orchestrator demo passed: `python Enterprise/examples/run_hybrid_demo.py`
+- End-to-end OpenClaw pipeline demo passed: `python Enterprise/examples/run_e2e_hybrid.py --max-cycles 1 --fallback-strategy heuristic_planner`
+- Realtime finite-cycle loop passed: `python Enterprise/examples/run_realtime_openclaw.py --max-cycles 1 --tool-runtime mock`
+
+Known operational limit:
+
+- In live filesystem mode, model-generated arguments may still request out-of-scope paths. Policy and runtime checks block unsafe calls, but you should still treat this as an expected operational failure mode to monitor.
+
 ## Design Goals
 
 - Keep low tool-selection error via semantic retrieval gates.
@@ -17,6 +32,15 @@ This directory contains an enterprise-grade hybrid architecture built on ToolFin
 4. Executor: schema-validates and invokes MCP tools.
 5. Event bus + telemetry: emits runtime events and performance metrics.
 6. Registry: supports live tool-catalog updates without changing planner logic.
+
+## New Hardening Features
+
+- Strict completion semantics: execution errors are no longer promoted into successful completions.
+- Policy parity across paths: OpenClaw tool calls use the same policy checks as orchestrator execution.
+- Tool-call-first safety: final OpenClaw answers are only accepted after planned tool calls execute.
+- Realtime precision: changed-file tracking uses added/modified/deleted deltas.
+- Durable telemetry: optional JSONL sink via `ENTERPRISE_TELEMETRY_SINK` and merged fallback telemetry.
+- Event bus isolation: one failing event subscriber does not stop event publication.
 
 ## Quick Start
 
