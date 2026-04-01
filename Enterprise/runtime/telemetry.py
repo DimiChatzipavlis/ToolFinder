@@ -13,13 +13,18 @@ class TelemetryCollector:
     counters: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     latencies_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
     sink_path: str | None = None
+    max_latency_samples_per_metric: int = 500
     _external_latency_stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
     def increment(self, key: str, amount: int = 1) -> None:
         self.counters[key] = self.counters.get(key, 0) + amount
 
     def record_latency(self, key: str, value_ms: float) -> None:
-        self.latencies_ms.setdefault(key, []).append(float(value_ms))
+        samples = self.latencies_ms.setdefault(key, [])
+        samples.append(float(value_ms))
+        overflow = len(samples) - self.max_latency_samples_per_metric
+        if overflow > 0:
+            del samples[:overflow]
 
     def merge_snapshot(self, snapshot: dict[str, object]) -> None:
         counters = snapshot.get("counters", {}) if isinstance(snapshot, dict) else {}

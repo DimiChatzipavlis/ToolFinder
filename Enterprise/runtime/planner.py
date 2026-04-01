@@ -23,10 +23,12 @@ class OpenClawPlanner:
         backend: PlannerBackend,
         timeout_s: float = 45.0,
         fallback_on_parse_error: bool = True,
+        fallback_allows_tool_retry: bool = False,
     ) -> None:
         self._backend = backend
         self._timeout_s = timeout_s
         self._fallback_on_parse_error = fallback_on_parse_error
+        self._fallback_allows_tool_retry = fallback_allows_tool_retry
 
     async def plan(self, turn_input: PlannerTurnInput) -> PlannerDecision:
         prompt = self._build_prompt(turn_input)
@@ -104,7 +106,7 @@ class OpenClawPlanner:
         if observations:
             last_observation = str(observations[-1].get("content", ""))
             if self._is_error_observation(last_observation):
-                if turn_input.candidates:
+                if self._fallback_allows_tool_retry and turn_input.candidates:
                     selected = turn_input.candidates[0]
                     return PlannerDecision(
                         action="call_tool",
@@ -115,8 +117,8 @@ class OpenClawPlanner:
                     )
                 return PlannerDecision(
                     action="complete",
-                    thought="Planner backend unavailable and no routed tools are available to recover from an execution error.",
-                    answer="Execution failed and no candidate tools matched the query for recovery.",
+                    thought="Planner backend unavailable and automatic retry is disabled.",
+                    answer="Execution failed and planner fallback is operating in fail-closed mode.",
                 )
 
             return PlannerDecision(
@@ -131,14 +133,10 @@ class OpenClawPlanner:
                 thought="No routed tools available.",
                 answer="No candidate tools matched the query.",
             )
-
-        selected = turn_input.candidates[0]
         return PlannerDecision(
-            action="call_tool",
-            thought="Fallback planner selected top-ranked routed tool.",
-            server_name=selected.server_name,
-            tool_name=selected.tool_name,
-            arguments=self._minimal_arguments(selected),
+            action="complete",
+            thought="Planner backend unavailable and fallback tool calls are disabled.",
+            answer="Planner backend failed and runtime refused speculative tool execution.",
         )
 
     @staticmethod

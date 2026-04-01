@@ -333,8 +333,10 @@ class OpenClawHybridPipeline:
             self.policy_engine = fallback_orchestrator.policy_engine
         else:
             self.policy_engine = PolicyEngine()
-        self.event_bus = event_bus or EnterpriseEventBus()
-        self.telemetry = telemetry or TelemetryCollector()
+        self.event_bus = event_bus or EnterpriseEventBus(max_handler_errors=self.config.event_bus_max_errors)
+        self.telemetry = telemetry or TelemetryCollector(
+            max_latency_samples_per_metric=self.config.telemetry_max_latency_samples
+        )
         if not self.telemetry.sink_path and self.config.telemetry_sink_path:
             self.telemetry.sink_path = self.config.telemetry_sink_path
         self.fallback_strategy = FallbackStrategy.validate(fallback_strategy)

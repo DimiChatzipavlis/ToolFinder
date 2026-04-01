@@ -10,10 +10,19 @@ EventHandler = Callable[[dict[str, Any]], None | Awaitable[None]]
 
 
 class EnterpriseEventBus:
-    def __init__(self, *, handler_timeout_s: float | None = None, continue_on_error: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        handler_timeout_s: float | None = None,
+        continue_on_error: bool = True,
+        max_handler_errors: int = 200,
+    ) -> None:
+        if max_handler_errors < 1:
+            raise ValueError("max_handler_errors must be >= 1")
         self._handlers: list[EventHandler] = []
         self._handler_timeout_s = handler_timeout_s
         self._continue_on_error = continue_on_error
+        self._max_handler_errors = max_handler_errors
         self._handler_errors: list[str] = []
 
     def subscribe(self, handler: EventHandler) -> Callable[[], None]:
@@ -36,6 +45,9 @@ class EnterpriseEventBus:
                         await result
             except Exception as exc:
                 self._handler_errors.append(str(exc))
+                overflow = len(self._handler_errors) - self._max_handler_errors
+                if overflow > 0:
+                    del self._handler_errors[:overflow]
                 if not self._continue_on_error:
                     raise
 

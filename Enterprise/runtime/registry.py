@@ -14,8 +14,17 @@ from .contracts import ToolCandidate
 class HybridToolRegistry:
     """Maintains a live tool catalog and semantic retrieval router."""
 
-    def __init__(self, model_name: str = "sentence-transformers/all-mpnet-base-v2") -> None:
+    def __init__(
+        self,
+        model_name: str = "sentence-transformers/all-mpnet-base-v2",
+        allow_low_confidence_keyword_fallback: bool | None = None,
+    ) -> None:
         self.model_name = model_name
+        self._allow_low_confidence_keyword_fallback = (
+            os.getenv("ENTERPRISE_ALLOW_KEYWORD_LOW_CONFIDENCE_FALLBACK", "0") == "1"
+            if allow_low_confidence_keyword_fallback is None
+            else allow_low_confidence_keyword_fallback
+        )
         self._lock = asyncio.Lock()
         self._server_tools: dict[str, list[dict[str, Any]]] = {}
         self._router: UniversalMCPRouter | None = None
@@ -142,7 +151,10 @@ class HybridToolRegistry:
         if filtered:
             return filtered[:k]
 
-        # Degraded mode fallback: keep runtime alive with top tools when semantic model is unavailable.
+        if not self._allow_low_confidence_keyword_fallback:
+            return []
+
+        # Optional degraded mode fallback for environments that prioritize liveness.
         fallback = [result for _, result in scored[:k]]
         for result in fallback:
             if result.score <= 0:

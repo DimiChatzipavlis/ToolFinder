@@ -32,8 +32,10 @@ class HybridEnterpriseOrchestrator:
         self.executor = executor
         self.policy_engine = policy_engine
         self.config = config or EnterpriseConfig()
-        self.event_bus = event_bus or EnterpriseEventBus()
-        self.telemetry = telemetry or TelemetryCollector()
+        self.event_bus = event_bus or EnterpriseEventBus(max_handler_errors=self.config.event_bus_max_errors)
+        self.telemetry = telemetry or TelemetryCollector(
+            max_latency_samples_per_metric=self.config.telemetry_max_latency_samples
+        )
         if not self.telemetry.sink_path and self.config.telemetry_sink_path:
             self.telemetry.sink_path = self.config.telemetry_sink_path
 
@@ -45,9 +47,10 @@ class HybridEnterpriseOrchestrator:
         last_call_signature: str | None = None
 
         for turn_index in range(1, self.config.max_turns + 1):
+            routing_query = self._build_routing_query(user_query, history)
             routing_started = time.perf_counter()
             candidates = await self.registry.route(
-                user_query,
+                routing_query,
                 k=self.config.top_k,
                 min_score=self.config.min_score,
             )
@@ -199,8 +202,9 @@ class HybridEnterpriseOrchestrator:
                     repeated_call_streak = 1
                     last_call_signature = call_signature
 
-                if repeated_call_streak >= 2:
-                    self.telemetry.increment("loop_guard_complete")
+                if repeated_call_streak >= self.config.loop_guard_repetition_limit:
+                    counter_key = "loop_guard_complete" if self.config.loop_guard_marks_complete else "loop_guard_failed"
+                    self.telemetry.increment(counter_key)
                     await self._publish(
                         {
                             "type": "loop_guard",
@@ -209,9 +213,15 @@ class HybridEnterpriseOrchestrator:
                             "tool": f"{selected.server_name}/{selected.tool_name}",
                         }
                     )
+                    status = "complete" if self.config.loop_guard_marks_complete else "failed"
+                    answer = (
+                        f"Completed from repeated observation: {clipped_observation}"
+                        if self.config.loop_guard_marks_complete
+                        else "Loop guard triggered: planner repeated identical tool calls without progress."
+                    )
                     return self._finalize_result(session_id, SessionResult(
-                        status="complete",
-                        answer=f"Completed from repeated observation: {clipped_observation}",
+                        status=status,
+                        answer=answer,
                         turns=turn_index,
                         tool_calls=tool_calls,
                         telemetry=self.telemetry.to_dict(),
@@ -263,6 +273,40 @@ class HybridEnterpriseOrchestrator:
         if len(observation) <= self.config.max_observation_chars:
             return observation
         return observation[: self.config.max_observation_chars] + "\n...[TRUNCATED]"
+
+    def _build_routing_query(self, user_query: str, history: list[dict[str, Any]]) -> str:
+        if not self.config.route_with_history_context:
+            return user_query
+
+        latest_observation = ""
+        latest_thought = ""
+        for entry in reversed(history):
+            if not latest_observation and entry.get("role") == "observation":
+                latest_observation = str(entry.get("content", ""))[:320]
+            if latest_thought:
+                continue
+            if entry.get("role") != "assistant":
+                continue
+            content = entry.get("content")
+            if isinstance(content, dict):
+                thought = content.get("thought")
+                if isinstance(thought, str):
+                    latest_thought = thought[:200]
+            elif isinstance(content, str):
+                latest_thought = content[:200]
+
+            if latest_observation and latest_thought:
+                break
+
+        if not latest_observation and not latest_thought:
+            return user_query
+
+        parts = [f"GOAL: {user_query}"]
+        if latest_thought:
+            parts.append(f"LAST_THOUGHT: {latest_thought}")
+        if latest_observation:
+            parts.append(f"LAST_OBSERVATION: {latest_observation}")
+        return "\n".join(parts)
 
     async def _publish(self, event: dict[str, Any]) -> None:
         event["timestamp"] = time.time()

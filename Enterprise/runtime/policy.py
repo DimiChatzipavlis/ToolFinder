@@ -15,6 +15,22 @@ class ToolPolicy:
     allowed_servers: set[str] | None = None
     denied_tool_pairs: set[tuple[str, str]] = field(default_factory=set)
     max_argument_bytes: int = 8192
+    max_string_argument_chars: int = 4096
+    max_collection_items: int = 256
+    deny_parent_path_segments: bool = True
+    path_argument_keys: set[str] = field(
+        default_factory=lambda: {
+            "path",
+            "paths",
+            "file",
+            "filepath",
+            "source",
+            "destination",
+            "dir",
+            "directory",
+            "target_path",
+        }
+    )
 
 
 class PolicyEngine:
@@ -48,3 +64,56 @@ class PolicyEngine:
             raise PolicyViolation(
                 f"argument payload exceeds policy limit ({self.policy.max_argument_bytes} bytes)"
             )
+
+        self._enforce_argument_guardrails(decision.arguments or {})
+
+    def _enforce_argument_guardrails(self, arguments: dict[str, object]) -> None:
+        def walk(node: object, parent_key: str = "") -> None:
+            if isinstance(node, dict):
+                if len(node) > self.policy.max_collection_items:
+                    raise PolicyViolation(
+                        f"argument object exceeds item limit ({self.policy.max_collection_items})"
+                    )
+                for key, value in node.items():
+                    walk(value, str(key))
+                return
+
+            if isinstance(node, list):
+                if len(node) > self.policy.max_collection_items:
+                    raise PolicyViolation(
+                        f"argument list exceeds item limit ({self.policy.max_collection_items})"
+                    )
+                for item in node:
+                    walk(item, parent_key)
+                return
+
+            if isinstance(node, str):
+                if len(node) > self.policy.max_string_argument_chars:
+                    raise PolicyViolation(
+                        "string argument exceeds policy limit "
+                        f"({self.policy.max_string_argument_chars} chars)"
+                    )
+                if self._looks_like_path(parent_key):
+                    self._enforce_path_safety(node, parent_key)
+
+        walk(arguments)
+
+    def _looks_like_path(self, key: str) -> bool:
+        normalized = key.strip().lower()
+        if not normalized:
+            return False
+        if normalized in self.policy.path_argument_keys:
+            return True
+        return normalized.endswith("_path") or normalized.endswith("_file")
+
+    def _enforce_path_safety(self, value: str, key: str) -> None:
+        if "\x00" in value:
+            raise PolicyViolation(f"path-like argument contains null byte: {key}")
+
+        if not self.policy.deny_parent_path_segments:
+            return
+
+        normalized = value.replace("\\", "/")
+        segments = [segment for segment in normalized.split("/") if segment and segment != "."]
+        if any(segment == ".." for segment in segments):
+            raise PolicyViolation(f"path-like argument contains parent traversal segments: {key}")

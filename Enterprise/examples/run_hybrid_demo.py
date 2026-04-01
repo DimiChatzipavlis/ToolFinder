@@ -42,7 +42,10 @@ class MockClient:
 
 async def main() -> None:
     config = EnterpriseConfig(top_k=2, min_score=0.05, max_turns=4)
-    registry = HybridToolRegistry(model_name=config.model_name)
+    registry = HybridToolRegistry(
+        model_name=config.model_name,
+        allow_low_confidence_keyword_fallback=config.allow_keyword_low_confidence_fallback,
+    )
 
     filesystem_tools = [
         {
@@ -91,7 +94,7 @@ async def main() -> None:
     policy = PolicyEngine(ToolPolicy(allowed_servers={"filesystem", "memory"}))
     executor = HybridToolExecutor(clients)
 
-    bus = EnterpriseEventBus()
+    bus = EnterpriseEventBus(max_handler_errors=config.event_bus_max_errors)
 
     async def print_event(event: dict[str, Any]) -> None:
         compact = {

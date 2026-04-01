@@ -249,7 +249,10 @@ async def main() -> None:
 
     # ── Build config & registry ────────────────────────────────────────
     config = EnterpriseConfig.from_env()
-    registry = HybridToolRegistry(model_name=config.model_name)
+    registry = HybridToolRegistry(
+        model_name=config.model_name,
+        allow_low_confidence_keyword_fallback=config.allow_keyword_low_confidence_fallback,
+    )
     await registry.upsert_server_tools("filesystem", FILESYSTEM_TOOLS)
     await registry.upsert_server_tools("memory", MEMORY_TOOLS)
 
@@ -284,7 +287,7 @@ async def main() -> None:
     )
 
     # ── Build event bus with logging ───────────────────────────────────
-    event_bus = EnterpriseEventBus()
+    event_bus = EnterpriseEventBus(max_handler_errors=config.event_bus_max_errors)
 
     async def log_event(event: dict[str, Any]) -> None:
         event_type = event.get("type", "unknown")
@@ -301,7 +304,7 @@ async def main() -> None:
         executor=executor,
         config=config,
         event_bus=event_bus,
-        telemetry=TelemetryCollector(),
+        telemetry=TelemetryCollector(max_latency_samples_per_metric=config.telemetry_max_latency_samples),
         fallback_strategy=args.fallback_strategy,
         max_agent_steps=args.max_agent_steps,
         model=args.model,

@@ -98,7 +98,10 @@ async def main() -> None:
     args = parser.parse_args()
 
     config = EnterpriseConfig.from_env()
-    registry = HybridToolRegistry(model_name=config.model_name)
+    registry = HybridToolRegistry(
+        model_name=config.model_name,
+        allow_low_confidence_keyword_fallback=config.allow_keyword_low_confidence_fallback,
+    )
 
     filesystem_tools = [
         {
@@ -147,7 +150,12 @@ async def main() -> None:
         timeout_s=config.planner_timeout_s,
         cli_binary=args.openclaw_cli_bin,
     )
-    planner = OpenClawPlanner(backend=backend, timeout_s=config.planner_timeout_s, fallback_on_parse_error=True)
+    planner = OpenClawPlanner(
+        backend=backend,
+        timeout_s=config.planner_timeout_s,
+        fallback_on_parse_error=config.planner_fallback_on_parse_error,
+        fallback_allows_tool_retry=config.planner_fallback_allows_tool_retry,
+    )
 
     clients: dict[str, Any] = {
         "filesystem": MockRealtimeClient("filesystem"),
@@ -179,7 +187,7 @@ async def main() -> None:
     executor = HybridToolExecutor(clients)
     policy_engine = PolicyEngine(ToolPolicy(allowed_servers={"filesystem", "memory"}))
 
-    event_bus = EnterpriseEventBus()
+    event_bus = EnterpriseEventBus(max_handler_errors=config.event_bus_max_errors)
 
     async def print_event(event: dict[str, Any]) -> None:
         filtered = {
