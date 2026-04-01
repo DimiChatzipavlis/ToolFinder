@@ -221,3 +221,41 @@ That separation is the reason the same architecture can support small local SLMs
 ## 📄 For Senior Review
 
 If you want the engineering whitepaper summary rather than the developer landing page, see [ARCHITECTURE_REPORT.md](ARCHITECTURE_REPORT.md).
+
+🏢 Enterprise Hybrid Pipeline (OpenClaw)
+ToolFinder natively supports integration with OpenClaw to act as a 24/7 autonomous service. OpenClaw handles the macro-orchestration (memory, scheduling, messaging channels), while ToolFinder handles the micro-execution (FAISS semantic routing, schema hardening, and zero-hallucination tool calls).
+
+You can deploy this pipeline in two distinct ways:
+
+Approach A: 100% Local (Privacy-First)
+This approach runs both the OpenClaw strategic planner and the ToolFinder executor entirely on your local machine using an LLM runner like Ollama. No data leaves your network, and no API keys are required.
+
+Execution:
+
+Start Ollama and pull your model (e.g., ollama run llama3.2). Note: A context window of at least 64k tokens is recommended for OpenClaw's memory summarization.
+
+Configure OpenClaw to point to your local provider in your config file:
+
+JSON
+"model": {
+    "provider": "ollama",
+    "baseUrl": "http://localhost:11434/v1",
+    "model": "llama3.2"
+}
+Launch the ToolFinder realtime service in Strict Mode to enforce live execution:
+
+Bash
+STRICT_MODE=True python Enterprise/examples/run_realtime_openclaw.py
+Approach B: Cloud API (High IQ Planning)
+The standard enterprise deployment uses a split architecture. OpenClaw uses a frontier model (e.g., Claude 3.7 Sonnet) via API keys to decide the high-level strategy. ToolFinder uses your local llama3.2 model to rapidly route schemas and execute the discrete steps without API costs.
+
+Execution:
+
+Set your OpenClaw provider to Anthropic or OpenAI in your configuration.
+
+Ensure your local Ollama instance is running to serve the ToolFinder routing layer.
+
+Launch the service:
+
+Bash
+STRICT_MODE=True python Enterprise/examples/run_realtime_openclaw.py

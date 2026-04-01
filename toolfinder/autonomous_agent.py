@@ -7,6 +7,7 @@ import contextlib
 import hashlib
 import json
 import logging
+import os
 import socket
 import time
 import urllib.error
@@ -161,6 +162,7 @@ class AutonomousMCPAgent:
         self.router: UniversalMCPRouter = UniversalMCPRouter(model_name=model_name)
         self.ollama_model: str = ollama_model
         self.ollama_url: str = ollama_url
+        self.request_timeout_s: int = int(os.getenv("TOOLFINDER_REQUEST_TIMEOUT", "300"))
         self.max_iterations: int = max(1, max_iterations)
         self.clients: dict[str, DynamicMCPClient] = {}
         self._owned_clients: list[DynamicMCPClient] = []
@@ -547,7 +549,7 @@ class AutonomousMCPAgent:
         )
         start_time = time.time()
         try:
-            with urllib.request.urlopen(request, timeout=300) as response:
+            with urllib.request.urlopen(request, timeout=self.request_timeout_s) as response:
                 raw_response = response.read().decode("utf-8")
             elapsed = time.time() - start_time
             logger.info("Ollama responded in %.2f seconds.", elapsed)
