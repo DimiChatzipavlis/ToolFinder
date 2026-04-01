@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
@@ -9,9 +10,12 @@ from .contracts import PlannerTurnInput, SessionResult, ToolCallRecord, ToolCand
 from .event_bus import EnterpriseEventBus
 from .executor import HybridToolExecutor
 from .planner import HeuristicPlanner, OpenClawPlanner
-from .policy import PolicyEngine
+from .policy import PolicyEngine, PolicyViolation, SecurityPolicyViolation
 from .registry import HybridToolRegistry
 from .telemetry import TelemetryCollector
+
+
+logger = logging.getLogger(__name__)
 
 
 class HybridEnterpriseOrchestrator:
@@ -140,6 +144,11 @@ class HybridEnterpriseOrchestrator:
                 )
                 selected = candidate_lookup.get((decision.server_name or "", decision.tool_name or ""))
                 if selected is None:
+                    logger.critical(
+                        "CRITICAL: Unrouted mode enabled. Schema validation is bypassed. tool=%s/%s",
+                        decision.server_name,
+                        decision.tool_name,
+                    )
                     selected = ToolCandidate(
                         server_name=decision.server_name or "",
                         tool_name=decision.tool_name or "",
@@ -228,6 +237,44 @@ class HybridEnterpriseOrchestrator:
                         final_history=history,
                     ))
                 retries = 0
+            except SecurityPolicyViolation as exc:
+                self.telemetry.increment("security_policy_violations")
+                history.append({"role": "observation", "content": f"Security policy violation: {exc}"})
+                await self._publish(
+                    {
+                        "type": "security_policy_violation",
+                        "session_id": session_id,
+                        "turn": turn_index,
+                        "error": str(exc),
+                    }
+                )
+                return self._finalize_result(session_id, SessionResult(
+                    status="failed",
+                    answer=f"Security policy violation: {exc}",
+                    turns=turn_index,
+                    tool_calls=tool_calls,
+                    telemetry=self.telemetry.to_dict(),
+                    final_history=history,
+                ))
+            except PolicyViolation as exc:
+                self.telemetry.increment("policy_violations")
+                history.append({"role": "observation", "content": f"Policy violation: {exc}"})
+                await self._publish(
+                    {
+                        "type": "policy_violation",
+                        "session_id": session_id,
+                        "turn": turn_index,
+                        "error": str(exc),
+                    }
+                )
+                return self._finalize_result(session_id, SessionResult(
+                    status="failed",
+                    answer=f"Policy violation: {exc}",
+                    turns=turn_index,
+                    tool_calls=tool_calls,
+                    telemetry=self.telemetry.to_dict(),
+                    final_history=history,
+                ))
             except Exception as exc:
                 retries += 1
                 self.telemetry.increment("execution_errors")

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 
 from .contracts import PlannerDecision, ToolCandidate
 
 
 class PolicyViolation(RuntimeError):
+    pass
+
+
+class SecurityPolicyViolation(Exception):
     pass
 
 
@@ -18,6 +23,7 @@ class ToolPolicy:
     max_string_argument_chars: int = 4096
     max_collection_items: int = 256
     deny_parent_path_segments: bool = True
+    allowed_path_roots: tuple[str, ...] = ()
     path_argument_keys: set[str] = field(
         default_factory=lambda: {
             "path",
@@ -108,12 +114,52 @@ class PolicyEngine:
 
     def _enforce_path_safety(self, value: str, key: str) -> None:
         if "\x00" in value:
-            raise PolicyViolation(f"path-like argument contains null byte: {key}")
+            raise SecurityPolicyViolation(f"path-like argument contains null byte: {key}")
 
         if not self.policy.deny_parent_path_segments:
+            self._enforce_allowed_path_roots(value, key)
             return
 
         normalized = value.replace("\\", "/")
         segments = [segment for segment in normalized.split("/") if segment and segment != "."]
         if any(segment == ".." for segment in segments):
-            raise PolicyViolation(f"path-like argument contains parent traversal segments: {key}")
+            raise SecurityPolicyViolation(
+                f"path-like argument traverses outside allowed roots via parent segments: {key}"
+            )
+
+        self._enforce_allowed_path_roots(value, key)
+
+    def _enforce_allowed_path_roots(self, value: str, key: str) -> None:
+        if not self.policy.allowed_path_roots:
+            return
+
+        if not self._is_absolute_path(value):
+            return
+
+        candidate = os.path.normpath(os.path.abspath(value))
+        allowed_roots = [
+            os.path.normpath(os.path.abspath(root))
+            for root in self.policy.allowed_path_roots
+        ]
+
+        for root in allowed_roots:
+            if self._is_within_root(candidate, root):
+                return
+
+        raise SecurityPolicyViolation(
+            f"path-like argument traverses outside allowed roots: {key}={value}"
+        )
+
+    @staticmethod
+    def _is_absolute_path(value: str) -> bool:
+        normalized = value.replace("\\", "/")
+        if len(normalized) >= 2 and normalized[1] == ":":
+            return True
+        return normalized.startswith("/") or normalized.startswith("\\")
+
+    @staticmethod
+    def _is_within_root(candidate: str, root: str) -> bool:
+        try:
+            return os.path.commonpath([candidate, root]) == root
+        except ValueError:
+            return False

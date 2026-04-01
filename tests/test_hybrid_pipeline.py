@@ -221,7 +221,7 @@ def test_session_driver_handles_empty_output() -> None:
     assert "empty" in result.error.lower()
 
 
-def test_session_driver_raw_text_fallback() -> None:
+def test_session_driver_raw_text_is_rejected() -> None:
     class _TextBackend:
         async def complete(self, prompt: str) -> str:
             return "The answer is 42."
@@ -232,9 +232,8 @@ def test_session_driver_raw_text_fallback() -> None:
             OpenClawAgentRequest(query="test", tool_manifest=[], session_id="s5")
         )
     )
-    assert result.success is True
-    assert result.answer == "The answer is 42."
-    assert result.metadata.get("parse_mode") == "raw_text"
+    assert result.success is False
+    assert "structured parsing failed" in (result.error or "")
 
 
 # ---------------------------------------------------------------------------
@@ -367,11 +366,13 @@ def test_pipeline_fallback_on_openclaw_failure() -> None:
     result = asyncio.run(pipeline.run("session-4", "list files"))
 
     assert result.execution_path == "fallback"
+    assert result.status == "degraded_fallback"
+    assert result.fallback_triggered is True
     assert PipelinePhase.FALLBACK.value in result.phase_trace
     assert result.openclaw_response is not None
     assert result.openclaw_response.success is False
     telemetry_counters = result.telemetry.get("counters", {})
-    assert telemetry_counters.get("complete", 0) >= 1
+    assert telemetry_counters.get("pipeline_fallback_triggered", 0) >= 1
 
 
 def test_pipeline_error_strategy_returns_failed() -> None:

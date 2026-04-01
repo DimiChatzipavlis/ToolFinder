@@ -9,7 +9,7 @@ from Enterprise.runtime.contracts import PlannerDecision, PlannerTurnInput, Tool
 from Enterprise.runtime.event_bus import EnterpriseEventBus
 from Enterprise.runtime.orchestrator import HybridEnterpriseOrchestrator
 from Enterprise.runtime.planner import HeuristicPlanner, OpenClawPlanner
-from Enterprise.runtime.policy import PolicyEngine, PolicyViolation, ToolPolicy
+from Enterprise.runtime.policy import PolicyEngine, PolicyViolation, SecurityPolicyViolation, ToolPolicy
 from Enterprise.runtime.realtime_service import RealTimeHybridService, WorkspaceChangeTracker
 from Enterprise.runtime.config import EnterpriseConfig
 from Enterprise.runtime.telemetry import TelemetryCollector
@@ -49,6 +49,20 @@ def test_policy_rejects_unrouted_tool() -> None:
         policy.enforce_call(decision, candidate_lookup={("filesystem", "list_directory"): _candidate()})
 
 
+def test_policy_raises_security_violation_on_path_traversal() -> None:
+    policy = PolicyEngine(ToolPolicy(allowed_servers={"filesystem"}, allowed_path_roots=("C:/workspace",)))
+    decision = PlannerDecision(
+        action="call_tool",
+        thought="test",
+        server_name="filesystem",
+        tool_name="list_directory",
+        arguments={"path": "../secrets"},
+    )
+
+    with pytest.raises(SecurityPolicyViolation):
+        policy.enforce_call(decision, candidate_lookup={("filesystem", "list_directory"): _candidate()})
+
+
 def test_heuristic_planner_completes_after_observation() -> None:
     planner = HeuristicPlanner()
     turn_input = PlannerTurnInput(
@@ -77,9 +91,8 @@ def test_openclaw_planner_falls_back_on_parse_error() -> None:
 
     decision = asyncio.run(planner.plan(turn_input))
 
-    assert decision.action == "call_tool"
-    assert decision.server_name == "filesystem"
-    assert decision.tool_name == "list_directory"
+    assert decision.action == "complete"
+    assert "refused speculative tool execution" in (decision.answer or "")
 
 
 def test_openclaw_planner_fallback_completes_with_observation() -> None:
@@ -102,6 +115,22 @@ def test_openclaw_planner_fallback_retries_on_error_observation() -> None:
     planner = OpenClawPlanner(backend=BrokenBackend())
     turn_input = PlannerTurnInput(
         session_id="s4",
+        user_query="list files",
+        history=[{"role": "observation", "content": "Execution error: filesystem unavailable"}],
+        candidates=[_candidate()],
+        turn_index=2,
+    )
+
+    decision = asyncio.run(planner.plan(turn_input))
+
+    assert decision.action == "complete"
+    assert "fail-closed mode" in (decision.answer or "")
+
+
+def test_openclaw_planner_fallback_retry_requires_explicit_opt_in() -> None:
+    planner = OpenClawPlanner(backend=BrokenBackend(), fallback_allows_tool_retry=True)
+    turn_input = PlannerTurnInput(
+        session_id="s4-opt-in",
         user_query="list files",
         history=[{"role": "observation", "content": "Execution error: filesystem unavailable"}],
         candidates=[_candidate()],
@@ -192,7 +221,7 @@ class _ExecutorStub:
         return {}, "files: a.txt"
 
 
-def test_orchestrator_loop_guard_completes_on_repeated_calls() -> None:
+def test_orchestrator_loop_guard_fails_on_repeated_calls() -> None:
     orchestrator = HybridEnterpriseOrchestrator(
         registry=_StaticRegistry(),
         planner=_RepeatingPlanner(),
@@ -203,10 +232,10 @@ def test_orchestrator_loop_guard_completes_on_repeated_calls() -> None:
 
     result = asyncio.run(orchestrator.run(session_id="loop-guard", user_query="list files"))
 
-    assert result.status == "complete"
+    assert result.status == "failed"
     assert result.turns == 2
     counters = result.telemetry.get("counters", {})
-    assert counters.get("loop_guard_complete") == 1
+    assert counters.get("loop_guard_failed") == 1
 
 
 def test_telemetry_merge_snapshot() -> None:

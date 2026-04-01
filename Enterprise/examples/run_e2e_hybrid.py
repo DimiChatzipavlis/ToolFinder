@@ -36,6 +36,7 @@ from Enterprise.runtime.planner import HeuristicPlanner
 from Enterprise.runtime.policy import PolicyEngine, ToolPolicy
 from Enterprise.runtime.registry import HybridToolRegistry
 from Enterprise.runtime.telemetry import TelemetryCollector
+from toolfinder.mcp_adapter import DynamicMCPClient
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +91,14 @@ class MockPipelineClient:
                 ]
             }
         return {"content": [{"type": "text", "text": f"{self.server_name}/{tool_name} executed"}]}
+
+
+def can_launch_npx() -> bool:
+    return shutil.which("npx") is not None or shutil.which("npx.cmd") is not None
+
+
+def strict_mode_env_enabled() -> bool:
+    return os.getenv("STRICT_MODE", "0").strip().lower() in {"1", "true", "yes", "on"}
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +254,19 @@ async def main() -> None:
         default=1,
         help="Number of pipeline runs (for stress/smoke testing).",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        default=strict_mode_env_enabled(),
+        help="Disable mocks and require real MCP servers. Fails hard if live servers are unavailable.",
+    )
+    parser.add_argument(
+        "--live-filesystem-root",
+        default=os.getenv("LIVE_FILESYSTEM_ROOT", ""),
+        help="Filesystem root for live MCP filesystem server (used in strict mode).",
+    )
     args = parser.parse_args()
+    strict_mode = bool(args.strict)
 
     # ── Build config & registry ────────────────────────────────────────
     config = EnterpriseConfig.from_env()
@@ -253,14 +274,50 @@ async def main() -> None:
         model_name=config.model_name,
         allow_low_confidence_keyword_fallback=config.allow_keyword_low_confidence_fallback,
     )
-    await registry.upsert_server_tools("filesystem", FILESYSTEM_TOOLS)
-    await registry.upsert_server_tools("memory", MEMORY_TOOLS)
+    live_clients: list[DynamicMCPClient] = []
 
-    # ── Build mock clients & executor ──────────────────────────────────
-    clients: dict[str, Any] = {
-        "filesystem": MockPipelineClient("filesystem"),
-        "memory": MockPipelineClient("memory"),
-    }
+    if strict_mode:
+        if not can_launch_npx():
+            raise RuntimeError("STRICT_MODE requires npx to launch real MCP servers.")
+        live_root = args.live_filesystem_root or str(REPO_ROOT)
+
+        filesystem_client = DynamicMCPClient(
+            server_name="filesystem",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-filesystem", live_root],
+            cwd=str(REPO_ROOT),
+            startup_timeout_s=90.0,
+            request_timeout_s=45.0,
+        )
+        filesystem_tools = await filesystem_client.initialize_and_get_tools()
+        await registry.upsert_server_tools("filesystem", filesystem_tools)
+
+        memory_client = DynamicMCPClient(
+            server_name="memory",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-memory"],
+            cwd=str(REPO_ROOT),
+            startup_timeout_s=90.0,
+            request_timeout_s=45.0,
+        )
+        memory_tools = await memory_client.initialize_and_get_tools()
+        await registry.upsert_server_tools("memory", memory_tools)
+
+        live_clients.extend([filesystem_client, memory_client])
+        clients: dict[str, Any] = {
+            "filesystem": filesystem_client,
+            "memory": memory_client,
+        }
+    else:
+        await registry.upsert_server_tools("filesystem", FILESYSTEM_TOOLS)
+        await registry.upsert_server_tools("memory", MEMORY_TOOLS)
+
+        # ── Build mock clients & executor ──────────────────────────────
+        clients = {
+            "filesystem": MockPipelineClient("filesystem"),
+            "memory": MockPipelineClient("memory"),
+        }
+
     executor = HybridToolExecutor(clients)
 
     # ── Build OpenClaw backend & session driver ────────────────────────
@@ -315,17 +372,22 @@ async def main() -> None:
     print(f"  backend:   {args.backend_kind}")
     print(f"  model:     {args.model}")
     print(f"  fallback:  {args.fallback_strategy}")
+    print(f"  strict:    {strict_mode}")
     print(f"  query:     {args.query[:80]}")
 
-    for cycle in range(1, args.max_cycles + 1):
-        if args.max_cycles > 1:
-            print(f"\n  ── Cycle {cycle}/{args.max_cycles} ──")
+    try:
+        for cycle in range(1, args.max_cycles + 1):
+            if args.max_cycles > 1:
+                print(f"\n  ── Cycle {cycle}/{args.max_cycles} ──")
 
-        result = await pipeline.run(
-            session_id=f"e2e-demo-{cycle}",
-            user_query=args.query,
-        )
-        print_result(result)
+            result = await pipeline.run(
+                session_id=f"e2e-demo-{cycle}",
+                user_query=args.query,
+            )
+            print_result(result)
+    finally:
+        for client in reversed(live_clients):
+            await client.close()
 
 
 if __name__ == "__main__":

@@ -75,7 +75,7 @@ class OpenClawHttpBackend:
         try:
             async with httpx.AsyncClient(timeout=min(self.timeout_s, 10.0)) as client:
                 response = await client.head(self.endpoint)
-                if response.status_code < 500:
+                if response.status_code == 200:
                     return True
         except httpx.HTTPError:
             pass
@@ -84,7 +84,7 @@ class OpenClawHttpBackend:
         try:
             async with httpx.AsyncClient(timeout=min(self.timeout_s, 10.0)) as client:
                 response = await client.get(self.endpoint)
-            return response.status_code < 500
+            return response.status_code == 200
         except httpx.HTTPError:
             return False
 

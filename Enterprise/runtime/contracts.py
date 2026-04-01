@@ -106,4 +106,5 @@ class HybridPipelineResult:
     phase_trace: list[str]
     execution_path: str  # "openclaw" | "fallback" | "direct"
     openclaw_response: OpenClawAgentResponse | None = None
+    fallback_triggered: bool = False
 

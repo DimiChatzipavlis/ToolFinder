@@ -79,6 +79,12 @@ class OpenClawToolManifest:
 # ---------------------------------------------------------------------------
 
 
+class StructuredParsingError(RuntimeError):
+    """Raised when OpenClaw output is not a structured JSON action/completion payload."""
+
+    pass
+
+
 class OpenClawSessionDriver:
     """Manages an OpenClaw agent session over HTTP or CLI backends.
 
@@ -111,6 +117,14 @@ class OpenClawSessionDriver:
                 raw_output="",
                 success=False,
                 error="OpenClaw agent session timed out",
+            )
+        except StructuredParsingError as exc:
+            return OpenClawAgentResponse(
+                answer="",
+                tool_calls=[],
+                raw_output="",
+                success=False,
+                error=f"OpenClaw agent structured parsing failed: {exc}",
             )
         except Exception as exc:
             return OpenClawAgentResponse(
@@ -186,24 +200,10 @@ class OpenClawSessionDriver:
                 success=True,
             )
 
-        # Last resort: treat entire output as a natural-language answer.
         stripped = raw_output.strip()
         if stripped:
-            return OpenClawAgentResponse(
-                answer=stripped,
-                tool_calls=[],
-                raw_output=raw_output,
-                success=True,
-                metadata={"parse_mode": "raw_text"},
-            )
-
-        return OpenClawAgentResponse(
-            answer="",
-            tool_calls=[],
-            raw_output=raw_output,
-            success=False,
-            error="OpenClaw agent returned empty output",
-        )
+            raise StructuredParsingError("backend returned unstructured plain text")
+        raise StructuredParsingError("backend returned empty output")
 
     def _extract_from_steps(
         self, steps: list[Any], raw_output: str
@@ -218,6 +218,8 @@ class OpenClawSessionDriver:
                 answer = str(step.get("answer", ""))
             elif step.get("action") == "call_tool":
                 tool_calls.append(step)
+        if not answer and not tool_calls:
+            raise StructuredParsingError("json array did not contain completion or tool calls")
         return OpenClawAgentResponse(
             answer=answer,
             tool_calls=tool_calls,
@@ -250,20 +252,10 @@ class OpenClawSessionDriver:
         for key in ("answer", "response", "content", "output"):
             value = payload.get(key)
             if isinstance(value, str) and value.strip():
-                return OpenClawAgentResponse(
-                    answer=value.strip(),
-                    tool_calls=[],
-                    raw_output=raw_output,
-                    success=True,
-                    metadata={"parse_mode": f"json_field_{key}"},
+                raise StructuredParsingError(
+                    "json object used unsupported answer field; expected structured completion payload"
                 )
-        return OpenClawAgentResponse(
-            answer="",
-            tool_calls=[],
-            raw_output=raw_output,
-            success=False,
-            error="Unrecognized OpenClaw agent response shape",
-        )
+        raise StructuredParsingError("unrecognized OpenClaw agent response shape")
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +374,7 @@ class OpenClawHybridPipeline:
                 final_history=history,
                 phase_trace=phase_trace,
                 execution_path="direct",
+                fallback_triggered=False,
                 ),
             )
 
@@ -468,6 +461,7 @@ class OpenClawHybridPipeline:
                     phase_trace=phase_trace,
                     execution_path="openclaw",
                     openclaw_response=agent_response,
+                    fallback_triggered=False,
                 ),
             )
 
@@ -495,6 +489,7 @@ class OpenClawHybridPipeline:
                 phase_trace=phase_trace,
                 execution_path="openclaw",
                 openclaw_response=agent_response,
+                fallback_triggered=False,
                 ),
             )
 
@@ -515,6 +510,7 @@ class OpenClawHybridPipeline:
                 phase_trace=phase_trace,
                 execution_path="openclaw",
                 openclaw_response=agent_response,
+                fallback_triggered=False,
                 ),
             )
 
@@ -534,6 +530,7 @@ class OpenClawHybridPipeline:
                 phase_trace=phase_trace,
                 execution_path="fallback",
                 openclaw_response=agent_response,
+                fallback_triggered=True,
                 ),
             )
 
@@ -554,12 +551,13 @@ class OpenClawHybridPipeline:
         fallback_ms = (time.perf_counter() - fallback_started) * 1000.0
         self.telemetry.record_latency("pipeline_fallback", fallback_ms)
         self.telemetry.merge_snapshot(fallback_result.telemetry)
+        self.telemetry.increment("pipeline_fallback_triggered")
 
         phase_trace.append(PipelinePhase.COMPLETE.value)
         return self._finalize_result(
             session_id,
             HybridPipelineResult(
-            status=fallback_result.status,
+            status="degraded_fallback",
             answer=fallback_result.answer,
             turns=fallback_result.turns,
             tool_calls=fallback_result.tool_calls,
@@ -568,6 +566,7 @@ class OpenClawHybridPipeline:
             phase_trace=phase_trace,
             execution_path="fallback",
             openclaw_response=agent_response,
+            fallback_triggered=True,
             ),
         )
 
@@ -736,6 +735,7 @@ class OpenClawHybridPipeline:
             phase_trace=phase_trace,
             execution_path="openclaw",
             openclaw_response=agent_response,
+            fallback_triggered=False,
         )
 
     # -------------------------------------------------------------------

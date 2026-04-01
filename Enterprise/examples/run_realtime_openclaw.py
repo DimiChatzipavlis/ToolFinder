@@ -56,6 +56,10 @@ def can_launch_npx() -> bool:
     return shutil.which("npx") is not None or shutil.which("npx.cmd") is not None
 
 
+def strict_mode_env_enabled() -> bool:
+    return os.getenv("STRICT_MODE", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Run real-time OpenClaw hybrid orchestration loop.")
     parser.add_argument("--workspace", default=str(REPO_ROOT), help="Workspace path to watch for changes.")
@@ -95,7 +99,14 @@ async def main() -> None:
         default=0,
         help="Run finite polling cycles for smoke tests; 0 means run forever.",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        default=strict_mode_env_enabled(),
+        help="Disable all mock clients; require real MCP servers and fail hard if unavailable.",
+    )
     args = parser.parse_args()
+    strict_mode = bool(args.strict)
 
     config = EnterpriseConfig.from_env()
     registry = HybridToolRegistry(
@@ -126,20 +137,21 @@ async def main() -> None:
             },
         },
     ]
-    await registry.upsert_server_tools(
-        "memory",
-        [
-            {
-                "tool_name": "create_entities",
-                "description": "Persist summary entities in memory graph.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"entities": {"type": "array"}},
-                    "required": ["entities"],
-                },
-            }
-        ],
-    )
+    if not strict_mode:
+        await registry.upsert_server_tools(
+            "memory",
+            [
+                {
+                    "tool_name": "create_entities",
+                    "description": "Persist summary entities in memory graph.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"entities": {"type": "array"}},
+                        "required": ["entities"],
+                    },
+                }
+            ],
+        )
 
     backend = build_openclaw_backend(
         backend_kind=args.backend_kind,
@@ -157,16 +169,20 @@ async def main() -> None:
         fallback_allows_tool_retry=config.planner_fallback_allows_tool_retry,
     )
 
-    clients: dict[str, Any] = {
-        "filesystem": MockRealtimeClient("filesystem"),
-        "memory": MockRealtimeClient("memory"),
-    }
+    clients: dict[str, Any] = {}
     live_clients: list[DynamicMCPClient] = []
 
     effective_live_root = args.live_filesystem_root
+    if strict_mode and args.tool_runtime == "mock":
+        raise RuntimeError("STRICT_MODE prohibits --tool-runtime mock; use live/auto with real MCP servers.")
+    if strict_mode and not can_launch_npx():
+        raise RuntimeError("STRICT_MODE requires npx to launch real MCP servers.")
+
     if not effective_live_root and args.tool_runtime == "live":
         effective_live_root = args.workspace
     if not effective_live_root and args.tool_runtime == "auto" and can_launch_npx():
+        effective_live_root = args.workspace
+    if strict_mode and not effective_live_root:
         effective_live_root = args.workspace
 
     if effective_live_root:
@@ -183,7 +199,27 @@ async def main() -> None:
         clients["filesystem"] = filesystem_client
         live_clients.append(filesystem_client)
     else:
+        if strict_mode:
+            raise RuntimeError("STRICT_MODE requires a live filesystem MCP server.")
         await registry.upsert_server_tools("filesystem", filesystem_tools)
+        clients["filesystem"] = MockRealtimeClient("filesystem")
+
+    if strict_mode:
+        memory_client = DynamicMCPClient(
+            server_name="memory",
+            command="npx",
+            args=["-y", "@modelcontextprotocol/server-memory"],
+            cwd=str(REPO_ROOT),
+            startup_timeout_s=90.0,
+            request_timeout_s=45.0,
+        )
+        discovered_memory_tools = await memory_client.initialize_and_get_tools()
+        await registry.upsert_server_tools("memory", discovered_memory_tools)
+        clients["memory"] = memory_client
+        live_clients.append(memory_client)
+    else:
+        clients["memory"] = MockRealtimeClient("memory")
+
     executor = HybridToolExecutor(clients)
     policy_engine = PolicyEngine(ToolPolicy(allowed_servers={"filesystem", "memory"}))
 
@@ -224,6 +260,7 @@ async def main() -> None:
     print("Starting real-time OpenClaw hybrid service")
     print("workspace:", args.workspace)
     print("backend_kind:", args.backend_kind)
+    print("strict_mode:", strict_mode)
     if args.backend_kind == "http":
         print("endpoint:", args.endpoint)
     print("api_mode:", args.api_mode)
