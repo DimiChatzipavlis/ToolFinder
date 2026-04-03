@@ -236,16 +236,18 @@ Start Ollama and pull your model (e.g., ollama run llama3.2). Note: A context wi
 
 Configure OpenClaw to point to your local provider in your config file:
 
-JSON
+```json
 "model": {
     "provider": "ollama",
     "baseUrl": "http://localhost:11434/v1",
     "model": "llama3.2"
 }
+```
 Launch the ToolFinder realtime service in Strict Mode to enforce live execution:
 
-Bash
+```bash
 STRICT_MODE=True python Enterprise/examples/run_realtime_openclaw.py
+```
 Approach B: Cloud API (High IQ Planning)
 The standard enterprise deployment uses a split architecture. OpenClaw uses a frontier model (e.g., Claude 3.7 Sonnet) via API keys to decide the high-level strategy. ToolFinder uses your local llama3.2 model to rapidly route schemas and execute the discrete steps without API costs.
 
@@ -257,5 +259,6 @@ Ensure your local Ollama instance is running to serve the ToolFinder routing lay
 
 Launch the service:
 
-Bash
+```bash
 STRICT_MODE=True python Enterprise/examples/run_realtime_openclaw.py
+```
