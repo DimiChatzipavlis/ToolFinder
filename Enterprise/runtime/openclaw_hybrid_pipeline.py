@@ -29,7 +29,7 @@ from .event_bus import EnterpriseEventBus
 from .executor import HybridToolExecutor
 from .openclaw_backend import OpenClawCliBackend, OpenClawHttpBackend
 from .orchestrator import HybridEnterpriseOrchestrator
-from .policy import PolicyEngine, PolicyViolation
+from .policy import PolicyEngine, PolicyViolation, SecurityPolicyViolation
 from .registry import HybridToolRegistry
 from .telemetry import TelemetryCollector
 
@@ -82,7 +82,9 @@ class OpenClawToolManifest:
 class StructuredParsingError(RuntimeError):
     """Raised when OpenClaw output is not a structured JSON action/completion payload."""
 
-    pass
+    def __init__(self, message: str, raw_excerpt: str = "") -> None:
+        super().__init__(message)
+        self.raw_excerpt = raw_excerpt
 
 
 class OpenClawSessionDriver:
@@ -122,9 +124,13 @@ class OpenClawSessionDriver:
             return OpenClawAgentResponse(
                 answer="",
                 tool_calls=[],
-                raw_output="",
+                raw_output=raw_output[:1000] if isinstance(raw_output, str) else "",
                 success=False,
-                error=f"OpenClaw agent structured parsing failed: {exc}",
+                error=(
+                    "OpenClaw agent structured parsing failed: "
+                    f"{exc}. raw_output_excerpt={exc.raw_excerpt}"
+                ),
+                metadata={"raw_output_excerpt": exc.raw_excerpt},
             )
         except Exception as exc:
             return OpenClawAgentResponse(
@@ -185,6 +191,8 @@ class OpenClawSessionDriver:
                 obj = json.loads(line)
                 if not isinstance(obj, dict):
                     continue
+                if not any(key in obj for key in ("status", "tool_name", "action")):
+                    continue
                 if obj.get("status") == "complete":
                     answer = str(obj.get("answer", ""))
                 elif obj.get("action") == "call_tool":
@@ -202,8 +210,11 @@ class OpenClawSessionDriver:
 
         stripped = raw_output.strip()
         if stripped:
-            raise StructuredParsingError("backend returned unstructured plain text")
-        raise StructuredParsingError("backend returned empty output")
+            raise StructuredParsingError(
+                "backend returned unstructured plain text",
+                raw_excerpt=raw_output[:1000],
+            )
+        raise StructuredParsingError("backend returned empty output", raw_excerpt="")
 
     def _extract_from_steps(
         self, steps: list[Any], raw_output: str
@@ -219,7 +230,10 @@ class OpenClawSessionDriver:
             elif step.get("action") == "call_tool":
                 tool_calls.append(step)
         if not answer and not tool_calls:
-            raise StructuredParsingError("json array did not contain completion or tool calls")
+            raise StructuredParsingError(
+                "json array did not contain completion or tool calls",
+                raw_excerpt=raw_output[:1000],
+            )
         return OpenClawAgentResponse(
             answer=answer,
             tool_calls=tool_calls,
@@ -253,9 +267,13 @@ class OpenClawSessionDriver:
             value = payload.get(key)
             if isinstance(value, str) and value.strip():
                 raise StructuredParsingError(
-                    "json object used unsupported answer field; expected structured completion payload"
+                    "json object used unsupported answer field; expected structured completion payload",
+                    raw_excerpt=raw_output[:1000],
                 )
-        raise StructuredParsingError("unrecognized OpenClaw agent response shape")
+        raise StructuredParsingError(
+            "unrecognized OpenClaw agent response shape",
+            raw_excerpt=raw_output[:1000],
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -656,6 +674,45 @@ class OpenClawHybridPipeline:
                         "latency_ms": round(exec_ms, 3),
                     }
                 )
+            except SecurityPolicyViolation as exc:
+                self.telemetry.increment("pipeline_security_policy_violations")
+                message = f"Security policy violation for {tool_ref}: {exc}"
+                observations.append(message)
+                failed_messages.append(message)
+                await self._publish(
+                    {
+                        "type": "pipeline_security_fault",
+                        "session_id": session_id,
+                        "turn": idx,
+                        "tool": tool_ref,
+                        "error": message,
+                    }
+                )
+                history.append(
+                    {
+                        "role": "assistant",
+                        "content": {
+                            "source": "openclaw_agent_executed",
+                            "status": "degraded_security_fault",
+                            "tool_calls": [r.__dict__ for r in tool_records] if tool_records else [],
+                            "observations": [self._truncate_observation(obs) for obs in observations],
+                            "errors": failed_messages,
+                        },
+                    }
+                )
+                phase_trace.append(PipelinePhase.COMPLETE.value)
+                return HybridPipelineResult(
+                    status="degraded_security_fault",
+                    answer=message,
+                    turns=max(1, len(tool_records) or idx),
+                    tool_calls=tool_records,
+                    telemetry=self.telemetry.to_dict(),
+                    final_history=history,
+                    phase_trace=phase_trace,
+                    execution_path="openclaw",
+                    openclaw_response=agent_response,
+                    fallback_triggered=False,
+                )
             except PolicyViolation as exc:
                 self.telemetry.increment("pipeline_policy_violations")
                 message = f"Policy violation for {tool_ref}: {exc}"
@@ -718,7 +775,7 @@ class OpenClawHybridPipeline:
                     "source": "openclaw_agent_executed",
                     "status": status,
                     "tool_calls": [r.__dict__ for r in tool_records] if tool_records else [],
-                    "observations": observations,
+                    "observations": [self._truncate_observation(obs) for obs in observations],
                     "errors": failed_messages,
                 },
             }
@@ -806,3 +863,9 @@ class OpenClawHybridPipeline:
     async def _publish(self, event: dict[str, Any]) -> None:
         event["timestamp"] = time.time()
         await self.event_bus.publish(event)
+
+    @staticmethod
+    def _truncate_observation(observation: str, max_chars: int = 2000) -> str:
+        if len(observation) <= max_chars:
+            return observation
+        return observation[:max_chars] + "... [truncated]"

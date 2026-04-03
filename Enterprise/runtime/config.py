@@ -31,6 +31,10 @@ class EnterpriseConfig:
             raise ValueError("top_k must be >= 1")
         if self.max_turns < 1:
             raise ValueError("max_turns must be >= 1")
+        if not (0.0 <= self.min_score <= 1.0):
+            raise ValueError("min_score must be between 0.0 and 1.0")
+        if self.planner_timeout_s <= 0:
+            raise ValueError("planner_timeout_s must be > 0")
         if self.loop_guard_repetition_limit < 2:
             raise ValueError("loop_guard_repetition_limit must be >= 2")
         if self.max_observation_chars < 100:

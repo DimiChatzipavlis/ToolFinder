@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 
 EventHandler = Callable[[dict[str, Any]], None | Awaitable[None]]
+
+
+logger = logging.getLogger(__name__)
 
 
 class EnterpriseEventBus:
@@ -44,6 +48,7 @@ class EnterpriseEventBus:
                     else:
                         await result
             except Exception as exc:
+                logger.exception("Event handler execution failed")
                 self._handler_errors.append(str(exc))
                 overflow = len(self._handler_errors) - self._max_handler_errors
                 if overflow > 0:

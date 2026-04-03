@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import shutil
 from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+
+
+logger = logging.getLogger(__name__)
 
 
 class OpenClawHttpBackend:
@@ -66,6 +70,11 @@ class OpenClawHttpBackend:
                 last_error = exc
                 if attempt >= self.max_retries:
                     break
+                logger.warning(
+                    "Backend probe failed on attempt %s: %s. Retrying...",
+                    attempt + 1,
+                    exc,
+                )
                 await asyncio.sleep(self.retry_backoff_s * (attempt + 1))
 
         raise RuntimeError(f"planner backend request failed after retries: {last_error}")

@@ -94,6 +94,7 @@ class DynamicMCPClient:
         self._server_info: JsonDict | None = None
         self._server_capabilities: JsonDict | None = None
         self._tools_cache: list[NormalizedTool] | None = None
+        self._startup_lock = asyncio.Lock()
         self._closed = False
         self._started = False
 
@@ -127,10 +128,32 @@ class DynamicMCPClient:
         Edge cases:
             Caches tools after first successful call and returns copies on repeat.
         """
-        if self._tools_cache is not None:
+        async with self._startup_lock:
+            if self._tools_cache is not None:
+                return copy.deepcopy(self._tools_cache)
+
+            if not self._started:
+                await self._start_process()
+                try:
+                    await asyncio.wait_for(self._initialize(), timeout=self.startup_timeout_s)
+                except Exception:
+                    await self.close()
+                    raise
+                self._started = True
+
+            self._tools_cache = await self._list_tools()
+            logger.debug(
+                "Initialized MCP server %s with %s tools",
+                self.server_name,
+                len(self._tools_cache),
+            )
             return copy.deepcopy(self._tools_cache)
 
-        if not self._started:
+    async def start(self) -> None:
+        """Start and initialize the MCP server process once."""
+        async with self._startup_lock:
+            if self._started:
+                return
             await self._start_process()
             try:
                 await asyncio.wait_for(self._initialize(), timeout=self.startup_timeout_s)
@@ -138,14 +161,6 @@ class DynamicMCPClient:
                 await self.close()
                 raise
             self._started = True
-
-        self._tools_cache = await self._list_tools()
-        logger.debug(
-            "Initialized MCP server %s with %s tools",
-            self.server_name,
-            len(self._tools_cache),
-        )
-        return copy.deepcopy(self._tools_cache)
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Invoke one MCP tool and return the result payload.

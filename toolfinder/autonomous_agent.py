@@ -165,6 +165,7 @@ class AutonomousMCPAgent:
         self.request_timeout_s: int = int(os.getenv("TOOLFINDER_REQUEST_TIMEOUT", "300"))
         self.max_iterations: int = max(1, max_iterations)
         self.clients: dict[str, DynamicMCPClient] = {}
+        self._registration_lock = asyncio.Lock()
         self._owned_clients: list[DynamicMCPClient] = []
 
     async def __aenter__(self) -> AutonomousMCPAgent:
@@ -222,11 +223,12 @@ class AutonomousMCPAgent:
                 f"server name mismatch: registry={server_name}, "
                 f"client={client.server_name}"
             )
-        if server_name in self.clients:
-            raise ValueError(f"server already registered: {server_name}")
 
         tools_list = await client.initialize_and_get_tools()
-        self.clients[server_name] = client
+        async with self._registration_lock:
+            if server_name in self.clients:
+                raise ValueError(f"server already registered: {server_name}")
+            self.clients[server_name] = client
         self.router.ingest_server(server_name, tools_list)
         return tools_list
 

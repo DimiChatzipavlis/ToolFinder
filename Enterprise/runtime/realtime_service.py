@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from .orchestrator import HybridEnterpriseOrchestrator
+
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceChangeTracker:
@@ -140,8 +144,8 @@ class RealTimeHybridService:
                         f"elapsed_ms={elapsed_ms:.2f}",
                     )
                     print("[realtime] answer:", result.answer)
-            except Exception as exc:
-                print("[realtime] loop error:", str(exc))
+            except Exception:
+                logger.exception("Realtime loop exception encountered")
                 if self.error_backoff_s > 0:
                     await asyncio.sleep(self.error_backoff_s)
                 continue
