@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import time
+
+from .policy import SecurityPolicyViolation
 
 
 @dataclass
@@ -13,6 +16,7 @@ class TelemetryCollector:
     counters: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     latencies_ms: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
     sink_path: str | None = None
+    allowed_root: str | None = None
     max_latency_samples_per_metric: int = 500
     _external_latency_stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
@@ -131,7 +135,20 @@ class TelemetryCollector:
         if context:
             payload["context"] = context
 
-        sink = Path(self.sink_path)
+        sink = Path(os.path.abspath(self.sink_path))
+        allowed_root = self.allowed_root or os.getenv("ENTERPRISE_TELEMETRY_ALLOWED_ROOT", "")
+        if allowed_root:
+            resolved_allowed_root = os.path.abspath(allowed_root)
+            try:
+                is_within_root = os.path.commonpath([str(sink), resolved_allowed_root]) == resolved_allowed_root
+            except ValueError as exc:
+                raise SecurityPolicyViolation(
+                    f"Telemetry sink path {sink} is not under allowed telemetry root {resolved_allowed_root}"
+                ) from exc
+            if not is_within_root:
+                raise SecurityPolicyViolation(
+                    f"Telemetry sink path {sink} is not under allowed telemetry root {resolved_allowed_root}"
+                )
         sink.parent.mkdir(parents=True, exist_ok=True)
         with sink.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=True))

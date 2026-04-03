@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import logging
 import os
 import re
 from typing import Any
@@ -9,6 +10,9 @@ from typing import Any
 from toolfinder.dynamic_faiss_router import RouteResult, UniversalMCPRouter
 
 from .contracts import ToolCandidate
+
+
+logger = logging.getLogger(__name__)
 
 
 class HybridToolRegistry:
@@ -107,6 +111,7 @@ class HybridToolRegistry:
             self._router_error = None
             return router
         except Exception as exc:
+            logger.exception("Runtime error encountered")
             self._router_error = str(exc)
             return None
 

@@ -435,7 +435,7 @@ def test_pipeline_event_bus_fires_events() -> None:
     events: list[dict] = []
 
     bus = EnterpriseEventBus()
-    bus.subscribe(lambda e: events.append(e))
+    asyncio.run(bus.subscribe(lambda e: events.append(e)))
 
     pipeline = OpenClawHybridPipeline(
         registry=_StaticRegistry(),

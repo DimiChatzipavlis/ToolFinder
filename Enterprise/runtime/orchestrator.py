@@ -38,7 +38,8 @@ class HybridEnterpriseOrchestrator:
         self.config = config or EnterpriseConfig()
         self.event_bus = event_bus or EnterpriseEventBus(max_handler_errors=self.config.event_bus_max_errors)
         self.telemetry = telemetry or TelemetryCollector(
-            max_latency_samples_per_metric=self.config.telemetry_max_latency_samples
+            max_latency_samples_per_metric=self.config.telemetry_max_latency_samples,
+            allowed_root=self.config.telemetry_allowed_root or None,
         )
         if not self.telemetry.sink_path and self.config.telemetry_sink_path:
             self.telemetry.sink_path = self.config.telemetry_sink_path
@@ -276,6 +277,7 @@ class HybridEnterpriseOrchestrator:
                     final_history=history,
                 ))
             except Exception as exc:
+                logger.exception("Runtime error encountered")
                 retries += 1
                 self.telemetry.increment("execution_errors")
                 history.append({"role": "observation", "content": f"Execution error: {exc}"})
@@ -356,8 +358,9 @@ class HybridEnterpriseOrchestrator:
         return "\n".join(parts)
 
     async def _publish(self, event: dict[str, Any]) -> None:
-        event["timestamp"] = time.time()
-        await self.event_bus.publish(event)
+        safe_event = event.copy()
+        safe_event["timestamp"] = time.time()
+        await self.event_bus.publish(safe_event)
 
     def _finalize_result(self, session_id: str, result: SessionResult) -> SessionResult:
         try:
@@ -369,6 +372,7 @@ class HybridEnterpriseOrchestrator:
                 }
             )
         except Exception:
+            logger.exception("Runtime error encountered")
             # Persistence failures are non-fatal for runtime execution.
             self.telemetry.increment("telemetry_persist_errors")
         return result

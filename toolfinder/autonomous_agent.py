@@ -591,7 +591,8 @@ class AutonomousMCPAgent:
         )
 
     async def _execute_tool(self, candidate: RouteResult, arguments: JsonDict) -> JsonDict:
-        client = self.clients.get(candidate.server_name)
+        async with self._registration_lock:
+            client = self.clients.get(candidate.server_name)
         if client is None:
             raise MCPClientError(f"No MCP client registered for server {candidate.server_name}")
         return await client.call_tool(candidate.tool_name, arguments)

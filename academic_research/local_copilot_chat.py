@@ -33,7 +33,10 @@ def call_local_llm(prompt):
             data=json.dumps(payload).encode('utf-8'), 
             headers={'Content-Type': 'application/json'}
         )
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(
+            req,
+            timeout=int(os.getenv("TOOLFINDER_REQUEST_TIMEOUT", "300")),
+        ) as response:
             result = json.loads(response.read().decode('utf-8'))
             return result.get("response", "").strip()
     except urllib.error.URLError:

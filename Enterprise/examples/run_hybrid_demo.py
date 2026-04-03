@@ -106,7 +106,7 @@ async def main() -> None:
         }
         print("[event]", json.dumps(compact, ensure_ascii=True))
 
-    bus.subscribe(print_event)
+    await bus.subscribe(print_event)
 
     orchestrator = HybridEnterpriseOrchestrator(
         registry=registry,

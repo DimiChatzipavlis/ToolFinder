@@ -90,6 +90,7 @@ class DynamicMCPClient:
         self._stdout_task: asyncio.Task[None] | None = None
         self._stderr_task: asyncio.Task[None] | None = None
         self._pending_requests: dict[RequestId, asyncio.Future[JsonDict]] = {}
+        self._pending_lock = asyncio.Lock()
         self._stderr_lines: deque[str] = deque(maxlen=200)
         self._server_info: JsonDict | None = None
         self._server_capabilities: JsonDict | None = None
@@ -312,13 +313,15 @@ class DynamicMCPClient:
 
         loop = asyncio.get_running_loop()
         future: asyncio.Future[JsonDict] = loop.create_future()
-        self._pending_requests[request_id] = future
+        async with self._pending_lock:
+            self._pending_requests[request_id] = future
 
         try:
             await self._send_message(message)
             response = await asyncio.wait_for(future, timeout=timeout_s or self.request_timeout_s)
         except Exception:
-            pending = self._pending_requests.pop(request_id, None)
+            async with self._pending_lock:
+                pending = self._pending_requests.pop(request_id, None)
             if pending is not None and not pending.done():
                 pending.cancel()
             raise
@@ -457,16 +460,17 @@ class DynamicMCPClient:
 
                 request_id = message.get("id")
                 if isinstance(request_id, (int, str)):
-                    future = self._pending_requests.pop(request_id, None)
+                    async with self._pending_lock:
+                        future = self._pending_requests.pop(request_id, None)
                     if future is not None and not future.done():
                         future.set_result(message)
         except Exception as exc:
-            self._fail_pending_requests(exc)
+            await self._fail_pending_requests(exc)
             raise
         finally:
             if self.process.returncode is None:
                 await self.process.wait()
-            self._fail_pending_requests(
+            await self._fail_pending_requests(
                 MCPClientError(
                     f"{self.server_name}: server exited with code {self.process.returncode}; "
                     f"stderr tail: {' | '.join(self.stderr_tail[-10:])}"
@@ -485,11 +489,12 @@ class DynamicMCPClient:
             if decoded:
                 self._stderr_lines.append(decoded)
 
-    def _fail_pending_requests(self, exc: BaseException) -> None:
-        for request_id, future in list(self._pending_requests.items()):
-            if not future.done():
-                future.set_exception(exc)
-            self._pending_requests.pop(request_id, None)
+    async def _fail_pending_requests(self, exc: BaseException) -> None:
+        async with self._pending_lock:
+            for request_id, future in list(self._pending_requests.items()):
+                if not future.done():
+                    future.set_exception(exc)
+                self._pending_requests.pop(request_id, None)
 
     async def close(self) -> None:
         """Close the client, stop tasks, terminate process, and fail pending RPCs."""
@@ -524,4 +529,4 @@ class DynamicMCPClient:
                         process.kill()
                     await process.wait()
 
-        self._fail_pending_requests(MCPClientError(f"{self.server_name}: client closed"))
+        await self._fail_pending_requests(MCPClientError(f"{self.server_name}: client closed"))

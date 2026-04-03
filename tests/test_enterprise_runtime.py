@@ -188,8 +188,8 @@ def test_event_bus_isolates_failing_handlers() -> None:
     def _recording_handler(event: dict[str, object]) -> None:
         events.append(str(event.get("type", "")))
 
-    bus.subscribe(_failing_handler)
-    bus.subscribe(_recording_handler)
+    asyncio.run(bus.subscribe(_failing_handler))
+    asyncio.run(bus.subscribe(_recording_handler))
 
     asyncio.run(bus.publish({"type": "runtime_event"}))
 

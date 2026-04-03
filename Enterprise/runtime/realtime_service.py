@@ -6,7 +6,6 @@ import logging
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from .orchestrator import HybridEnterpriseOrchestrator
 
@@ -136,14 +135,14 @@ class RealTimeHybridService:
                     started = time.perf_counter()
                     result = await self.orchestrator.run(session_id=session_id, user_query=query)
                     elapsed_ms = (time.perf_counter() - started) * 1000.0
-                    print(
-                        "[realtime]",
-                        f"session={session_id}",
-                        f"status={result.status}",
-                        f"turns={result.turns}",
-                        f"elapsed_ms={elapsed_ms:.2f}",
+                    logger.info(
+                        "[realtime] session=%s status=%s turns=%s elapsed_ms=%.2f",
+                        session_id,
+                        result.status,
+                        result.turns,
+                        elapsed_ms,
                     )
-                    print("[realtime] answer:", result.answer)
+                    logger.info("[realtime] answer: %s", result.answer)
             except Exception:
                 logger.exception("Realtime loop exception encountered")
                 if self.error_backoff_s > 0:
@@ -162,5 +161,5 @@ class RealTimeHybridService:
             if should_run:
                 query = self.query_builder(touched)
                 result = await self.orchestrator.run(session_id="realtime-test", user_query=query)
-                print("[realtime-test]", result.status, result.answer)
+                logger.info("[realtime-test] %s %s", result.status, result.answer)
             await asyncio.sleep(self.poll_interval_s)

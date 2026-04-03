@@ -12,6 +12,7 @@ This module provides a unified pipeline that:
 import asyncio
 import copy
 import json
+import logging
 import time
 from typing import Any
 
@@ -34,6 +35,14 @@ from .registry import HybridToolRegistry
 from .telemetry import TelemetryCollector
 
 
+logger = logging.getLogger(__name__)
+
+ManifestEntry = dict[str, object]
+ToolCallPayload = dict[str, object]
+HistoryEntry = dict[str, object]
+EventPayload = dict[str, object]
+
+
 # ---------------------------------------------------------------------------
 # Tool manifest builder
 # ---------------------------------------------------------------------------
@@ -50,9 +59,9 @@ class OpenClawToolManifest:
     """
 
     @staticmethod
-    def from_candidates(candidates: list[ToolCandidate]) -> list[dict[str, Any]]:
+    def from_candidates(candidates: list[ToolCandidate]) -> list[ManifestEntry]:
         """Build an OpenClaw-compatible tool manifest from routed candidates."""
-        manifest: list[dict[str, Any]] = []
+        manifest: list[ManifestEntry] = []
         for candidate in candidates:
             manifest.append(
                 {
@@ -69,7 +78,7 @@ class OpenClawToolManifest:
         return manifest
 
     @staticmethod
-    def render_json(manifest: list[dict[str, Any]]) -> str:
+    def render_json(manifest: list[ManifestEntry]) -> str:
         """Serialize manifest to a compact JSON string for CLI/HTTP payloads."""
         return json.dumps(manifest, ensure_ascii=True, indent=None,  sort_keys=True)
 
@@ -133,6 +142,7 @@ class OpenClawSessionDriver:
                 metadata={"raw_output_excerpt": exc.raw_excerpt},
             )
         except Exception as exc:
+            logger.exception("Runtime error encountered")
             return OpenClawAgentResponse(
                 answer="",
                 tool_calls=[],
@@ -163,7 +173,7 @@ class OpenClawSessionDriver:
 
     def _parse_agent_output(self, raw_output: str) -> OpenClawAgentResponse:
         """Parse OpenClaw agent output into a structured response."""
-        tool_calls: list[dict[str, Any]] = []
+        tool_calls: list[ToolCallPayload] = []
         answer = ""
 
         # Attempt to parse as a JSON array of steps.
@@ -220,7 +230,7 @@ class OpenClawSessionDriver:
         self, steps: list[Any], raw_output: str
     ) -> OpenClawAgentResponse:
         """Extract answer and tool calls from a JSON array of agent steps."""
-        tool_calls: list[dict[str, Any]] = []
+        tool_calls: list[ToolCallPayload] = []
         answer = ""
         for step in steps:
             if not isinstance(step, dict):
@@ -243,7 +253,7 @@ class OpenClawSessionDriver:
         )
 
     def _extract_from_single(
-        self, payload: dict[str, Any], raw_output: str
+        self, payload: dict[str, object], raw_output: str
     ) -> OpenClawAgentResponse:
         """Extract answer from a single JSON completion object."""
         if payload.get("status") == "complete":
@@ -345,7 +355,8 @@ class OpenClawHybridPipeline:
             self.policy_engine = PolicyEngine()
         self.event_bus = event_bus or EnterpriseEventBus(max_handler_errors=self.config.event_bus_max_errors)
         self.telemetry = telemetry or TelemetryCollector(
-            max_latency_samples_per_metric=self.config.telemetry_max_latency_samples
+            max_latency_samples_per_metric=self.config.telemetry_max_latency_samples,
+            allowed_root=self.config.telemetry_allowed_root or None,
         )
         if not self.telemetry.sink_path and self.config.telemetry_sink_path:
             self.telemetry.sink_path = self.config.telemetry_sink_path
@@ -357,7 +368,7 @@ class OpenClawHybridPipeline:
     async def run(self, session_id: str, user_query: str) -> HybridPipelineResult:
         """Execute the full hybrid pipeline for a user query."""
         phase_trace: list[str] = []
-        history: list[dict[str, Any]] = [{"role": "user", "content": user_query}]
+        history: list[HistoryEntry] = [{"role": "user", "content": user_query}]
 
         # ── Phase 1: Semantic routing ──────────────────────────────────
         phase_trace.append(PipelinePhase.ROUTING.value)
@@ -435,7 +446,6 @@ class OpenClawHybridPipeline:
                 self.telemetry.increment("pipeline_openclaw_tool_execution")
                 tool_execution_result = await self._execute_openclaw_tool_calls(
                     session_id=session_id,
-                    user_query=user_query,
                     agent_response=agent_response,
                     candidates=candidates,
                     history=history,
@@ -596,14 +606,12 @@ class OpenClawHybridPipeline:
         self,
         *,
         session_id: str,
-        user_query: str,
         agent_response: OpenClawAgentResponse,
         candidates: list[ToolCandidate],
-        history: list[dict[str, Any]],
+        history: list[HistoryEntry],
         phase_trace: list[str],
     ) -> HybridPipelineResult:
         """Execute tool calls from OpenClaw's plan through the MCP executor."""
-        del user_query
         assert self.executor is not None
 
         tool_records: list[ToolCallRecord] = []
@@ -728,6 +736,7 @@ class OpenClawHybridPipeline:
                     }
                 )
             except Exception as exc:
+                logger.exception("Runtime error encountered")
                 self.telemetry.increment("pipeline_tool_errors")
                 message = f"Execution error for {tool_ref}: {exc}"
                 observations.append(message)
@@ -801,7 +810,7 @@ class OpenClawHybridPipeline:
 
     def _map_tool_calls(
         self,
-        tool_calls: list[dict[str, Any]],
+        tool_calls: list[ToolCallPayload],
         candidates: list[ToolCandidate],
     ) -> list[ToolCallRecord]:
         """Map OpenClaw tool call dicts back to typed ToolCallRecord."""
@@ -836,7 +845,7 @@ class OpenClawHybridPipeline:
     def _build_policy_decision(
         server_name: str,
         tool_name: str,
-        arguments: dict[str, Any],
+        arguments: dict[str, object],
     ) -> PlannerDecision:
         return PlannerDecision(
             action="call_tool",
@@ -856,13 +865,15 @@ class OpenClawHybridPipeline:
                 }
             )
         except Exception:
+            logger.exception("Runtime error encountered")
             # Telemetry persistence must never break request completion.
             self.telemetry.increment("pipeline_telemetry_persist_errors")
         return result
 
-    async def _publish(self, event: dict[str, Any]) -> None:
-        event["timestamp"] = time.time()
-        await self.event_bus.publish(event)
+    async def _publish(self, event: EventPayload) -> None:
+        safe_event = event.copy()
+        safe_event["timestamp"] = time.time()
+        await self.event_bus.publish(safe_event)
 
     @staticmethod
     def _truncate_observation(observation: str, max_chars: int = 2000) -> str:

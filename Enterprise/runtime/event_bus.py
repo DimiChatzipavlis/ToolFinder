@@ -24,22 +24,27 @@ class EnterpriseEventBus:
         if max_handler_errors < 1:
             raise ValueError("max_handler_errors must be >= 1")
         self._handlers: list[EventHandler] = []
+        self._handler_lock = asyncio.Lock()
         self._handler_timeout_s = handler_timeout_s
         self._continue_on_error = continue_on_error
         self._max_handler_errors = max_handler_errors
         self._handler_errors: list[str] = []
 
-    def subscribe(self, handler: EventHandler) -> Callable[[], None]:
-        self._handlers.append(handler)
+    async def subscribe(self, handler: EventHandler) -> Callable[[], Awaitable[None]]:
+        async with self._handler_lock:
+            self._handlers.append(handler)
 
-        def unsubscribe() -> None:
-            if handler in self._handlers:
-                self._handlers.remove(handler)
+        async def unsubscribe() -> None:
+            async with self._handler_lock:
+                if handler in self._handlers:
+                    self._handlers.remove(handler)
 
         return unsubscribe
 
     async def publish(self, event: dict[str, Any]) -> None:
-        for handler in list(self._handlers):
+        async with self._handler_lock:
+            handlers = list(self._handlers)
+        for handler in handlers:
             try:
                 result = handler(event)
                 if inspect.isawaitable(result):

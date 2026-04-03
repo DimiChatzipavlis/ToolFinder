@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Protocol
 
 from jsonschema import validate
 
@@ -10,13 +10,22 @@ from toolfinder.mcp_adapter import DynamicMCPClient
 from .contracts import ToolCandidate
 
 
+JsonPrimitive = str | int | float | bool | None
+JsonValue = JsonPrimitive | list["JsonValue"] | dict[str, "JsonValue"]
+JsonObject = dict[str, JsonValue]
+
+
+class ToolClientProtocol(Protocol):
+    async def call_tool(self, tool_name: str, arguments: JsonObject) -> JsonObject: ...
+
+
 class HybridToolExecutor:
     """Executes validated tool calls against registered MCP clients."""
 
-    def __init__(self, clients: dict[str, DynamicMCPClient | Any]) -> None:
+    def __init__(self, clients: dict[str, DynamicMCPClient | ToolClientProtocol]) -> None:
         self.clients = clients
 
-    async def execute(self, candidate: ToolCandidate, arguments: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    async def execute(self, candidate: ToolCandidate, arguments: JsonObject) -> tuple[JsonObject, str]:
         client = self.clients.get(candidate.server_name)
         if client is None:
             raise RuntimeError(f"no client registered for server {candidate.server_name}")
@@ -35,10 +44,10 @@ class HybridToolExecutor:
 
         return raw_result, observation
 
-    def _extract_text(self, payload: Any) -> str:
+    def _extract_text(self, payload: object) -> str:
         fragments: list[str] = []
 
-        def walk(node: Any) -> None:
+        def walk(node: object) -> None:
             if isinstance(node, str):
                 fragments.append(node)
                 return

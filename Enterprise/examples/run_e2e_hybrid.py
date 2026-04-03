@@ -351,7 +351,7 @@ async def main() -> None:
         compact = {k: v for k, v in event.items() if k not in ("timestamp",) and v is not None}
         print(f"  [event] {event_type}: {json.dumps(compact, ensure_ascii=True)}")
 
-    event_bus.subscribe(log_event)
+    await event_bus.subscribe(log_event)
 
     # ── Build pipeline ─────────────────────────────────────────────────
     pipeline = OpenClawHybridPipeline(
@@ -361,7 +361,10 @@ async def main() -> None:
         executor=executor,
         config=config,
         event_bus=event_bus,
-        telemetry=TelemetryCollector(max_latency_samples_per_metric=config.telemetry_max_latency_samples),
+        telemetry=TelemetryCollector(
+            max_latency_samples_per_metric=config.telemetry_max_latency_samples,
+            allowed_root=config.telemetry_allowed_root or None,
+        ),
         fallback_strategy=args.fallback_strategy,
         max_agent_steps=args.max_agent_steps,
         model=args.model,
