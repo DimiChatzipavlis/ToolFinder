@@ -118,7 +118,10 @@ def create_app(
             return ExecuteIntentResponse(session_id=session_id, error=f"execution failed: {exc}")
 
         if _is_security_fault(result):
-            return JSONResponse(status_code=403, content={"error": _security_error_message(result)})
+            return JSONResponse(
+                status_code=403,
+                content={"error": f"Path Traversal error: {_security_error_message(result)}"},
+            )
 
         return ExecuteIntentResponse(session_id=session_id, execution_output=asdict(result))
 

@@ -336,6 +336,8 @@ class UniversalMCPRouter:
     @staticmethod
     def _format_bindable_tool_schema(result: RouteResult) -> dict[str, Any]:
         return {
+            "server_name": result.server_name,
+            "tool_name": result.tool_name,
             "type": "function",
             "function": {
                 "name": result.tool_name,
