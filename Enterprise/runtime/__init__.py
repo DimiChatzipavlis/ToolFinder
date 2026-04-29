@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .config import EnterpriseConfig
+from .api import ExecuteIntentRequest, ExecuteIntentResponse, create_app
 from .contracts import (
     HybridPipelineResult,
     OpenClawAgentRequest,
@@ -20,12 +21,14 @@ from .openclaw_hybrid_pipeline import (
 )
 from .orchestrator import HybridEnterpriseOrchestrator
 from .planner import HeuristicPlanner, OpenClawPlanner
-from .policy import PolicyEngine, ToolPolicy
+from .policy import PolicyEngine, SecurityViolation, ToolPolicy
 from .realtime_service import RealTimeHybridService, WorkspaceChangeTracker
 from .registry import HybridToolRegistry
 
 __all__ = [
     "EnterpriseConfig",
+    "ExecuteIntentRequest",
+    "ExecuteIntentResponse",
     "FallbackStrategy",
     "HeuristicPlanner",
     "HybridEnterpriseOrchestrator",
@@ -43,10 +46,12 @@ __all__ = [
     "PipelinePhase",
     "PlannerDecision",
     "PolicyEngine",
+    "SecurityViolation",
     "RealTimeHybridService",
     "SessionResult",
     "ToolCandidate",
     "ToolPolicy",
     "WorkspaceChangeTracker",
+    "create_app",
     "build_openclaw_backend",
 ]

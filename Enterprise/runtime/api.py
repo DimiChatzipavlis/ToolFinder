@@ -106,7 +106,7 @@ def create_app(
         lifespan=lifespan,
     )
 
-    @app.post("/execute", response_model=ExecuteIntentResponse)
+    @app.post("/execute", response_model=ExecuteIntentResponse, response_model_exclude_none=True)
     async def execute(payload: ExecuteIntentRequest) -> ExecuteIntentResponse | JSONResponse:
         session_id = f"api-{uuid4().hex}"
 
