@@ -116,149 +116,123 @@ router.build_index()
 # Route and bind
 llm = ChatOllama(model="llama3.2")
 top_tools = router.route_top_k("Write a summary to output.txt", k=2)
-response = llm.bind_tools(top_tools).invoke("Write a summary to output.txt")
-```
 
-For a complete end-to-end proof, run:
+# ToolFinder
 
-```bash
-python examples/eval_toolfinder.py
-python -u examples/langgraph_integration/benchmark_agent.py
-python -u examples/langgraph_integration/baseline_agent.py
-```
+ToolFinder is a semantic routing and guarded execution layer for MCP tool ecosystems. It narrows a natural-language intent to a small set
+of relevant tools (via semantic retrieval) and executes selected calls with schema validation, policy enforcement, and telemetry.
 
-## ▶️ Examples: Exact Run Instructions
+## Short status (accurate and agnostic)
 
-Use these exact commands from the repository root (`ToolFinder`).
+- The code provides a local HTTP runtime that can be started from the repository root.
+- The project includes a pair of workspace-level validation scripts (`start_server.py` and `run_e2e_client.py`) that exercise the end-to-end API.
+- This repository implements a runtime and examples; it does not package an opinionated multi-node distributed deployment.
 
-### 1) Prerequisites
+If you need a production, multi-node deployment you will need to add an operational layer (service discovery, secrets, auth, load balancing, etc.).
 
-```bash
-# Python dependencies (core + langgraph integration + tests)
-pip install -e .[langgraph,dev]
+## What is in this repo
 
-# Node.js runtime is required for MCP servers launched with npx.
-# Verify both commands are available:
-node --version
-npx --version
+- `toolfinder/` — core semantic router and FAISS-backed retrieval utilities.
+- `Enterprise/` — hybrid runtime, API, policy, executor, planner, telemetry, and OpenClaw bridge.
+- `examples/` — scripted demos and benchmarks.
+- `academic_research/` — notebooks and datasets used for evaluation.
+- Root-level validation helpers: `start_server.py` and `run_e2e_client.py`.
 
-# Ollama must be installed and running for LLM-backed examples.
-ollama --version
-ollama pull llama3.2
-```
+## Installation (minimal)
 
-### 2) Interactive Notebook Walkthrough (recommended first)
+Requires Python 3.10+. From the repository root:
 
 ```bash
-jupyter lab examples/ToolFinder_StepByStep.ipynb
+python -m pip install -e .
 ```
 
-This notebook demonstrates semantic routing end-to-end with a small synthetic toolset, then points to the full script-based examples.
-
-### 3) Scripted Example Matrix
+Optional extras (examples and dev tools):
 
 ```bash
-# A/B benchmark over filesystem MCP tools (does NOT mutate README by default)
-python examples/eval_toolfinder.py
-
-# If you want benchmark markers updated in README:
-python examples/eval_toolfinder.py --update-readme
-
-# LangGraph baseline (context stuffing)
-python -u examples/langgraph_integration/baseline_agent.py
-
-# LangGraph + ToolFinder routing
-python -u examples/langgraph_integration/benchmark_agent.py
-
-# Tri-server autonomous proof (memory + sqlite + fetch)
-python -u examples/prove_scalability.py
-
-# ReAct verification harness
-python -u examples/verify_react_agent.py
-
-# Enterprise hybrid runtime demo
-python Enterprise/examples/run_hybrid_demo.py
-
-# Enterprise real-time OpenClaw runtime (HTTP backend, finite smoke run)
-python Enterprise/examples/run_realtime_openclaw.py --backend-kind http --max-cycles 2
-
-# Enterprise real-time OpenClaw runtime with live MCP filesystem server
-python Enterprise/examples/run_realtime_openclaw.py --backend-kind http --tool-runtime live --live-filesystem-root ./examples/langgraph_integration/sandbox
-
-# Enterprise real-time OpenClaw runtime with local OpenClaw CLI backend
-python Enterprise/examples/run_realtime_openclaw.py --backend-kind cli --max-cycles 2
-
-# Enterprise end-to-end hybrid pipeline (ToolFinder routing + OpenClaw agent)
-python Enterprise/examples/run_e2e_hybrid.py --max-cycles 1 --fallback-strategy heuristic_planner
+python -m pip install -e '.[dev]'
+python -m pip install -e '.[langgraph]'
+python -m pip install -e '.[enterprise]'
 ```
 
-### 4) What to Expect
+## Local validation (agnostic instructions)
 
-- `examples/eval_toolfinder.py`: Prints per-task and aggregate telemetry. Sandbox files are created and cleaned under `examples/langgraph_integration/sandbox`.
-- `examples/langgraph_integration/*.py`: Prints routing/inference telemetry and tool-call traces.
-- `examples/prove_scalability.py`: Prints per-iteration action/observation trace and final scratchpad.
-- `examples/verify_react_agent.py`: Verifies sqlite discovery and memory-note persistence.
-- `Enterprise/examples/run_e2e_hybrid.py`: Executes routing -> OpenClaw agent -> guarded tool execution with fallback strategy controls.
-- `Enterprise/examples/run_realtime_openclaw.py`: Runs finite or continuous workspace polling using precise changed-file deltas and policy-guarded execution.
+From a shell opened at the repository root:
 
-## 🗂️ Repository Structure
+1. Start the local runtime:
 
-- [toolfinder](toolfinder): Core package. FAISS routing, MCP ingestion, schema hardening, parsing recovery, and autonomous execution.
-- [examples](examples): Integration proofs. LangGraph benchmark, baseline comparison, self-bootstrapping evaluator, orchestration demos, and a notebook walkthrough in `examples/ToolFinder_StepByStep.ipynb`.
-- [academic_research](academic_research): Semester project assets. Training data, notebooks, model artifacts, and evaluation code underpinning the semantic routing layer.
-- [Enterprise](Enterprise): Enterprise hybrid runtime with retrieval gate + OpenClaw-style planner abstraction + policy/telemetry/event-driven orchestration.
+```bash
+python start_server.py
+```
 
-## 🔬 Why This Architecture Works
+2. In a second shell (same working directory) run the client:
 
-ToolFinder treats tool use as a systems architecture problem, not a prompt formatting trick.
+```bash
+python run_e2e_client.py
+```
 
-- Retrieval handles scale.
-- Middleware validation handles malformed outputs.
-- ReAct orchestration handles recovery.
+The client sends a JSON request with a single required field, `intent`, to `POST /execute` and prints the server response for inspection.
 
-That separation is the reason the same architecture can support small local SLMs, larger hosted models, and expanding MCP ecosystems without turning every new server into prompt debt.
+Notes:
 
-## 📄 For Senior Review
+- Run the commands from your repository root so relative imports and workspace checks work correctly.
+- The validation scripts are convenience helpers; they are not intended to be production entry points.
 
-If you want the engineering whitepaper summary rather than the developer landing page, see [ARCHITECTURE_REPORT.md](ARCHITECTURE_REPORT.md).
+## HTTP API (concise)
 
-🏢 Enterprise Hybrid Pipeline (OpenClaw)
-ToolFinder natively supports integration with OpenClaw to act as a 24/7 autonomous service. OpenClaw handles the macro-orchestration (memory, scheduling, messaging channels), while ToolFinder handles the micro-execution (FAISS semantic routing, schema hardening, and zero-hallucination tool calls).
+The API is implemented by a factory function in `Enterprise/runtime/api.py` and should be launched via the factory rather than assuming a module-level `app` object. See `create_app(...)` in [Enterprise/runtime/api.py](Enterprise/runtime/api.py#L44) and the request model `ExecuteIntentRequest` in [Enterprise/runtime/api.py](Enterprise/runtime/api.py#L22).
 
-You can deploy this pipeline in two distinct ways:
+Endpoint
 
-Approach A: 100% Local (Privacy-First)
-This approach runs both the OpenClaw strategic planner and the ToolFinder executor entirely on your local machine using an LLM runner like Ollama. No data leaves your network, and no API keys are required.
+```http
+POST /execute
+```
 
-Execution:
-
-Start Ollama and pull your model (e.g., ollama run llama3.2). Note: A context window of at least 64k tokens is recommended for OpenClaw's memory summarization.
-
-Configure OpenClaw to point to your local provider in your config file:
+Request JSON (required):
 
 ```json
-"model": {
-    "provider": "ollama",
-    "baseUrl": "http://localhost:11434/v1",
-    "model": "llama3.2"
+{ "intent": "<user natural language intent>" }
+```
+
+Successful response (abridged):
+
+```json
+{
+    "session_id": "api-...",
+    "execution_output": {
+        "status": "complete|failed|partial",
+        "answer": "...",
+        "tool_calls": [ ... ],
+        "telemetry": { ... }
+    }
 }
 ```
-Launch the ToolFinder realtime service in Strict Mode to enforce live execution:
+
+If the request fails schema validation or policy enforcement the server will return an error payload (HTTP 4xx/5xx with an `error` field).
+
+## How the runtime is organized (short)
+
+- `HybridToolRegistry` — catalog + retrieval (FAISS/keyword fallback).
+- `PolicyEngine` — path and argument guardrails.
+- `HybridToolExecutor` — executes validated tool calls against MCP clients (or mocks).
+- `OpenClawHybridPipeline` — end-to-end orchestration: routing → agent → tool execution → fallback → telemetry.
+
+These are designed to be composable; the repo contains examples that wire them together for local validation.
+
+## Distribution note (explicit)
+
+This repository provides the runtime components and examples. A production distributed deployment requires additional operational components (deployment manifests, service discovery, secrets, authentication, logging/monitoring, scaling strategies) which are outside the scope of this codebase.
+
+## Examples and demos
+
+See `examples/` and `Enterprise/examples/` for many runnable demos. Typical commands (from repo root):
 
 ```bash
-STRICT_MODE=True python Enterprise/examples/run_realtime_openclaw.py
+python examples/eval_toolfinder.py
+python Enterprise/examples/run_e2e_hybrid.py --max-cycles 1
 ```
-Approach B: Cloud API (High IQ Planning)
-The standard enterprise deployment uses a split architecture. OpenClaw uses a frontier model (e.g., Claude 3.7 Sonnet) via API keys to decide the high-level strategy. ToolFinder uses your local llama3.2 model to rapidly route schemas and execute the discrete steps without API costs.
 
-Execution:
+## Further reading
 
-Set your OpenClaw provider to Anthropic or OpenAI in your configuration.
-
-Ensure your local Ollama instance is running to serve the ToolFinder routing layer.
-
-Launch the service:
-
-```bash
-STRICT_MODE=True python Enterprise/examples/run_realtime_openclaw.py
-```
+- `ARCHITECTURE_REPORT.md`
+- `SYSTEM_REALITY_REPORT.md`
+- `ENTERPRISE_SYSTEM_REPORT.md`
