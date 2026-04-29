@@ -13,6 +13,7 @@ from Enterprise.runtime.policy import PolicyEngine, PolicyViolation, SecurityPol
 from Enterprise.runtime.realtime_service import RealTimeHybridService, WorkspaceChangeTracker
 from Enterprise.runtime.config import EnterpriseConfig
 from Enterprise.runtime.telemetry import TelemetryCollector
+from Enterprise.runtime.policy import SecurityViolation
 
 
 class BrokenBackend:
@@ -35,8 +36,8 @@ def _candidate() -> ToolCandidate:
     )
 
 
-def test_policy_rejects_unrouted_tool() -> None:
-    policy = PolicyEngine(ToolPolicy(allowed_servers={"filesystem"}))
+def test_policy_rejects_unrouted_tool(tmp_path: Path) -> None:
+    policy = PolicyEngine(ToolPolicy(allowed_servers={"filesystem"}), workspace_root=str(tmp_path))
     decision = PlannerDecision(
         action="call_tool",
         thought="test",
@@ -49,8 +50,11 @@ def test_policy_rejects_unrouted_tool() -> None:
         policy.enforce_call(decision, candidate_lookup={("filesystem", "list_directory"): _candidate()})
 
 
-def test_policy_raises_security_violation_on_path_traversal() -> None:
-    policy = PolicyEngine(ToolPolicy(allowed_servers={"filesystem"}, allowed_path_roots=("C:/workspace",)))
+def test_policy_raises_security_violation_on_path_traversal(tmp_path: Path) -> None:
+    policy = PolicyEngine(
+        ToolPolicy(allowed_servers={"filesystem"}),
+        workspace_root=str(tmp_path),
+    )
     decision = PlannerDecision(
         action="call_tool",
         thought="test",
@@ -59,7 +63,7 @@ def test_policy_raises_security_violation_on_path_traversal() -> None:
         arguments={"path": "../secrets"},
     )
 
-    with pytest.raises(SecurityPolicyViolation):
+    with pytest.raises(SecurityViolation):
         policy.enforce_call(decision, candidate_lookup={("filesystem", "list_directory"): _candidate()})
 
 
@@ -204,6 +208,9 @@ class _StaticRegistry:
 
 
 class _RepeatingPlanner:
+    def __init__(self, safe_path: str) -> None:
+        self._safe_path = safe_path
+
     async def plan(self, turn_input: PlannerTurnInput) -> PlannerDecision:
         del turn_input
         return PlannerDecision(
@@ -211,7 +218,7 @@ class _RepeatingPlanner:
             thought="repeat",
             server_name="filesystem",
             tool_name="list_directory",
-            arguments={"path": "."},
+            arguments={"path": self._safe_path},
         )
 
 
@@ -221,12 +228,12 @@ class _ExecutorStub:
         return {}, "files: a.txt"
 
 
-def test_orchestrator_loop_guard_fails_on_repeated_calls() -> None:
+def test_orchestrator_loop_guard_fails_on_repeated_calls(tmp_path: Path) -> None:
     orchestrator = HybridEnterpriseOrchestrator(
         registry=_StaticRegistry(),
-        planner=_RepeatingPlanner(),
+        planner=_RepeatingPlanner(str(tmp_path / "nested" / "file.txt")),
         executor=_ExecutorStub(),
-        policy_engine=PolicyEngine(ToolPolicy(allowed_servers={"filesystem"})),
+        policy_engine=PolicyEngine(ToolPolicy(allowed_servers={"filesystem"}), workspace_root=str(tmp_path)),
         config=EnterpriseConfig(max_turns=8),
     )
 

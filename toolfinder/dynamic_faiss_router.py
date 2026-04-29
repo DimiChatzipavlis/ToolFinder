@@ -3,8 +3,10 @@ from __future__ import annotations
 """Semantic routing for MCP tools backed by FAISS similarity search."""
 
 import copy
+import gc
 import json
 import logging
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -36,6 +38,43 @@ class RouteNotFoundError(LookupError):
     pass
 
 
+class _EmbeddingModelSingleton:
+    _models: dict[tuple[str, str], SentenceTransformer] = {}
+    _lock = threading.Lock()
+
+    @classmethod
+    def acquire(cls, model_name: str, device: str) -> SentenceTransformer:
+        key = (model_name, device)
+        with cls._lock:
+            model = cls._models.get(key)
+            if model is None:
+                model = SentenceTransformer(model_name, device=device)
+                cls._models[key] = model
+            return model
+
+    @classmethod
+    def teardown(cls, model_name: str | None = None, device: str | None = None) -> None:
+        with cls._lock:
+            if model_name is None and device is None:
+                keys = list(cls._models.keys())
+            else:
+                keys = [
+                    key
+                    for key in cls._models
+                    if (model_name is None or key[0] == model_name)
+                    and (device is None or key[1] == device)
+                ]
+
+            for key in keys:
+                model = cls._models.pop(key, None)
+                if model is not None:
+                    del model
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+
 class UniversalMCPRouter:
     """Route natural-language queries to MCP tools using dense retrieval.
 
@@ -60,7 +99,7 @@ class UniversalMCPRouter:
         self.model_name: str = model_name
         self.device: str = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size: int = batch_size
-        self.model: SentenceTransformer = SentenceTransformer(self.model_name, device=self.device)
+        self.model: SentenceTransformer | None = _EmbeddingModelSingleton.acquire(self.model_name, self.device)
         embedding_dim = int(self.model.get_sentence_embedding_dimension())
 
         self._embedding_dim: int = embedding_dim
@@ -68,6 +107,27 @@ class UniversalMCPRouter:
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
         self._staged_tools: list[tuple[str, ToolSchema]] = []
         self._compat_mode: bool = False
+
+    def set_catalog(self, catalog: dict[str, list[ToolSchema]]) -> int:
+        """Replace the staged tool catalog and rebuild only the FAISS index."""
+        self._staged_tools = []
+        for server_name, tools in catalog.items():
+            for tool in tools:
+                self._staged_tools.append((server_name, copy.deepcopy(tool)))
+        return self.build_index()
+
+    def teardown(self) -> None:
+        """Release router state and aggressively free embedding memory."""
+        self.faiss_index = faiss.IndexFlatIP(self._embedding_dim)
+        self.metadata.clear()
+        self._staged_tools.clear()
+        self._compat_mode = False
+
+        if self.model is not None:
+            del self.model
+            self.model = None
+
+        _EmbeddingModelSingleton.teardown(self.model_name, self.device)
 
     @staticmethod
     def canonicalize_schema(schema: ToolSchema) -> str:
@@ -152,6 +212,10 @@ class UniversalMCPRouter:
         normalized_tools: list[ToolSchema] = []
         embedding_corpus: list[str] = []
 
+        model = self.model
+        if model is None:
+            raise RuntimeError("embedding model has been torn down")
+
         for raw_tool in tools_list:
             normalized_tool = {
                 "server_name": server_name,
@@ -163,7 +227,7 @@ class UniversalMCPRouter:
             embedding_corpus.append(self._minify_schema_for_embedding(normalized_tool))
 
         with torch.inference_mode():
-            embeddings = self.model.encode(
+            embeddings = model.encode(
                 embedding_corpus,
                 batch_size=self.batch_size,
                 convert_to_numpy=True,
@@ -206,8 +270,12 @@ class UniversalMCPRouter:
         if self.faiss_index.ntotal == 0:
             raise ValueError("router index is empty; ingest at least one server first")
 
+        model = self.model
+        if model is None:
+            raise RuntimeError("embedding model has been torn down")
+
         with torch.inference_mode():
-            query_embedding = self.model.encode([query], convert_to_numpy=True)
+            query_embedding = model.encode([query], convert_to_numpy=True)
 
         query_embedding = np.asarray(query_embedding, dtype=np.float32)
         faiss.normalize_L2(query_embedding)

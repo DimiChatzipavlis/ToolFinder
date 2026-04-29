@@ -65,7 +65,7 @@ class HybridToolRegistry:
     async def route(self, query: str, k: int, min_score: float) -> list[ToolCandidate]:
         async with self._lock:
             if self._router is not None:
-                routed = self._router.route_top_k(query, k=k, min_score=min_score)
+                routed = await asyncio.to_thread(self._router.route_top_k, query, k=k, min_score=min_score)
             else:
                 routed = self._keyword_route_top_k(query, k=k, min_score=min_score)
 
@@ -105,15 +105,20 @@ class HybridToolRegistry:
             return None
 
         try:
-            router = UniversalMCPRouter(model_name=self.model_name)
-            for server_name, tools in self._server_tools.items():
-                router.ingest_server(server_name, tools)
+            router = self._router or UniversalMCPRouter(model_name=self.model_name)
+            router.set_catalog(self._server_tools)
             self._router_error = None
             return router
         except Exception as exc:
             logger.exception("Runtime error encountered")
             self._router_error = str(exc)
             return None
+
+    def teardown(self) -> None:
+        if self._router is not None:
+            self._router.teardown()
+            self._router = None
+        self._server_tools.clear()
 
     def _keyword_route_top_k(self, query: str, k: int, min_score: float) -> list[RouteResult]:
         query_tokens = self._tokenize(query)

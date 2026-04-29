@@ -70,7 +70,7 @@ async def main() -> None:
         help="Planner backend type: http endpoint or local openclaw CLI.",
     )
     parser.add_argument("--endpoint", default=os.getenv("OPENCLAW_ENDPOINT", "http://127.0.0.1:11434/api/generate"))
-    parser.add_argument("--model", default=os.getenv("OPENCLAW_MODEL", "llama3.2"))
+    parser.add_argument("--model", default=os.getenv("OPENCLAW_MODEL", "qwen3-coder"))
     parser.add_argument(
         "--api-mode",
         default=os.getenv("OPENCLAW_API_MODE", "ollama-generate"),

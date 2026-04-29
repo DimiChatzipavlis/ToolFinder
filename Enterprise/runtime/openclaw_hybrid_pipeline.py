@@ -206,7 +206,7 @@ class OpenClawSessionDriver:
                 if obj.get("status") == "complete":
                     answer = str(obj.get("answer", ""))
                 elif obj.get("action") == "call_tool":
-                    tool_calls.append(obj)
+                    tool_calls.append(self._normalize_tool_call_payload(obj, raw_output))
             except (json.JSONDecodeError, ValueError):
                 continue
 
@@ -238,7 +238,7 @@ class OpenClawSessionDriver:
             if step.get("status") == "complete":
                 answer = str(step.get("answer", ""))
             elif step.get("action") == "call_tool":
-                tool_calls.append(step)
+                tool_calls.append(self._normalize_tool_call_payload(step, raw_output))
         if not answer and not tool_calls:
             raise StructuredParsingError(
                 "json array did not contain completion or tool calls",
@@ -267,7 +267,7 @@ class OpenClawSessionDriver:
         if payload.get("action") == "call_tool":
             return OpenClawAgentResponse(
                 answer="",
-                tool_calls=[payload],
+                tool_calls=[self._normalize_tool_call_payload(payload, raw_output)],
                 raw_output=raw_output,
                 success=True,
                 metadata={"parse_mode": "json_single_action"},
@@ -282,6 +282,25 @@ class OpenClawSessionDriver:
                 )
         raise StructuredParsingError(
             "unrecognized OpenClaw agent response shape",
+            raw_excerpt=raw_output[:1000],
+        )
+
+    @staticmethod
+    def _normalize_tool_call_payload(payload: dict[str, object], raw_output: str) -> ToolCallPayload:
+        """Normalize OpenClaw tool-call payloads into executor-ready shape."""
+        normalized_payload = dict(payload)
+
+        tool_ref = normalized_payload.get("tool")
+        if isinstance(tool_ref, str) and tool_ref.strip():
+            return normalized_payload
+
+        tool_name = normalized_payload.get("tool_name")
+        if isinstance(tool_name, str) and tool_name.strip():
+            normalized_payload["tool"] = f"server/{tool_name.strip()}"
+            return normalized_payload
+
+        raise StructuredParsingError(
+            "schema validation error: OpenClaw tool payload missing tool/tool_name",
             raw_excerpt=raw_output[:1000],
         )
 

@@ -15,6 +15,10 @@ class SecurityPolicyViolation(Exception):
     pass
 
 
+class SecurityViolation(SecurityPolicyViolation):
+    pass
+
+
 @dataclass(frozen=True)
 class ToolPolicy:
     allowed_servers: set[str] | None = None
@@ -23,6 +27,7 @@ class ToolPolicy:
     max_string_argument_chars: int = 4096
     max_collection_items: int = 256
     deny_parent_path_segments: bool = True
+    workspace_root: str = ""
     allowed_path_roots: tuple[str, ...] = ()
     path_argument_keys: set[str] = field(
         default_factory=lambda: {
@@ -40,8 +45,29 @@ class ToolPolicy:
 
 
 class PolicyEngine:
-    def __init__(self, policy: ToolPolicy | None = None) -> None:
-        self.policy = policy or ToolPolicy()
+    def __init__(self, policy: ToolPolicy | None = None, workspace_root: str | None = None) -> None:
+        resolved_policy = policy or ToolPolicy()
+        resolved_root = workspace_root or resolved_policy.workspace_root or os.getenv("ENTERPRISE_WORKSPACE_ROOT", "")
+        if not resolved_root:
+            raise ValueError("workspace_root is required for policy enforcement")
+
+        absolute_root = os.path.abspath(resolved_root)
+        if not os.path.isdir(absolute_root):
+            raise ValueError(f"workspace_root must be an existing directory: {resolved_root}")
+
+        self.policy = ToolPolicy(
+            allowed_servers=resolved_policy.allowed_servers,
+            denied_tool_pairs=set(resolved_policy.denied_tool_pairs),
+            max_argument_bytes=resolved_policy.max_argument_bytes,
+            max_string_argument_chars=resolved_policy.max_string_argument_chars,
+            max_collection_items=resolved_policy.max_collection_items,
+            deny_parent_path_segments=resolved_policy.deny_parent_path_segments,
+            workspace_root=absolute_root,
+            allowed_path_roots=tuple(
+                os.path.abspath(root) for root in resolved_policy.allowed_path_roots
+            ),
+            path_argument_keys=set(resolved_policy.path_argument_keys),
+        )
 
     def enforce_call(
         self,
@@ -116,37 +142,35 @@ class PolicyEngine:
         if "\x00" in value:
             raise SecurityPolicyViolation(f"path-like argument contains null byte: {key}")
 
-        if not self.policy.deny_parent_path_segments:
-            self._enforce_allowed_path_roots(value, key)
-            return
-
-        normalized = value.replace("\\", "/")
-        segments = [segment for segment in normalized.split("/") if segment and segment != "."]
-        if any(segment == ".." for segment in segments):
-            raise SecurityPolicyViolation(
-                f"path-like argument traverses outside allowed roots via parent segments: {key}"
+        candidate = os.path.abspath(value)
+        workspace_root = os.path.abspath(self.policy.workspace_root)
+        if not self._is_strict_child_path(candidate, workspace_root):
+            raise SecurityViolation(
+                f"path-like argument escapes workspace_root: {key}={value}"
             )
 
-        self._enforce_allowed_path_roots(value, key)
+        if self.policy.deny_parent_path_segments:
+            normalized = value.replace("\\", "/")
+            segments = [segment for segment in normalized.split("/") if segment and segment != "."]
+            if any(segment == ".." for segment in segments):
+                raise SecurityViolation(
+                    f"path-like argument traverses outside workspace_root via parent segments: {key}"
+                )
+
+        self._enforce_allowed_path_roots(candidate, key)
 
     def _enforce_allowed_path_roots(self, value: str, key: str) -> None:
         if not self.policy.allowed_path_roots:
             return
 
-        if not self._is_absolute_path(value):
-            return
-
-        candidate = os.path.normpath(os.path.abspath(value))
-        allowed_roots = [
-            os.path.normpath(os.path.abspath(root))
-            for root in self.policy.allowed_path_roots
-        ]
+        candidate = os.path.abspath(value)
+        allowed_roots = [os.path.abspath(root) for root in self.policy.allowed_path_roots]
 
         for root in allowed_roots:
             if self._is_within_root(candidate, root):
                 return
 
-        raise SecurityPolicyViolation(
+        raise SecurityViolation(
             f"path-like argument traverses outside allowed roots: {key}={value}"
         )
 
@@ -161,5 +185,12 @@ class PolicyEngine:
     def _is_within_root(candidate: str, root: str) -> bool:
         try:
             return os.path.commonpath([candidate, root]) == root
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _is_strict_child_path(candidate: str, root: str) -> bool:
+        try:
+            return os.path.commonpath([candidate, root]) == root and os.path.abspath(candidate) != os.path.abspath(root)
         except ValueError:
             return False

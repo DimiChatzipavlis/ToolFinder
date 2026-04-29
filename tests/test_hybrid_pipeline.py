@@ -76,7 +76,7 @@ class _ToolCallBackend:
                 "thought": "need to list files",
                 "action": "call_tool",
                 "tool": "filesystem/list_directory",
-                "arguments": {"path": "."},
+                "arguments": {"path": "examples/sample.txt"},
             },
             {
                 "thought": "got result",
