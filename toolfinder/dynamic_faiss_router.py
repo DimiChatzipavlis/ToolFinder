@@ -103,7 +103,11 @@ class UniversalMCPRouter:
         embedding_dim = int(self.model.get_sentence_embedding_dimension())
 
         self._embedding_dim: int = embedding_dim
-        self.faiss_index: faiss.IndexFlatIP = faiss.IndexFlatIP(self._embedding_dim)
+        self.faiss_index: faiss.IndexHNSWFlat = faiss.IndexHNSWFlat(
+            self._embedding_dim,
+            32,
+            faiss.METRIC_INNER_PRODUCT,
+        )
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
         self._staged_tools: list[tuple[str, ToolSchema]] = []
         self._compat_mode: bool = False
@@ -118,7 +122,11 @@ class UniversalMCPRouter:
 
     def teardown(self) -> None:
         """Release router state and aggressively free embedding memory."""
-        self.faiss_index = faiss.IndexFlatIP(self._embedding_dim)
+        self.faiss_index = faiss.IndexHNSWFlat(
+            self._embedding_dim,
+            32,
+            faiss.METRIC_INNER_PRODUCT,
+        )
         self.metadata.clear()
         self._staged_tools.clear()
         self._compat_mode = False
@@ -171,7 +179,11 @@ class UniversalMCPRouter:
         if not self._staged_tools:
             return 0
 
-        self.faiss_index = faiss.IndexFlatIP(self._embedding_dim)
+        self.faiss_index = faiss.IndexHNSWFlat(
+            self._embedding_dim,
+            32,
+            faiss.METRIC_INNER_PRODUCT,
+        )
         self.metadata.clear()
 
         grouped_tools: dict[str, list[ToolSchema]] = {}
