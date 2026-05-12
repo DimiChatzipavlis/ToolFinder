@@ -65,7 +65,12 @@ class HybridToolRegistry:
     async def route(self, query: str, k: int, min_score: float) -> list[ToolCandidate]:
         async with self._lock:
             if self._router is not None:
-                routed = await asyncio.to_thread(self._router.route_top_k, query, k=k, min_score=min_score)
+                previous_min_cosine_similarity = self._router.config.min_cosine_similarity
+                self._router.config.min_cosine_similarity = min_score
+                try:
+                    routed = await asyncio.to_thread(self._router.route_top_k, query, k=k)
+                finally:
+                    self._router.config.min_cosine_similarity = previous_min_cosine_similarity
             else:
                 routed = self._keyword_route_top_k(query, k=k, min_score=min_score)
 

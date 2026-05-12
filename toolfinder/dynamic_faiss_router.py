@@ -13,6 +13,7 @@ from typing import Any
 import faiss
 import numpy as np
 import torch
+from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 
 
@@ -20,6 +21,16 @@ logger = logging.getLogger(__name__)
 
 
 ToolSchema = dict[str, Any]
+
+
+class RouterHyperparameters(BaseModel):
+    hnsw_m: int = Field(default=32, description="Number of bi-directional links for HNSW graph")
+    hnsw_ef_search: int = Field(default=64, description="Depth of search exploration at query time")
+    min_cosine_similarity: float = Field(
+        default=0.15,
+        description="Absolute fallback threshold for cosine similarity",
+    )
+    top_k_candidates: int = Field(default=3, description="Default number of route candidates to evaluate")
 
 
 @dataclass(frozen=True)
@@ -88,6 +99,7 @@ class UniversalMCPRouter:
         model_name: str = "sentence-transformers/all-mpnet-base-v2",
         device: str | None = None,
         batch_size: int = 32,
+        config: RouterHyperparameters | None = None,
     ) -> None:
         """Initialize the router and allocate the FAISS index.
 
@@ -95,19 +107,22 @@ class UniversalMCPRouter:
             model_name: SentenceTransformer model used for embeddings.
             device: Explicit device override. Uses CUDA when available, else CPU.
             batch_size: Batch size used for embedding generation.
+            config: Optional router hyperparameters. Defaults to RouterHyperparameters().
         """
         self.model_name: str = model_name
         self.device: str = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size: int = batch_size
+        self.config: RouterHyperparameters = config or RouterHyperparameters()
         self.model: SentenceTransformer | None = _EmbeddingModelSingleton.acquire(self.model_name, self.device)
         embedding_dim = int(self.model.get_sentence_embedding_dimension())
 
         self._embedding_dim: int = embedding_dim
         self.faiss_index: faiss.IndexHNSWFlat = faiss.IndexHNSWFlat(
             self._embedding_dim,
-            32,
+            self.config.hnsw_m,
             faiss.METRIC_INNER_PRODUCT,
         )
+        self.faiss_index.hnsw.efSearch = self.config.hnsw_ef_search
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
         self._staged_tools: list[tuple[str, ToolSchema]] = []
         self._compat_mode: bool = False
@@ -124,9 +139,10 @@ class UniversalMCPRouter:
         """Release router state and aggressively free embedding memory."""
         self.faiss_index = faiss.IndexHNSWFlat(
             self._embedding_dim,
-            32,
+            self.config.hnsw_m,
             faiss.METRIC_INNER_PRODUCT,
         )
+        self.faiss_index.hnsw.efSearch = self.config.hnsw_ef_search
         self.metadata.clear()
         self._staged_tools.clear()
         self._compat_mode = False
@@ -181,9 +197,10 @@ class UniversalMCPRouter:
 
         self.faiss_index = faiss.IndexHNSWFlat(
             self._embedding_dim,
-            32,
+            self.config.hnsw_m,
             faiss.METRIC_INNER_PRODUCT,
         )
+        self.faiss_index.hnsw.efSearch = self.config.hnsw_ef_search
         self.metadata.clear()
 
         grouped_tools: dict[str, list[ToolSchema]] = {}
@@ -260,23 +277,19 @@ class UniversalMCPRouter:
     def route_top_k(
         self,
         query: str,
-        k: int = 3,
-        min_score: float = 0.15,
+        k: int | None = None,
     ) -> list[RouteResult] | list[dict[str, Any]]:
         """Route a query to the top-k matching tools.
 
         Args:
             query: The natural language query to route.
-            k: Maximum number of results to return.
-            min_score: ALGY-2 FIX - Minimum similarity score threshold (0.0-1.0).
-                       Tools below this threshold are filtered out to prevent
-                       out-of-distribution queries from returning irrelevant tools.
-                       Calibrated to 0.15 to reduce false negatives on in-distribution queries.
+            k: Maximum number of results to return. Defaults to the configured candidate budget.
 
         Returns:
             List of matching tools (RouteResult or dict depending on compat_mode).
-            Returns empty list if no tools meet the min_score threshold.
+            Returns empty list if no tools meet the configured similarity threshold.
         """
+        k = self.config.top_k_candidates if k is None else k
         if k < 1:
             raise ValueError("k must be at least 1")
         if self.faiss_index.ntotal == 0:
@@ -297,21 +310,47 @@ class UniversalMCPRouter:
             k=min(k, int(self.faiss_index.ntotal)),
         )
 
+        top_score = float(scores[0][0])
+        if k > 1 and scores.shape[1] >= 2 and float(indices[0][1]) >= 0:
+            margin = float(scores[0][0]) - float(scores[0][1])
+            if margin < 0.02:
+                logger.warning(
+                    "Ambiguous semantic routing for query %r (score1=%.4f, score2=%.4f, margin=%.4f)",
+                    query,
+                    float(scores[0][0]),
+                    float(scores[0][1]),
+                    margin,
+                )
+
+        if top_score < self.config.min_cosine_similarity:
+            logger.debug(
+                "Rejected query %r (top_score=%.4f < min_cosine_similarity=%.2f)",
+                query,
+                top_score,
+                self.config.min_cosine_similarity,
+            )
+            return []
+
         matches: list[RouteResult] = []
         for score, index_id in zip(scores[0], indices[0], strict=True):
             if index_id < 0:
                 continue
             server_name, tool_name, schema = self.metadata[int(index_id)]
-            # ALGY-2 FIX: Filter out tools below minimum similarity threshold
-            if float(score) < min_score:
+            if float(score) < self.config.min_cosine_similarity:
                 logger.debug(
-                    "Filtered tool %s/%s (score=%.4f < min_score=%.2f)",
-                    server_name, tool_name, float(score), min_score,
+                    "Filtered tool %s/%s (score=%.4f < min_cosine_similarity=%.2f)",
+                    server_name,
+                    tool_name,
+                    float(score),
+                    self.config.min_cosine_similarity,
                 )
                 continue
             logger.info(
                 "Matched tool %s/%s with score=%.4f (threshold=%.2f)",
-                server_name, tool_name, float(score), min_score,
+                server_name,
+                tool_name,
+                float(score),
+                self.config.min_cosine_similarity,
             )
             matches.append(
                 RouteResult(
@@ -340,8 +379,8 @@ class UniversalMCPRouter:
         matches = self.route_top_k(query, k=1)
         if not matches:
             raise RouteNotFoundError(
-                "no route candidates met the similarity threshold; try lowering min_score "
-                "or rephrasing the query"
+                "no route candidates met the similarity threshold; try lowering the router "
+                "threshold or rephrasing the query"
             )
         return matches[0]
 
