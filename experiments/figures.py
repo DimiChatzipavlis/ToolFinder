@@ -90,10 +90,11 @@ def fig_main_results() -> None:
         "ft_minilm (avg over seeds)",
         "ft_bge (avg over seeds)",
         "ft_mpnet (avg over seeds)",
+        "hybrid_bm25+ft_minilm_seed42",
         "ft_minilm+ce_rerank (avg over seeds)",
     ]
     regimes = list(results["regimes"])
-    figure, axes = plt.subplots(1, len(regimes), figsize=(13, 4.5), sharey=True)
+    figure, axes = plt.subplots(1, len(regimes), figsize=(4.8 * len(regimes) + 1, 4.5), sharey=True)
     for axis, regime in zip(np.atleast_1d(axes), regimes):
         block = results["regimes"][regime]
         names = [name for name in preferred_order if name in block]

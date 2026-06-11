@@ -22,6 +22,8 @@ STAGES: list[tuple[str, list[list[str]]]] = [
             ["experiments/dataset/annotate_scenarios.py"],
             ["experiments/dataset/make_splits.py"],
             ["experiments/dataset/make_ood.py"],
+            ["experiments/dataset/build_multiserver_catalog.py"],
+            ["experiments/dataset/make_multiserver_queries.py"],
         ],
     ),
     ("train", [["experiments/models/biencoder.py"]]),
@@ -36,8 +38,10 @@ STAGES: list[tuple[str, list[list[str]]]] = [
     ("ood", [["experiments/evaluation/ood.py"]]),
     ("ablation", [["experiments/ablation_representation.py"]]),
     ("scaling", [["experiments/benchmarks/scaling_bench.py"]]),
+    ("attacks", [["experiments/attacks/poisoning.py"]]),
+    ("calibration", [["experiments/evaluation/calibration.py"]]),
     ("figures", [["experiments/figures.py"], ["experiments/build_eda_notebook.py"]]),
-    ("report", [["experiments/build_report.py"]]),
+    ("report", [["experiments/build_report.py"], ["experiments/build_manifest.py"]]),
 ]
 
 

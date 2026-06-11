@@ -432,7 +432,14 @@ class DynamicMCPClient:
 
         payload = json.dumps(message, separators=(",", ":")) + "\n"
         self.process.stdin.write(payload.encode("utf-8"))
-        await self.process.stdin.drain()
+        # Bounded drain: stdio backpressure from a stalled server must not block
+        # request tasks forever ahead of the response-timeout logic.
+        try:
+            await asyncio.wait_for(self.process.stdin.drain(), timeout=self.request_timeout_s)
+        except TimeoutError as exc:
+            raise MCPClientError(
+                f"{self.server_name}: stdin write stalled beyond {self.request_timeout_s}s"
+            ) from exc
 
     async def _stdout_loop(self) -> None:
         assert self.process is not None

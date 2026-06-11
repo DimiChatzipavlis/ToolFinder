@@ -641,12 +641,27 @@ class OpenClawHybridPipeline:
         failed_messages: list[str] = []
         successful_calls = 0
         expected_calls = len(agent_response.tool_calls)
+        executed_signatures: set[str] = set()
 
         for idx, call in enumerate(agent_response.tool_calls, 1):
             tool_ref = str(call.get("tool", ""))
             arguments = call.get("arguments", {})
             if not isinstance(arguments, dict):
                 arguments = {}
+
+            # Canonicalized duplicate guard: identical action+arguments emitted
+            # more than once in a single agent response execute only once.
+            signature = json.dumps(
+                {"tool": tool_ref, "arguments": arguments},
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+            if signature in executed_signatures:
+                self.telemetry.increment("pipeline_duplicate_calls_skipped")
+                observations.append(f"Duplicate tool call skipped: {tool_ref}")
+                continue
+            executed_signatures.add(signature)
 
             # Parse "server/tool" reference.
             server_name, tool_name = self._parse_tool_ref(tool_ref)

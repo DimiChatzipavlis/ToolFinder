@@ -26,7 +26,7 @@ class WorkspaceChangeTracker:
         self.include_suffixes = include_suffixes or {".py", ".md", ".json", ".yaml", ".yml", ".toml"}
         self.exclude_dirs = exclude_dirs or {".git", "__pycache__", ".pytest_cache", ".venv", "venv"}
         self._last_fingerprint: str | None = None
-        self._last_snapshot: dict[str, tuple[int, int]] | None = None
+        self._last_snapshot: dict[str, tuple[int, int, str]] | None = None
 
     def detect_changes(self) -> tuple[bool, list[str]]:
         paths = self._collect_paths()
@@ -58,6 +58,18 @@ class WorkspaceChangeTracker:
         collected.sort()
         return collected
 
+    _CONTENT_HASH_MAX_BYTES = 1_000_000
+
+    def _content_digest(self, path: Path, size: int) -> str:
+        # mtime_ns alone is unreliable: same-size writes can coalesce into one
+        # timestamp tick on Windows, so small files are content-hashed.
+        if size > self._CONTENT_HASH_MAX_BYTES:
+            return ""
+        try:
+            return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+        except OSError:
+            return ""
+
     def _fingerprint(self, paths: list[Path]) -> str:
         digest = hashlib.sha256()
         for path in paths:
@@ -65,20 +77,25 @@ class WorkspaceChangeTracker:
             digest.update(str(path.relative_to(self.root)).encode("utf-8"))
             digest.update(str(stat.st_mtime_ns).encode("utf-8"))
             digest.update(str(stat.st_size).encode("utf-8"))
+            digest.update(self._content_digest(path, stat.st_size).encode("utf-8"))
         return digest.hexdigest()
 
-    def _snapshot(self, paths: list[Path]) -> dict[str, tuple[int, int]]:
-        snapshot: dict[str, tuple[int, int]] = {}
+    def _snapshot(self, paths: list[Path]) -> dict[str, tuple[int, int, str]]:
+        snapshot: dict[str, tuple[int, int, str]] = {}
         for path in paths:
             relative = str(path.relative_to(self.root))
             stat = path.stat()
-            snapshot[relative] = (int(stat.st_mtime_ns), int(stat.st_size))
+            snapshot[relative] = (
+                int(stat.st_mtime_ns),
+                int(stat.st_size),
+                self._content_digest(path, stat.st_size),
+            )
         return snapshot
 
     @staticmethod
     def _changed_paths(
-        previous: dict[str, tuple[int, int]],
-        current: dict[str, tuple[int, int]],
+        previous: dict[str, tuple[int, int, str]],
+        current: dict[str, tuple[int, int, str]],
         max_paths: int = 25,
     ) -> list[str]:
         changed: list[str] = []
