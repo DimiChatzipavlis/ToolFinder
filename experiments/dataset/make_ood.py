@@ -1,0 +1,318 @@
+"""Author the out-of-distribution evaluation sets.
+
+Three subsets, all eval-only (never trained on), all author-written and
+documented as such in the report's limitations:
+
+  chitchat          No tool intent at all. The router should abstain.
+  out_of_catalog    Tool-ish requests whose capability lives outside the
+                    GitHub-only corpus. difficulty=far is a different domain
+                    entirely; difficulty=near shares developer-tool vocabulary
+                    (GitLab/Jira/CI/local files) and stresses the threshold.
+  adversarial_near_miss
+                    GitHub-domain requests for capabilities deliberately absent
+                    from the 30-tool corpus (e.g. create_issue, delete_branch,
+                    star_repository). Maximum-difficulty abstention cases: the
+                    vocabulary matches the corpus, the capability does not.
+
+A correct router answers in-distribution queries and abstains on all of these.
+"""
+
+from __future__ import annotations
+
+import csv
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from experiments import paths  # noqa: E402
+
+CHITCHAT = [
+    "Hey, how are you doing today?",
+    "Good morning! Ready to start the day?",
+    "What's your favorite movie of all time?",
+    "Tell me a joke about programmers.",
+    "What is the capital of Australia?",
+    "How many ounces are in a kilogram?",
+    "What's 1247 times 38?",
+    "Explain the difference between affect and effect.",
+    "Write a haiku about autumn rain.",
+    "What should I cook for dinner tonight with chicken and rice?",
+    "Recommend a good science fiction novel.",
+    "Why is the sky blue?",
+    "How do airplanes stay in the air?",
+    "What's the best way to learn Spanish quickly?",
+    "Give me three tips for better sleep.",
+    "What happened in the French Revolution?",
+    "Who painted the Mona Lisa?",
+    "Is a tomato a fruit or a vegetable?",
+    "How long does it take to boil an egg?",
+    "What's a good name for a golden retriever puppy?",
+    "Can you explain what a closure is in Python?",
+    "What is the time complexity of quicksort?",
+    "Explain the CAP theorem in simple terms.",
+    "What's the difference between TCP and UDP?",
+    "How does garbage collection work in Java?",
+    "When should I use a linked list instead of an array?",
+    "What does the walrus operator do in Python?",
+    "Explain dependency injection like I'm five.",
+    "What are the SOLID principles?",
+    "Why do people say premature optimization is the root of all evil?",
+    "How was your week?",
+    "Do you think cats or dogs make better pets?",
+    "What's the weather like in your world?",
+    "I'm feeling a bit tired today.",
+    "Congratulations are in order, I passed my exam!",
+    "What's a fun fact about octopuses?",
+    "How tall is Mount Everest?",
+    "What year did the Berlin Wall fall?",
+    "Translate 'good evening' into Italian.",
+    "What rhymes with orange?",
+    "Summarize the plot of Romeo and Juliet in two sentences.",
+    "What's the healthiest breakfast option?",
+    "How much water should I drink per day?",
+    "Suggest a workout routine for beginners.",
+    "What's the difference between espresso and filter coffee?",
+    "Plan a three-day itinerary for Rome.",
+    "What souvenirs should I bring back from Japan?",
+    "Is it cheaper to fly on Tuesdays?",
+    "What's the legal driving age in Germany?",
+    "How do I get red wine stains out of a carpet?",
+    "My houseplant's leaves are turning yellow, what should I do?",
+    "What's a good gift for a ten year old who likes space?",
+    "How do noise cancelling headphones work?",
+    "Should I buy or lease a car?",
+    "Explain compound interest with an example.",
+    "What's the difference between stocks and bonds?",
+    "How do credit scores work?",
+    "What causes inflation?",
+    "Who won the football world cup in 2022?",
+    "What are the rules of cricket, briefly?",
+    "How many players are on a basketball team?",
+    "What's the fastest marathon time ever recorded?",
+    "Tell me about the history of the Olympic Games.",
+    "What's the difference between a virus and a bacterium?",
+    "How do vaccines work?",
+    "Why do we dream?",
+    "What is the placebo effect?",
+    "Explain photosynthesis in one paragraph.",
+    "What's the largest animal that has ever lived?",
+    "How old is the universe?",
+    "What is dark matter?",
+    "Could you explain quantum entanglement simply?",
+    "What's the difference between fission and fusion?",
+    "Why is Pluto no longer a planet?",
+    "What language has the most native speakers?",
+    "What does 'carpe diem' mean?",
+    "Give me a motivational quote for Monday morning.",
+    "What's the origin of the phrase 'break a leg'?",
+    "How do I tie a bow tie?",
+    "What's the dress code for a black tie event?",
+    "How should I introduce myself in a job interview?",
+    "Write a short toast for my best friend's wedding.",
+    "What are good icebreaker questions for a team event?",
+    "How do I stay focused while studying?",
+    "What's the Pomodoro technique?",
+    "Recommend a podcast about history.",
+    "What board games are fun for four players?",
+    "Teach me a simple card trick.",
+    "What's the difference between baking soda and baking powder?",
+    "How do I sharpen a kitchen knife properly?",
+    "What temperature should I bake sourdough at?",
+    "Is it safe to eat raw cookie dough?",
+    "What cheese goes well with pears?",
+    "How do I make cold brew coffee at home?",
+    "What's a good substitute for buttermilk?",
+    "How long can leftovers stay in the fridge?",
+    "What's the proper way to store fresh basil?",
+    "Why does chopping onions make you cry?",
+    "Thanks for all your help today, you've been great!",
+]
+
+OUT_OF_CATALOG_FAR = [
+    "Send a message to the #general channel in Slack.",
+    "Post an announcement in our Teams channel.",
+    "DM Maria on Discord about the launch.",
+    "Send an email to the finance team about the budget review.",
+    "Forward yesterday's invoice email to accounting.",
+    "Check my inbox for unread messages from HR.",
+    "Schedule a meeting with the design team for Thursday at 3pm.",
+    "Create a calendar event for the quarterly review.",
+    "Move my 2pm appointment to Friday morning.",
+    "What's on my calendar for tomorrow?",
+    "Set a reminder to call the dentist at noon.",
+    "What's the weather forecast for Berlin this weekend?",
+    "Will it rain in Athens tomorrow afternoon?",
+    "Get directions from the office to the airport.",
+    "How long is the drive from Munich to Vienna?",
+    "Find a sushi restaurant near the hotel.",
+    "Book a table for four at an Italian place tonight.",
+    "Play my focus playlist on Spotify.",
+    "Skip to the next song.",
+    "Turn the living room lights off.",
+    "Set the thermostat to 21 degrees.",
+    "Lock the front door.",
+    "Order more printer paper from the office supplies vendor.",
+    "Track my Amazon package.",
+    "What's the current price of Bitcoin?",
+    "Convert 500 euros to US dollars.",
+    "Transfer 200 dollars to my savings account.",
+    "Pay the electricity bill due this week.",
+    "Run the SQL query to count active users by region.",
+    "Show me the schema of the customers table in Postgres.",
+    "Back up the production database to S3.",
+    "Restore the staging database from last night's snapshot.",
+    "Upload the quarterly report to Google Drive.",
+    "Share the budget spreadsheet with the leadership group.",
+    "Create a new page in Notion for meeting notes.",
+    "Add a row to the CRM for the new lead from the conference.",
+    "Update the customer's shipping address in Salesforce.",
+    "Generate an invoice for client Acme Corp for March.",
+    "Post the product photo to our Instagram account.",
+    "Schedule a tweet announcing the webinar for Monday 9am.",
+    "Publish the blog draft about onboarding best practices.",
+    "Translate this document from German to English.",
+    "Transcribe the audio recording from this morning's standup.",
+    "Summarize this PDF contract for me.",
+    "OCR the scanned receipts in the expenses folder.",
+    "Resize these product images to 800 by 600.",
+    "Convert the presentation to PDF.",
+    "Print the boarding pass on the office printer.",
+    "Scan the network for devices with open port 22.",
+    "Check if example.com is down right now.",
+    "Renew the TLS certificate for the marketing site.",
+    "Provision a new EC2 instance in eu-central-1.",
+    "Scale the kubernetes deployment to five replicas.",
+    "Tail the production logs for payment errors.",
+    "Silence the PagerDuty alert for the next hour.",
+    "Create a Zoom link for the customer call.",
+    "Start recording this meeting.",
+    "Order lunch for the team from the usual place.",
+    "Book a flight to London for next Tuesday.",
+    "Reserve a rental car for the conference trip.",
+]
+
+OUT_OF_CATALOG_NEAR = [
+    "Open a merge request in GitLab for the payments service.",
+    "List the open merge requests on our GitLab instance.",
+    "Approve the merge request in GitLab from the infra team.",
+    "Create a new issue in Jira for the login bug.",
+    "Move the Jira ticket to In Progress.",
+    "Assign the Jira ticket PROJ-142 to Elena.",
+    "Add a story to the current sprint board in Jira.",
+    "Comment on the Bitbucket pull request about the hotfix.",
+    "Clone the repository from Bitbucket to my laptop.",
+    "Push my local commits to the remote.",
+    "Rebase my feature branch onto main locally.",
+    "Stash my local changes before switching branches.",
+    "Run git blame on the billing module locally.",
+    "Trigger the Jenkins build for the release pipeline.",
+    "Rerun the failed CircleCI workflow.",
+    "Check why the GitHub Actions run failed and rerun it.",
+    "Cancel the currently running CI pipeline.",
+    "Deploy the latest build to the staging environment.",
+    "Roll back production to the previous deployment.",
+    "Promote the canary release to all users.",
+    "Bump the package version and publish to npm.",
+    "Publish the new release of our library to PyPI.",
+    "Build and push the Docker image to the registry.",
+    "Update the Helm chart values for the api service.",
+    "Open the project in VS Code.",
+    "Format the codebase with prettier.",
+    "Run the unit tests locally and show failures.",
+    "Profile the API server for memory leaks.",
+    "Delete the temp folder on my laptop.",
+    "Rename the file on my desktop from notes.txt to ideas.txt.",
+    "Zip the logs directory and attach it to the ticket.",
+    "Mount the network drive on this machine.",
+    "Review the code quality report in SonarQube.",
+    "Check the error rate dashboard in Grafana.",
+    "Query Sentry for new exceptions in the checkout flow.",
+    "Create an epic in Azure DevOps for the migration.",
+    "List my assigned work items in Azure Boards.",
+    "Sync the design tokens from Figma.",
+    "Export the analytics report from Mixpanel.",
+    "Add the new API key to the Vault secrets store.",
+]
+
+ADVERSARIAL_NEAR_MISS = [
+    "Create a new issue reporting the crash on startup.",
+    "Open an issue about the memory leak in the worker.",
+    "File a bug report issue for the broken pagination.",
+    "Close issue 87 as completed.",
+    "Reopen issue 45, the bug is back.",
+    "Mark issue 230 as a duplicate and close it.",
+    "Edit the title of issue 12 to mention the API version.",
+    "Add the bug label to issue 19.",
+    "Remove the wontfix label from issue 33.",
+    "Create a new label called regression with red color.",
+    "Delete the obsolete label experimental from the repo.",
+    "Assign issue 56 to the backend team lead.",
+    "Unassign me from issue 78.",
+    "Set the milestone for issue 90 to the June release.",
+    "Create a milestone for version 2.0.",
+    "Star the kubernetes repository.",
+    "Unstar the repo I starred yesterday.",
+    "Watch the tensorflow repository for releases.",
+    "List the stargazers of our main repository.",
+    "Delete the old prototype repository entirely.",
+    "Archive the legacy-api repository.",
+    "Transfer the repository to the platform organization.",
+    "Rename the repository from webapp to storefront.",
+    "Update the repository description and homepage URL.",
+    "Make the internal-tools repository private.",
+    "Add Lena as a collaborator with write access.",
+    "Remove the contractor's access to the repo.",
+    "Invite a new member to the engineering organization.",
+    "Create a new team called release-managers.",
+    "Delete the feature/old-login branch.",
+    "Rename the master branch to main.",
+    "Set develop as the default branch.",
+    "Protect the main branch and require reviews.",
+    "Lock the release branch from force pushes.",
+    "Create a release for version 3.2.0 with notes.",
+    "Publish a draft release for the beta build.",
+    "Delete the broken release from last week.",
+    "Upload the binary as a release asset.",
+    "Create a tag v1.9.0 on the current commit.",
+    "Delete the tag v0.1.0-alpha.",
+    "Close the pull request without merging it.",
+    "Reopen pull request 140.",
+    "Request a review from the security team on PR 77.",
+    "Approve pull request 91.",
+    "Mark pull request 18 as a draft.",
+    "Revert the merge commit from yesterday.",
+    "Cherry-pick commit abc123 onto the release branch.",
+    "Create a gist with this code snippet.",
+    "Comment on commit abc123 about the off-by-one error.",
+    "Follow the user octocat on GitHub.",
+]
+
+
+def write_csv(path: Path, rows: list[dict]) -> None:
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"wrote {path} ({len(rows)} rows)")
+
+
+def main() -> None:
+    paths.ensure_dirs()
+    write_csv(
+        paths.OOD_DIR / "chitchat.csv",
+        [{"query": q, "subset": "chitchat", "difficulty": "far"} for q in CHITCHAT],
+    )
+    write_csv(
+        paths.OOD_DIR / "out_of_catalog.csv",
+        [{"query": q, "subset": "out_of_catalog", "difficulty": "far"} for q in OUT_OF_CATALOG_FAR]
+        + [{"query": q, "subset": "out_of_catalog", "difficulty": "near"} for q in OUT_OF_CATALOG_NEAR],
+    )
+    write_csv(
+        paths.OOD_DIR / "adversarial_near_miss.csv",
+        [{"query": q, "subset": "adversarial_near_miss", "difficulty": "near"} for q in ADVERSARIAL_NEAR_MISS],
+    )
+
+
+if __name__ == "__main__":
+    main()

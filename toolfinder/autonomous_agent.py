@@ -373,12 +373,20 @@ class AutonomousMCPAgent:
                         "Tool call payload must include an object 'arguments' field."
                     )
 
-                # CRIT-2 FIX: Hash the signature to cap memory footprint of idempotency lock
+                # CRIT-2 FIX: Hash the signature to cap memory footprint of idempotency lock.
+                # Arguments are canonicalized (sorted keys, fixed separators) so
+                # semantically identical payloads with different key order cannot
+                # evade the duplicate guard.
                 raw_signature = ":".join(
                     (
                         str(decision.get("server_name")),
                         str(decision.get("tool_name")),
-                        str(decision.get("arguments")),
+                        json.dumps(
+                            decision.get("arguments"),
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            default=str,
+                        ),
                     )
                 )
                 action_signature = hashlib.sha256(raw_signature.encode()).hexdigest()

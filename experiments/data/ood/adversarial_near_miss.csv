@@ -1,0 +1,51 @@
+query,subset,difficulty
+Create a new issue reporting the crash on startup.,adversarial_near_miss,near
+Open an issue about the memory leak in the worker.,adversarial_near_miss,near
+File a bug report issue for the broken pagination.,adversarial_near_miss,near
+Close issue 87 as completed.,adversarial_near_miss,near
+"Reopen issue 45, the bug is back.",adversarial_near_miss,near
+Mark issue 230 as a duplicate and close it.,adversarial_near_miss,near
+Edit the title of issue 12 to mention the API version.,adversarial_near_miss,near
+Add the bug label to issue 19.,adversarial_near_miss,near
+Remove the wontfix label from issue 33.,adversarial_near_miss,near
+Create a new label called regression with red color.,adversarial_near_miss,near
+Delete the obsolete label experimental from the repo.,adversarial_near_miss,near
+Assign issue 56 to the backend team lead.,adversarial_near_miss,near
+Unassign me from issue 78.,adversarial_near_miss,near
+Set the milestone for issue 90 to the June release.,adversarial_near_miss,near
+Create a milestone for version 2.0.,adversarial_near_miss,near
+Star the kubernetes repository.,adversarial_near_miss,near
+Unstar the repo I starred yesterday.,adversarial_near_miss,near
+Watch the tensorflow repository for releases.,adversarial_near_miss,near
+List the stargazers of our main repository.,adversarial_near_miss,near
+Delete the old prototype repository entirely.,adversarial_near_miss,near
+Archive the legacy-api repository.,adversarial_near_miss,near
+Transfer the repository to the platform organization.,adversarial_near_miss,near
+Rename the repository from webapp to storefront.,adversarial_near_miss,near
+Update the repository description and homepage URL.,adversarial_near_miss,near
+Make the internal-tools repository private.,adversarial_near_miss,near
+Add Lena as a collaborator with write access.,adversarial_near_miss,near
+Remove the contractor's access to the repo.,adversarial_near_miss,near
+Invite a new member to the engineering organization.,adversarial_near_miss,near
+Create a new team called release-managers.,adversarial_near_miss,near
+Delete the feature/old-login branch.,adversarial_near_miss,near
+Rename the master branch to main.,adversarial_near_miss,near
+Set develop as the default branch.,adversarial_near_miss,near
+Protect the main branch and require reviews.,adversarial_near_miss,near
+Lock the release branch from force pushes.,adversarial_near_miss,near
+Create a release for version 3.2.0 with notes.,adversarial_near_miss,near
+Publish a draft release for the beta build.,adversarial_near_miss,near
+Delete the broken release from last week.,adversarial_near_miss,near
+Upload the binary as a release asset.,adversarial_near_miss,near
+Create a tag v1.9.0 on the current commit.,adversarial_near_miss,near
+Delete the tag v0.1.0-alpha.,adversarial_near_miss,near
+Close the pull request without merging it.,adversarial_near_miss,near
+Reopen pull request 140.,adversarial_near_miss,near
+Request a review from the security team on PR 77.,adversarial_near_miss,near
+Approve pull request 91.,adversarial_near_miss,near
+Mark pull request 18 as a draft.,adversarial_near_miss,near
+Revert the merge commit from yesterday.,adversarial_near_miss,near
+Cherry-pick commit abc123 onto the release branch.,adversarial_near_miss,near
+Create a gist with this code snippet.,adversarial_near_miss,near
+Comment on commit abc123 about the off-by-one error.,adversarial_near_miss,near
+Follow the user octocat on GitHub.,adversarial_near_miss,near

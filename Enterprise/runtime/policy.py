@@ -51,7 +51,7 @@ class PolicyEngine:
         if not resolved_root:
             raise ValueError("workspace_root is required for policy enforcement")
 
-        absolute_root = os.path.abspath(resolved_root)
+        absolute_root = os.path.realpath(resolved_root)
         if not os.path.isdir(absolute_root):
             raise ValueError(f"workspace_root must be an existing directory: {resolved_root}")
 
@@ -138,12 +138,23 @@ class PolicyEngine:
             return True
         return normalized.endswith("_path") or normalized.endswith("_file")
 
+    def _resolve_candidate(self, value: str) -> str:
+        """Resolve a path argument deterministically, independent of process cwd.
+
+        Relative paths are anchored at workspace_root (never the process working
+        directory), and symlinks/parent segments are resolved before containment
+        checks so enforcement is invariant across launch environments.
+        """
+        if self._is_absolute_path(value):
+            return os.path.realpath(value)
+        return os.path.realpath(os.path.join(self.policy.workspace_root, value))
+
     def _enforce_path_safety(self, value: str, key: str) -> None:
         if "\x00" in value:
             raise SecurityPolicyViolation(f"path-like argument contains null byte: {key}")
 
-        candidate = os.path.abspath(value)
-        workspace_root = os.path.abspath(self.policy.workspace_root)
+        candidate = self._resolve_candidate(value)
+        workspace_root = self.policy.workspace_root
         if not self._is_strict_child_path(candidate, workspace_root):
             raise SecurityViolation(
                 f"path-like argument escapes workspace_root: {key}={value}"
@@ -159,19 +170,18 @@ class PolicyEngine:
 
         self._enforce_allowed_path_roots(candidate, key)
 
-    def _enforce_allowed_path_roots(self, value: str, key: str) -> None:
+    def _enforce_allowed_path_roots(self, candidate: str, key: str) -> None:
+        """Containment check over an already-resolved candidate path."""
         if not self.policy.allowed_path_roots:
             return
 
-        candidate = os.path.abspath(value)
-        allowed_roots = [os.path.abspath(root) for root in self.policy.allowed_path_roots]
-
+        allowed_roots = [os.path.realpath(root) for root in self.policy.allowed_path_roots]
         for root in allowed_roots:
             if self._is_within_root(candidate, root):
                 return
 
         raise SecurityViolation(
-            f"path-like argument traverses outside allowed roots: {key}={value}"
+            f"path-like argument traverses outside allowed roots: {key}={candidate}"
         )
 
     @staticmethod

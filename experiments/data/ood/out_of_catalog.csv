@@ -1,0 +1,101 @@
+query,subset,difficulty
+Send a message to the #general channel in Slack.,out_of_catalog,far
+Post an announcement in our Teams channel.,out_of_catalog,far
+DM Maria on Discord about the launch.,out_of_catalog,far
+Send an email to the finance team about the budget review.,out_of_catalog,far
+Forward yesterday's invoice email to accounting.,out_of_catalog,far
+Check my inbox for unread messages from HR.,out_of_catalog,far
+Schedule a meeting with the design team for Thursday at 3pm.,out_of_catalog,far
+Create a calendar event for the quarterly review.,out_of_catalog,far
+Move my 2pm appointment to Friday morning.,out_of_catalog,far
+What's on my calendar for tomorrow?,out_of_catalog,far
+Set a reminder to call the dentist at noon.,out_of_catalog,far
+What's the weather forecast for Berlin this weekend?,out_of_catalog,far
+Will it rain in Athens tomorrow afternoon?,out_of_catalog,far
+Get directions from the office to the airport.,out_of_catalog,far
+How long is the drive from Munich to Vienna?,out_of_catalog,far
+Find a sushi restaurant near the hotel.,out_of_catalog,far
+Book a table for four at an Italian place tonight.,out_of_catalog,far
+Play my focus playlist on Spotify.,out_of_catalog,far
+Skip to the next song.,out_of_catalog,far
+Turn the living room lights off.,out_of_catalog,far
+Set the thermostat to 21 degrees.,out_of_catalog,far
+Lock the front door.,out_of_catalog,far
+Order more printer paper from the office supplies vendor.,out_of_catalog,far
+Track my Amazon package.,out_of_catalog,far
+What's the current price of Bitcoin?,out_of_catalog,far
+Convert 500 euros to US dollars.,out_of_catalog,far
+Transfer 200 dollars to my savings account.,out_of_catalog,far
+Pay the electricity bill due this week.,out_of_catalog,far
+Run the SQL query to count active users by region.,out_of_catalog,far
+Show me the schema of the customers table in Postgres.,out_of_catalog,far
+Back up the production database to S3.,out_of_catalog,far
+Restore the staging database from last night's snapshot.,out_of_catalog,far
+Upload the quarterly report to Google Drive.,out_of_catalog,far
+Share the budget spreadsheet with the leadership group.,out_of_catalog,far
+Create a new page in Notion for meeting notes.,out_of_catalog,far
+Add a row to the CRM for the new lead from the conference.,out_of_catalog,far
+Update the customer's shipping address in Salesforce.,out_of_catalog,far
+Generate an invoice for client Acme Corp for March.,out_of_catalog,far
+Post the product photo to our Instagram account.,out_of_catalog,far
+Schedule a tweet announcing the webinar for Monday 9am.,out_of_catalog,far
+Publish the blog draft about onboarding best practices.,out_of_catalog,far
+Translate this document from German to English.,out_of_catalog,far
+Transcribe the audio recording from this morning's standup.,out_of_catalog,far
+Summarize this PDF contract for me.,out_of_catalog,far
+OCR the scanned receipts in the expenses folder.,out_of_catalog,far
+Resize these product images to 800 by 600.,out_of_catalog,far
+Convert the presentation to PDF.,out_of_catalog,far
+Print the boarding pass on the office printer.,out_of_catalog,far
+Scan the network for devices with open port 22.,out_of_catalog,far
+Check if example.com is down right now.,out_of_catalog,far
+Renew the TLS certificate for the marketing site.,out_of_catalog,far
+Provision a new EC2 instance in eu-central-1.,out_of_catalog,far
+Scale the kubernetes deployment to five replicas.,out_of_catalog,far
+Tail the production logs for payment errors.,out_of_catalog,far
+Silence the PagerDuty alert for the next hour.,out_of_catalog,far
+Create a Zoom link for the customer call.,out_of_catalog,far
+Start recording this meeting.,out_of_catalog,far
+Order lunch for the team from the usual place.,out_of_catalog,far
+Book a flight to London for next Tuesday.,out_of_catalog,far
+Reserve a rental car for the conference trip.,out_of_catalog,far
+Open a merge request in GitLab for the payments service.,out_of_catalog,near
+List the open merge requests on our GitLab instance.,out_of_catalog,near
+Approve the merge request in GitLab from the infra team.,out_of_catalog,near
+Create a new issue in Jira for the login bug.,out_of_catalog,near
+Move the Jira ticket to In Progress.,out_of_catalog,near
+Assign the Jira ticket PROJ-142 to Elena.,out_of_catalog,near
+Add a story to the current sprint board in Jira.,out_of_catalog,near
+Comment on the Bitbucket pull request about the hotfix.,out_of_catalog,near
+Clone the repository from Bitbucket to my laptop.,out_of_catalog,near
+Push my local commits to the remote.,out_of_catalog,near
+Rebase my feature branch onto main locally.,out_of_catalog,near
+Stash my local changes before switching branches.,out_of_catalog,near
+Run git blame on the billing module locally.,out_of_catalog,near
+Trigger the Jenkins build for the release pipeline.,out_of_catalog,near
+Rerun the failed CircleCI workflow.,out_of_catalog,near
+Check why the GitHub Actions run failed and rerun it.,out_of_catalog,near
+Cancel the currently running CI pipeline.,out_of_catalog,near
+Deploy the latest build to the staging environment.,out_of_catalog,near
+Roll back production to the previous deployment.,out_of_catalog,near
+Promote the canary release to all users.,out_of_catalog,near
+Bump the package version and publish to npm.,out_of_catalog,near
+Publish the new release of our library to PyPI.,out_of_catalog,near
+Build and push the Docker image to the registry.,out_of_catalog,near
+Update the Helm chart values for the api service.,out_of_catalog,near
+Open the project in VS Code.,out_of_catalog,near
+Format the codebase with prettier.,out_of_catalog,near
+Run the unit tests locally and show failures.,out_of_catalog,near
+Profile the API server for memory leaks.,out_of_catalog,near
+Delete the temp folder on my laptop.,out_of_catalog,near
+Rename the file on my desktop from notes.txt to ideas.txt.,out_of_catalog,near
+Zip the logs directory and attach it to the ticket.,out_of_catalog,near
+Mount the network drive on this machine.,out_of_catalog,near
+Review the code quality report in SonarQube.,out_of_catalog,near
+Check the error rate dashboard in Grafana.,out_of_catalog,near
+Query Sentry for new exceptions in the checkout flow.,out_of_catalog,near
+Create an epic in Azure DevOps for the migration.,out_of_catalog,near
+List my assigned work items in Azure Boards.,out_of_catalog,near
+Sync the design tokens from Figma.,out_of_catalog,near
+Export the analytics report from Mixpanel.,out_of_catalog,near
+Add the new API key to the Vault secrets store.,out_of_catalog,near

@@ -1,0 +1,50 @@
+# ToolFinder Experiments
+
+The reproducible research pipeline behind `reports/report.md`. Every number in
+the report is written by a script here into `results/*.json`; nothing is
+hand-typed. The earlier exploratory `academic_research/` folder is kept for
+provenance only — this package supersedes it.
+
+## Pipeline
+
+```bash
+pip install -e ".[experiments]"
+python experiments/run_all.py          # data -> train -> eval -> report
+```
+
+Stages (each runnable standalone):
+
+| Stage | Script | Output |
+| --- | --- | --- |
+| Scenario recovery | `dataset/annotate_scenarios.py` | `data/queries_with_scenarios.csv`, `data/corpus.json` |
+| Splits | `dataset/make_splits.py` | `data/splits/regime{1,2}_*.json` |
+| OOD sets | `dataset/make_ood.py` | `data/ood/*.csv` (eval-only) |
+| Bi-encoder training | `models/biencoder.py` | `artifacts/biencoder/*`, `results/biencoder_training.json` |
+| Hard negatives + cross-encoder | `models/hard_negatives.py`, `models/crossencoder.py` | `artifacts/crossencoder/*`, `results/crossencoder_training.json` |
+| Main evaluation | `evaluation/evaluate.py` | `results/main_eval.json` |
+| Open-set rejection | `evaluation/ood.py` | `results/ood_eval.json` |
+| Representation ablation | `ablation_representation.py` | `results/ablation_representation.json` |
+| Flat-vs-HNSW scaling | `benchmarks/scaling_bench.py` | `results/scaling_bench.json` |
+| Figures | `figures.py` | `results/figures/*.png` |
+| EDA notebook | `build_eda_notebook.py` | `notebooks/01_eda.ipynb` (executed, outputs committed) |
+| Report | `build_report.py` | `reports/report.md` |
+
+## Why the splits look the way they do
+
+The query datasets follow a `scenario × template` generation grammar
+(~5 scenarios × ~10 paraphrase templates per tool). A random row split puts
+paraphrases of every test scenario into training: a 1-NN lookup over training
+anchors scores ~96% Recall@1 on such a split without reading a single schema.
+Splits here are therefore **scenario-grouped** (regime 1, unseen queries) and
+**tool-disjoint** (regime 2, unseen tools), both ranked against the full
+30-tool corpus. `tests/test_split_hygiene.py` enforces this in CI — if those
+tests fail, fix the data, never the test.
+
+## Conventions
+
+- Model weights live under `experiments/artifacts/` (gitignored, regenerable
+  from seeds); datasets, splits, results JSON, and figures are committed.
+- Trained systems run with seeds {13, 42, 1337}; tables report mean ± std over
+  seeds, and per-system 95% bootstrap CIs over queries.
+- All retrieval systems implement `rank(query) -> ordered tool names` and are
+  evaluated through the same code path (`evaluation/evaluate.py`).

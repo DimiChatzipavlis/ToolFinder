@@ -7,8 +7,9 @@ import gc
 import json
 import logging
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import faiss
 import numpy as np
@@ -24,6 +25,18 @@ ToolSchema = dict[str, Any]
 
 
 class RouterHyperparameters(BaseModel):
+    index_type: Literal["flat", "hnsw", "auto"] = Field(
+        default="flat",
+        description=(
+            "Vector index backend. 'flat' is exact and fastest below ~5e4 tools; "
+            "'hnsw' is approximate and only pays off on very large catalogs; "
+            "'auto' picks hnsw when the staged catalog exceeds hnsw_auto_threshold."
+        ),
+    )
+    hnsw_auto_threshold: int = Field(
+        default=50_000,
+        description="Catalog size at which index_type='auto' switches from flat to HNSW",
+    )
     hnsw_m: int = Field(default=32, description="Number of bi-directional links for HNSW graph")
     hnsw_ef_search: int = Field(default=64, description="Depth of search exploration at query time")
     min_cosine_similarity: float = Field(
@@ -86,12 +99,30 @@ class _EmbeddingModelSingleton:
             torch.cuda.empty_cache()
 
 
+def to_openai_tools(results: Iterable[RouteResult]) -> list[dict[str, Any]]:
+    """Convert routed candidates into OpenAI-compatible bindable tool schemas."""
+    return [
+        {
+            "server_name": result.server_name,
+            "tool_name": result.tool_name,
+            "type": "function",
+            "function": {
+                "name": result.tool_name,
+                "description": result.schema.get("description", ""),
+                "parameters": copy.deepcopy(result.schema.get("inputSchema", {})),
+            },
+        }
+        for result in results
+    ]
+
+
 class UniversalMCPRouter:
     """Route natural-language queries to MCP tools using dense retrieval.
 
-    The router ingests tool schemas, builds embeddings, and queries a FAISS index.
-    It can return either `RouteResult` objects or OpenAI-compatible bindable tool
-    schemas when compatibility mode is enabled through `build_index()`.
+    The router ingests tool schemas, builds embeddings, and queries a FAISS
+    index (exact `IndexFlatIP` by default; see `RouterHyperparameters.index_type`).
+    Routing methods always return `RouteResult` objects; use `to_openai_tools()`
+    to convert candidates into bindable function-calling schemas.
     """
 
     def __init__(
@@ -117,15 +148,30 @@ class UniversalMCPRouter:
         embedding_dim = int(self.model.get_sentence_embedding_dimension())
 
         self._embedding_dim: int = embedding_dim
-        self.faiss_index: faiss.IndexHNSWFlat = faiss.IndexHNSWFlat(
-            self._embedding_dim,
-            self.config.hnsw_m,
-            faiss.METRIC_INNER_PRODUCT,
-        )
-        self.faiss_index.hnsw.efSearch = self.config.hnsw_ef_search
+        self.faiss_index: faiss.Index = self._create_index()
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
         self._staged_tools: list[tuple[str, ToolSchema]] = []
-        self._compat_mode: bool = False
+
+    def _create_index(self, expected_size: int = 0) -> faiss.Index:
+        """Allocate the FAISS index configured by `index_type`.
+
+        Exact flat search is the default: at MCP-realistic catalog sizes it is
+        faster than HNSW graph traversal, exact, and deterministic. HNSW is used
+        only when explicitly requested, or in 'auto' mode once the staged
+        catalog exceeds `hnsw_auto_threshold`.
+        """
+        use_hnsw = self.config.index_type == "hnsw" or (
+            self.config.index_type == "auto" and expected_size >= self.config.hnsw_auto_threshold
+        )
+        if use_hnsw:
+            index = faiss.IndexHNSWFlat(
+                self._embedding_dim,
+                self.config.hnsw_m,
+                faiss.METRIC_INNER_PRODUCT,
+            )
+            index.hnsw.efSearch = self.config.hnsw_ef_search
+            return index
+        return faiss.IndexFlatIP(self._embedding_dim)
 
     def set_catalog(self, catalog: dict[str, list[ToolSchema]]) -> int:
         """Replace the staged tool catalog and rebuild only the FAISS index."""
@@ -137,15 +183,9 @@ class UniversalMCPRouter:
 
     def teardown(self) -> None:
         """Release router state and aggressively free embedding memory."""
-        self.faiss_index = faiss.IndexHNSWFlat(
-            self._embedding_dim,
-            self.config.hnsw_m,
-            faiss.METRIC_INNER_PRODUCT,
-        )
-        self.faiss_index.hnsw.efSearch = self.config.hnsw_ef_search
+        self.faiss_index = self._create_index()
         self.metadata.clear()
         self._staged_tools.clear()
-        self._compat_mode = False
 
         if self.model is not None:
             del self.model
@@ -195,12 +235,7 @@ class UniversalMCPRouter:
         if not self._staged_tools:
             return 0
 
-        self.faiss_index = faiss.IndexHNSWFlat(
-            self._embedding_dim,
-            self.config.hnsw_m,
-            faiss.METRIC_INNER_PRODUCT,
-        )
-        self.faiss_index.hnsw.efSearch = self.config.hnsw_ef_search
+        self.faiss_index = self._create_index(expected_size=len(self._staged_tools))
         self.metadata.clear()
 
         grouped_tools: dict[str, list[ToolSchema]] = {}
@@ -219,7 +254,6 @@ class UniversalMCPRouter:
         for grouped_server_name, grouped_list in grouped_tools.items():
             ingested_count += self.ingest_server(grouped_server_name, grouped_list)
 
-        self._compat_mode = True
         return ingested_count
 
     def ingest_server(self, server_name: str, tools_list: list[ToolSchema]) -> int:
@@ -278,7 +312,7 @@ class UniversalMCPRouter:
         self,
         query: str,
         k: int | None = None,
-    ) -> list[RouteResult] | list[dict[str, Any]]:
+    ) -> list[RouteResult]:
         """Route a query to the top-k matching tools.
 
         Args:
@@ -286,8 +320,9 @@ class UniversalMCPRouter:
             k: Maximum number of results to return. Defaults to the configured candidate budget.
 
         Returns:
-            List of matching tools (RouteResult or dict depending on compat_mode).
-            Returns empty list if no tools meet the configured similarity threshold.
+            List of matching `RouteResult` objects, best first. Returns an empty
+            list if no tools meet the configured similarity threshold. Use
+            `to_openai_tools()` to convert results into bindable schemas.
         """
         k = self.config.top_k_candidates if k is None else k
         if k < 1:
@@ -360,18 +395,16 @@ class UniversalMCPRouter:
                     score=float(score),
                 )
             )
-        if self._compat_mode:
-            return [self._format_bindable_tool_schema(match) for match in matches]
         return matches
 
-    def route(self, query: str) -> RouteResult | dict[str, Any]:
+    def route(self, query: str) -> RouteResult:
         """Return the single highest-ranked tool candidate for a query.
 
         Args:
             query: Natural language query to route.
 
         Returns:
-            The best matching tool as `RouteResult` or bindable schema.
+            The best matching tool as `RouteResult`.
 
         Edge cases:
             Raises `RouteNotFoundError` if no result survives threshold filtering.
@@ -383,19 +416,6 @@ class UniversalMCPRouter:
                 "threshold or rephrasing the query"
             )
         return matches[0]
-
-    @staticmethod
-    def _format_bindable_tool_schema(result: RouteResult) -> dict[str, Any]:
-        return {
-            "server_name": result.server_name,
-            "tool_name": result.tool_name,
-            "type": "function",
-            "function": {
-                "name": result.tool_name,
-                "description": result.schema.get("description", ""),
-                "parameters": copy.deepcopy(result.schema.get("inputSchema", {})),
-            },
-        }
 
     def _inject_additional_properties_false(self, node: Any, depth: int = 0, max_depth: int = 100) -> Any:
         # ALGY-4 FIX: Prevent stack overflow on deeply nested / circular schemas

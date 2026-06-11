@@ -23,6 +23,13 @@ dependencies = [
 langgraph = ["langchain", "langgraph", "langchain-ollama"]
 enterprise = ["openclaw>=2026.3.20", "cmdop"]
 dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0"]
+experiments = [
+    "pandas>=2.0.0",
+    "scikit-learn>=1.3.0",
+    "matplotlib>=3.8.0",
+    "datasets>=2.19.0",
+    "accelerate>=0.30.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["toolfinder*", "Enterprise*"]

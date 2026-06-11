@@ -64,3 +64,46 @@ def test_route_raises_when_no_match_above_threshold(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(router_module.RouteNotFoundError):
         router.route("unrelated request")
+
+
+def test_default_index_is_exact_flat(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_router(monkeypatch)
+
+    assert isinstance(router.faiss_index, router_module.faiss.IndexFlatIP)
+
+
+def test_explicit_hnsw_index_is_honored(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)
+    config = router_module.RouterHyperparameters(index_type="hnsw")
+    router = router_module.UniversalMCPRouter(model_name="dummy", config=config)
+
+    assert isinstance(router.faiss_index, router_module.faiss.IndexHNSWFlat)
+
+
+def test_route_top_k_is_type_stable_after_build_index(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)
+    router = router_module.UniversalMCPRouter(model_name="dummy")
+    router.add_tool(
+        {
+            "name": "alpha_tool",
+            "description": "Tool for alpha query",
+            "inputSchema": {"type": "object", "properties": {"x": {"type": "string"}}},
+        },
+        server_name="test-server",
+    )
+    router.build_index()
+
+    results = router.route_top_k("alpha query", k=1)
+
+    assert all(isinstance(item, router_module.RouteResult) for item in results)
+    assert results[0].tool_name == "alpha_tool"
+
+
+def test_to_openai_tools_formats_bindable_schema(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_router(monkeypatch)
+
+    bindable = router_module.to_openai_tools(router.route_top_k("alpha query", k=1))
+
+    assert bindable[0]["type"] == "function"
+    assert bindable[0]["function"]["name"] == "alpha_tool"
+    assert "parameters" in bindable[0]["function"]

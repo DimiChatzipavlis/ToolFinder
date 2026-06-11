@@ -1,4 +1,6 @@
 models/
+experiments/artifacts/
+audit_logs/
 *.zip
 __pycache__/
 *.pyc
