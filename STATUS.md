@@ -2,10 +2,11 @@
 
 _Last updated: 2026-06-12_
 
-Single source of truth for the repository's current state. The three dated
-audit documents (`ARCHITECTURE_REPORT.md`, `SYSTEM_REALITY_REPORT.md`,
-`ENTERPRISE_SYSTEM_REPORT.md`) are historical snapshots; findings recorded
-there have been addressed as below.
+Single source of truth for the repository's current state. Three dated audit
+documents (`ARCHITECTURE_REPORT.md`, `SYSTEM_REALITY_REPORT.md`,
+`ENTERPRISE_SYSTEM_REPORT.md`) were removed in the 2026-06 cleanup; they are
+preserved in git history, and every open finding they recorded has been
+addressed as below.
 
 ## Research pipeline (course deliverable)
 
