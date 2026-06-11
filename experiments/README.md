@@ -19,15 +19,20 @@ Stages (each runnable standalone):
 | Scenario recovery | `dataset/annotate_scenarios.py` | `data/queries_with_scenarios.csv`, `data/corpus.json` |
 | Splits | `dataset/make_splits.py` | `data/splits/regime{1,2}_*.json` |
 | OOD sets | `dataset/make_ood.py` | `data/ood/*.csv` (eval-only) |
+| Multi-server catalog | `dataset/build_multiserver_catalog.py` | `data/catalogs/multiserver_catalog.json` (544 real tools, 23 providers, apis.guru) |
+| Unseen-server regime | `dataset/make_multiserver_queries.py` | `data/queries_multiserver.csv`, `data/corpus_multiserver.json` (574 tools), `data/splits/regime3_unseen_servers.json` |
 | Bi-encoder training | `models/biencoder.py` | `artifacts/biencoder/*`, `results/biencoder_training.json` |
 | Hard negatives + cross-encoder | `models/hard_negatives.py`, `models/crossencoder.py` | `artifacts/crossencoder/*`, `results/crossencoder_training.json` |
-| Main evaluation | `evaluation/evaluate.py` | `results/main_eval.json` |
+| Main evaluation (3 regimes) | `evaluation/evaluate.py` | `results/main_eval.json` |
 | Open-set rejection | `evaluation/ood.py` | `results/ood_eval.json` |
 | Representation ablation | `ablation_representation.py` | `results/ablation_representation.json` |
 | Flat-vs-HNSW scaling | `benchmarks/scaling_bench.py` | `results/scaling_bench.json` |
+| Description poisoning | `attacks/poisoning.py` | `results/poisoning.json` |
+| CE calibration | `evaluation/calibration.py` | `results/calibration.json`, `figures/fig_calibration.png` |
+| LLM-in-context baseline | `evaluation/llm_incontext.py` | `results/llm_incontext.json` (requires a local Ollama service; not run in the authoring environment) |
 | Figures | `figures.py` | `results/figures/*.png` |
 | EDA notebook | `build_eda_notebook.py` | `notebooks/01_eda.ipynb` (executed, outputs committed) |
-| Report | `build_report.py` | `reports/report.md` |
+| Report + manifest | `build_report.py`, `build_manifest.py` | `reports/report.md`, `results/artifact_manifest.json` |
 
 ## Why the splits look the way they do
 
