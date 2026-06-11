@@ -207,7 +207,7 @@ def main() -> int:
         server.should_exit = True
         thread.join(timeout=30.0)
 
-    print("audit_validation_test: passed")
+    print("validate_enterprise_api: passed")
     return 0
 
 

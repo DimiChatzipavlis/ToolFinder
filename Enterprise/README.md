@@ -1,21 +1,25 @@
 # Enterprise Hybrid Runtime
 
-This directory contains an enterprise-grade hybrid architecture built on ToolFinder's retrieval-first design.
+This directory contains a hybrid orchestration runtime built on ToolFinder's retrieval-first design. It is **out of scope for the research evaluation** in `experiments/` — it exists to show the routing layer operating inside a policy-governed execution stack.
 
-## Verified Status (2026-03-31)
+## Status (2026-06)
 
-Current verdict: the Enterprise hybrid edition is working on this repository checkout.
+- Component tests green: `pytest -q tests/test_enterprise_runtime.py tests/test_hybrid_pipeline.py tests/test_enterprise_backend.py`
+- HTTP-level end-to-end validation: `python Enterprise/examples/validate_enterprise_api.py` boots the real FastAPI app on `127.0.0.1` with a stub embedder and asserts routing, schema rejection, and path-traversal rejection through the wire.
+- Security hardening since the March audit (details in the root [SECURITY.md](../SECURITY.md) and [STATUS.md](../STATUS.md)): path arguments resolve against `workspace_root` via `realpath` (never process cwd); duplicate tool calls within one agent response are deduplicated by canonical signature; telemetry counts skipped duplicates.
 
-Verified on this machine:
+Known operational limit: in live filesystem mode, model-generated arguments may still request out-of-scope paths. Policy checks block unsafe calls, but treat this as an expected failure mode to monitor — and note the HTTP API itself has **no authentication layer** (bind to localhost only).
 
-- Enterprise-focused tests passed: `pytest -q tests/test_enterprise_runtime.py tests/test_hybrid_pipeline.py tests/test_enterprise_backend.py`
-- Deterministic orchestrator demo passed: `python Enterprise/examples/run_hybrid_demo.py`
-- End-to-end OpenClaw pipeline demo passed: `python Enterprise/examples/run_e2e_hybrid.py --max-cycles 1 --fallback-strategy heuristic_planner`
-- Realtime finite-cycle loop passed: `python Enterprise/examples/run_realtime_openclaw.py --max-cycles 1 --tool-runtime mock`
+## HTTP API
 
-Known operational limit:
+The API is created by the factory `create_app(...)` in `runtime/api.py` (no module-level `app`). Single endpoint:
 
-- In live filesystem mode, model-generated arguments may still request out-of-scope paths. Policy and runtime checks block unsafe calls, but you should still treat this as an expected operational failure mode to monitor.
+```http
+POST /execute
+{ "intent": "<natural language intent>" }
+```
+
+Responses carry `execution_output` (status, answer, tool_calls, telemetry) or an `error`; policy violations return HTTP 403.
 
 ## Design Goals
 
