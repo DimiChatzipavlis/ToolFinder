@@ -97,12 +97,12 @@ Regenerate with `python examples/eval_toolfinder.py --update-readme` (preserve t
 Every folder has its own README with details.
 
 - [`toolfinder/`](toolfinder/README.md) — core library: router, MCP stdio client, autonomous ReAct agent, recovery parsing.
-- [`experiments/`](experiments/README.md) — the research pipeline: datasets, leakage-controlled splits, training (bi- and cross-encoders), baselines, three evaluation regimes, OOD/threshold analysis, Flat-vs-HNSW scaling benchmark, poisoning attack, calibration, figures, report generation.
+- [`experiments/`](experiments/README.md) — the research pipeline: datasets, leakage-controlled splits, training (bi- and cross-encoders), baselines, three evaluation regimes, OOD/threshold analysis, Flat-vs-HNSW scaling benchmark, poisoning attack, calibration, figures, report generation. Generated evidence lives in [`experiments/results/`](experiments/results/README.md).
 - [`examples/`](examples/README.md) — runnable demos: A/B harness, multi-server agent demo, LangGraph integration (require local Ollama + Node).
 - [`Enterprise/`](Enterprise/README.md) — optional hybrid runtime (HTTP API, policy engine, executor, telemetry). Out of scope for the research evaluation.
 - [`tests/`](tests/README.md) — unit tests incl. CI-enforced split-hygiene guards (run `pytest`).
-- [`notebooks/`](notebooks/README.md) — executed EDA notebook with committed outputs.
-- [`reports/`](reports/README.md) — research report (auto-rendered from results) and paper draft.
+- [`notebooks/`](notebooks/README.md) — executed notebooks with committed outputs: EDA and the live local/Colab evidence notebook.
+- [`reports/`](reports/README.md) — the research report, auto-rendered from `experiments/results/`.
 - [`academic_research/`](academic_research/README.md) — raw source datasets only (provenance anchor).
 - [STATUS.md](STATUS.md) — current state, closed audit findings. [SECURITY.md](SECURITY.md) — threat model and mitigations.
 

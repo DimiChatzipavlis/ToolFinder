@@ -10,6 +10,7 @@ SPLITS_DIR = DATA_DIR / "splits"
 OOD_DIR = DATA_DIR / "ood"
 RESULTS_DIR = EXPERIMENTS_DIR / "results"
 FIGURES_DIR = RESULTS_DIR / "figures"
+DIAGNOSTICS_DIR = RESULTS_DIR / "diagnostics"
 ARTIFACTS_DIR = EXPERIMENTS_DIR / "artifacts"
 
 RAW_V1_CSV = REPO_ROOT / "academic_research" / "mcp_routing_dataset.csv"
@@ -20,5 +21,5 @@ CORPUS_JSON = DATA_DIR / "corpus.json"
 
 
 def ensure_dirs() -> None:
-    for path in (DATA_DIR, SPLITS_DIR, OOD_DIR, RESULTS_DIR, FIGURES_DIR, ARTIFACTS_DIR):
+    for path in (DATA_DIR, SPLITS_DIR, OOD_DIR, RESULTS_DIR, FIGURES_DIR, DIAGNOSTICS_DIR, ARTIFACTS_DIR):
         path.mkdir(parents=True, exist_ok=True)

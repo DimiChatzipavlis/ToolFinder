@@ -49,6 +49,11 @@ tests fail, fix the data, never the test.
 
 - Model weights live under `experiments/artifacts/` (gitignored, regenerable
   from seeds); datasets, splits, results JSON, and figures are committed.
+  Derived training data that requires the artifacts to regenerate
+  (`data/crossencoder_train_pairs.csv`) is gitignored too.
+- `results/*.json` are human-readable summaries; bulky per-query machine data
+  is quarantined in `results/diagnostics/`. See `results/README.md` for what
+  each file holds, who reads it, and why results are committed at all.
 - Trained systems run with seeds {13, 42, 1337}; tables report mean ± std over
   seeds, and per-system 95% bootstrap CIs over queries.
 - All retrieval systems implement `rank(query) -> ordered tool names` and are

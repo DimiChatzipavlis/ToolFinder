@@ -1,0 +1,37 @@
+# experiments/results/ — Generated Evidence
+
+Every number in `reports/report.md` and every figure is generated **from the
+files in this folder**, which are in turn produced by the scripts in
+`experiments/`. They are committed on purpose: the report's claims must be
+verifiable by a grader *without* re-running ~1.5 hours of GPU training, and
+`artifact_manifest.json` pins their hashes so a stale report can be detected.
+If a number looks wrong, fix the experiment and regenerate — never edit these
+files by hand.
+
+## Files and who reads them
+
+| File | Size | What it holds | Read by |
+| --- | --- | --- | --- |
+| `main_eval.json` | ~50 KB | Per-system metric summaries (R@k, MRR, NDCG, accuracy/P/R/F1, latency, CIs) for all 3 regimes — the human-readable scoreboard | `build_report.py`, `figures.py`, live notebook |
+| `diagnostics/main_eval_per_query.json` | ~1.3 MB | Per-query rank + top-1 prediction for every system × regime (~1,000 queries × 16 systems). **Machine data — not meant to be read**, but required for the confusion matrix and any error analysis without re-running models | `figures.py` (confusion matrix) |
+| `ood_eval.json` | ~90 KB | OOD scores: AUROC/FPR per subset + the full 101-point threshold sweep (the curve data behind the risk-coverage figure) | `build_report.py`, `figures.py` |
+| `biencoder_training.json` | ~20 KB | All 9 training runs: hyperparameters, duration, loss history, per-epoch val MRR (the loss curves) | `build_report.py`, `figures.py` |
+| `crossencoder_training.json` | ~3 KB | Same for the 3 cross-encoder runs | `build_report.py` |
+| `ablation_representation.json` | ~4 KB | R@1/R@3/MRR per schema representation × system × regime | `build_report.py` |
+| `scaling_bench.json` | ~10 KB | Flat-vs-HNSW latency/recall/build/size per tier + encoder latency | `build_report.py`, `figures.py` |
+| `poisoning.json` | ~3 KB | Hijack rates per attack strength × system × mitigation | `build_report.py` |
+| `calibration.json` | ~3 KB | ECE + reliability bins, raw vs temperature-scaled | `build_report.py` |
+| `artifact_manifest.json` | ~7 KB | SHA256 of datasets, results, and (uncommitted) model artifacts | release verification |
+| `figures/*.png` | — | Every figure referenced by the report | report, notebooks |
+
+## Why JSON, and why committed
+
+- **JSON because the report is generated, not written.** `build_report.py`
+  injects these values into the report; hand-typed numbers were the original
+  project's core failure.
+- **Committed because results are evidence.** Model weights are *not*
+  committed (regenerable from seeds; see `artifact_manifest.json` for their
+  hashes) — results are kept because regenerating them requires the weights.
+- **Big files are quarantined.** Anything humans shouldn't read lives under
+  `diagnostics/`. If a results file ever feels unreadable, the fix is moving
+  detail into `diagnostics/`, not deleting evidence.

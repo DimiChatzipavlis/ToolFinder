@@ -121,15 +121,15 @@ def fig_main_results() -> None:
 
 
 def fig_confusion() -> None:
-    results_path = paths.RESULTS_DIR / "main_eval.json"
-    if not results_path.exists():
-        print("[skip] main_eval.json missing")
+    diagnostics_path = paths.DIAGNOSTICS_DIR / "main_eval_per_query.json"
+    if not diagnostics_path.exists():
+        print("[skip] diagnostics/main_eval_per_query.json missing")
         return
-    results = json.loads(results_path.read_text(encoding="utf-8"))
-    block = results["regimes"]["regime1_unseen_queries"]
+    diagnostics = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+    block = diagnostics["regimes"]["regime1_unseen_queries"]
     candidates = [name for name in block if name.startswith("ft_") and "_seed42" in name]
     if not candidates:
-        print("[skip] no seed-42 fine-tuned system in main_eval.json")
+        print("[skip] no seed-42 fine-tuned system in diagnostics")
         return
     system = sorted(candidates)[0]
 

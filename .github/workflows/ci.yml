@@ -28,7 +28,7 @@ jobs:
 
       - name: Syntax smoke check
         run: |
-          python -m compileall toolfinder Enterprise academic_research examples experiments
+          python -m compileall toolfinder Enterprise examples experiments
 
       - name: Run unit tests
         run: |

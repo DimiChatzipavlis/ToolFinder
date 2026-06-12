@@ -249,10 +249,15 @@ def main() -> None:
 
     paths.ensure_dirs()
     out_path = paths.RESULTS_DIR / "main_eval.json"
+    diagnostics_path = paths.DIAGNOSTICS_DIR / "main_eval_per_query.json"
     output: dict = {"regimes": {}}
     if out_path.exists():
         output = json.loads(out_path.read_text(encoding="utf-8"))
         output.setdefault("regimes", {})
+    diagnostics: dict = {"regimes": {}}
+    if diagnostics_path.exists():
+        diagnostics = json.loads(diagnostics_path.read_text(encoding="utf-8"))
+        diagnostics.setdefault("regimes", {})
 
     for regime in args.regimes:
         split_path = paths.SPLITS_DIR / f"{regime}.json"
@@ -298,11 +303,26 @@ def main() -> None:
                     _release_memory()
 
         regime_results.update(aggregate_seed_groups(regime_results))
+
+        # Human-readable summaries and bulky per-query diagnostics are written
+        # to separate files: main_eval.json stays reviewable, while the
+        # per-query ranks/predictions that figures and error analysis need live
+        # under results/diagnostics/.
+        regime_diagnostics: dict[str, dict] = {}
+        for system_name, summary in regime_results.items():
+            per_query = summary.pop("per_query", None)
+            top1 = summary.pop("top1", None)
+            if per_query is not None or top1 is not None:
+                regime_diagnostics[system_name] = {"per_query": per_query, "top1": top1}
+
         output["regimes"][regime] = regime_results
         output["corpus_size_" + regime] = len(corpus_tools)
+        diagnostics["regimes"].setdefault(regime, {}).update(regime_diagnostics)
         out_path.write_text(json.dumps(output, indent=1), encoding="utf-8")
+        diagnostics_path.write_text(json.dumps(diagnostics, indent=1), encoding="utf-8")
 
     print(f"\nwrote {out_path}")
+    print(f"wrote {diagnostics_path}")
 
 
 if __name__ == "__main__":
