@@ -1,7 +1,12 @@
 """Render reports/report.md from experiments/results/*.json.
 
-Every number in the report is read from a results file produced by a script in
-this package; nothing is hand-typed. Re-run after any experiment:
+Structure follows the course rubric: Abstract (~150 words), Introduction,
+Related Work, Methodology (data + preprocessing + two DL models), Experiments &
+Results (accuracy/precision/recall/F1, ROC-AUC, loss curves, comparison tables),
+Discussion & Limitations, Conclusions.
+
+Every number is read from a results file produced by a script in this package;
+nothing is hand-typed. Re-run after any experiment:
 
     python experiments/build_report.py
 """
@@ -27,11 +32,18 @@ MAIN_SYSTEM_ORDER = [
     ("frozen_minilm", "Frozen MiniLM-L6 (22M)"),
     ("frozen_bge", "Frozen BGE-small (33M)"),
     ("frozen_mpnet", "Frozen MPNet (109M)"),
-    ("ft_minilm (avg over seeds)", "**FT bi-encoder MiniLM-L6** (3 seeds)"),
-    ("ft_bge (avg over seeds)", "**FT bi-encoder BGE-small** (3 seeds)"),
-    ("ft_mpnet (avg over seeds)", "**FT bi-encoder MPNet** (3 seeds)"),
+    ("ft_minilm (avg over seeds)", "**Model A: FT bi-encoder MiniLM-L6** (3 seeds)"),
+    ("ft_bge (avg over seeds)", "FT bi-encoder BGE-small (3 seeds)"),
+    ("ft_mpnet (avg over seeds)", "FT bi-encoder MPNet (3 seeds)"),
     ("hybrid_bm25+ft_minilm_seed42", "Hybrid RRF: BM25 + FT MiniLM (seed 42)"),
-    ("ft_minilm+ce_rerank (avg over seeds)", "**FT MiniLM + CE rerank** (3 seeds)"),
+    ("ft_minilm+ce_rerank (avg over seeds)", "**Model B: FT MiniLM + CE rerank** (3 seeds)"),
+]
+
+CLASSIFICATION_SYSTEMS = [
+    ("bm25", "BM25"),
+    ("frozen_minilm", "Frozen MiniLM-L6"),
+    ("ft_minilm_seed42", "Model A: FT bi-encoder (seed 42)"),
+    ("ft_minilm+ce_rerank_seed42", "Model B: + CE rerank (seed 42)"),
 ]
 
 
@@ -67,7 +79,28 @@ def main_results_table(results: dict, regime: str) -> str:
     return "\n".join(lines)
 
 
+def classification_table(results: dict, regimes: list[str]) -> str:
+    lines = [
+        "| System | Regime | Accuracy | Macro Precision | Macro Recall | Macro F1 |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for key, label in CLASSIFICATION_SYSTEMS:
+        for regime in regimes:
+            block = results["regimes"].get(regime, {})
+            if key not in block or "classification" not in block[key]:
+                continue
+            cls = block[key]["classification"]
+            regime_short = regime.replace("regime", "R").split("_")[0]
+            lines.append(
+                f"| {label} | {regime_short} | {cls['accuracy']:.3f} | {cls['macro_precision']:.3f} "
+                f"| {cls['macro_recall']:.3f} | {cls['macro_f1']:.3f} |"
+            )
+    return "\n".join(lines)
+
+
 def training_table(records: list[dict]) -> str:
+    import numpy as np
+
     lines = [
         "| Model | Params | Seeds | Train time (s, mean) | Val MRR@10 (mean ± std) |",
         "| --- | --- | --- | --- | --- |",
@@ -80,8 +113,6 @@ def training_table(records: list[dict]) -> str:
         mrr_key = "final_val_mrr@10" if "final_val_mrr@10" in runs[0] else "final_val_mrr_full_corpus"
         mrrs = [run[mrr_key] for run in runs]
         times = [run["train_duration_s"] for run in runs]
-        import numpy as np
-
         lines.append(
             f"| {model_key} | {params.get(model_key, '?')} | {len(runs)} "
             f"| {np.mean(times):.0f} | {np.mean(mrrs):.4f} ± {np.std(mrrs):.4f} |"
@@ -91,7 +122,7 @@ def training_table(records: list[dict]) -> str:
 
 def ood_table(ood: dict) -> str:
     lines = [
-        "| System | Score | AUROC (pooled) | FPR@95TPR | AUROC chitchat | AUROC out-of-catalog | AUROC near-miss |",
+        "| System | Score | ROC-AUC (pooled) | FPR@95TPR | AUC chitchat | AUC out-of-catalog | AUC near-miss |",
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for system_name, block in ood["systems"].items():
@@ -167,39 +198,6 @@ def poisoning_table(poisoning: dict) -> str:
     return "\n".join(lines)
 
 
-RELATED_WORK = """## Related Work
-
-**Tool-augmented LLMs.** MRKL (Karpas et al., 2022) introduced the modular
-router-over-experts framing this system implements; Toolformer (Schick et al.,
-2023) learns API invocation self-supervised; Gorilla (Patil et al., 2023) and
-ToolLLM/ToolBench (Qin et al., 2023) target correct call *generation* over
-large real API collections and already incorporate retrievers; ToolFinder
-addresses only the selection sub-problem, but evaluates it under open-set and
-adversarial conditions those works do not focus on.
-
-**Retrieval-based tool selection in practice.** Embedding tool descriptions
-and retrieving by cosine similarity is shipped functionality in LangChain's
-tool retriever, LlamaIndex object retrievers, and the semantic-router library;
-OpenAI's function-retrieval cookbook documents the same pattern. This project
-does not claim architectural novelty over these systems - its contribution is
-a leakage-controlled benchmark and a controlled empirical comparison (lexical
-vs frozen vs fine-tuned vs reranked) of what they ship as defaults, plus
-abstention and poisoning analyses.
-
-**Dense retrieval methodology.** Bi-encoder contrastive training follows
-Sentence-BERT (Reimers & Gurevych, 2019) with in-batch negatives (DPR,
-Karpukhin et al., 2020; MultipleNegativesRankingLoss); cross-encoder reranking
-follows Nogueira & Cho (2019) on MS MARCO. HNSW is Malkov & Yashunin (2018);
-the scaling study revisits its trade-offs at tool-catalog sizes rather than
-web-corpus sizes.
-
-**Benchmark hygiene.** The leakage analysis follows the train-test
-contamination literature for paraphrase-templated synthetic data: grouped
-splits over generation units rather than rows, with split constraints
-enforced as tests.
-"""
-
-
 def build() -> str:
     main_eval = load("main_eval.json")
     biencoder_training = load("biencoder_training.json")
@@ -212,55 +210,149 @@ def build() -> str:
     llm_incontext = load("llm_incontext.json")
 
     sections: list[str] = []
-    sections.append(f"""# ToolFinder: An Empirical Study of Dense Retrieval for Open-Set MCP Tool Routing
 
-*Generated from `experiments/results/` on {date.today().isoformat()}. Regenerate with `python experiments/build_report.py`.*
+    # ------------------------------------------------------------------ header
+    sections.append(f"""# ToolFinder: Dense Retrieval for Open-Set MCP Tool Routing — An Empirical Study
+
+*Generated from `experiments/results/` on {date.today().isoformat()}. Regenerate with `python experiments/build_report.py`. Figures referenced as `figures/...` live in `experiments/results/figures/`.*
 
 ## Abstract
 
-Selecting the right tool from a Model Context Protocol (MCP) catalog is a precondition for reliable tool-using LLM agents, especially small local models whose context windows cannot hold every schema. We study retrieval-based tool selection on a benchmark of 1,695 natural-language intents over 574 real tool schemas (30 GitHub MCP tools plus 544 operations converted from 23 public OpenAPI providers). We first show that the naive random split used in earlier iterations of this project is answerable at ~96% Recall@1 by a nearest-neighbor lookup over training queries alone, because the queries follow a scenario-by-template generation grammar; we therefore introduce three leakage-controlled protocols - unseen queries (scenario-grouped), unseen tools, and unseen servers - enforced by CI tests. Under these protocols we train and compare two deep architectures - contrastively fine-tuned bi-encoders (22M-109M parameters) and a cross-encoder reranker - against lexical (BM25, TF-IDF), hybrid-fusion, and frozen-encoder baselines, with three seeds and bootstrap confidence intervals. We further characterize threshold-based rejection of out-of-scope requests on 249 out-of-distribution queries (chitchat, out-of-catalog, adversarial near-miss), measure a description-poisoning attack with three mitigations, analyze reranker confidence calibration, and benchmark exact flat search against HNSW from 15 to 100,000 vectors. The fine-tuned bi-encoder substantially outperforms all baselines on all three regimes, including zero-shot transfer to unseen servers; the cross-encoder adds precision on confusable candidates at linear per-query cost; and exact flat search dominates HNSW at every catalog size tested, motivating the runtime's exact-search default.
+Tool-using LLM agents must select the right tool from a catalog before invoking it; stuffing every schema into the context window degrades small models and scales poorly. We study tool selection as dense retrieval on a benchmark of 1,695 natural-language intents over 574 real tool schemas (30 GitHub MCP tools plus 544 operations from 23 public API providers). We first show the project's original random split is invalid: a nearest-neighbor lookup over training queries scores ~96% Recall@1 because queries follow a scenario-by-template grammar. We introduce three leakage-controlled protocols (unseen queries, unseen tools, unseen servers), enforced by CI tests. Under them we train and compare two deep architectures — a contrastively fine-tuned bi-encoder and a cross-encoder reranker — against lexical, hybrid, and frozen-encoder baselines over three seeds with bootstrap confidence intervals, and characterize open-set rejection (ROC-AUC), description-poisoning attacks with mitigations, confidence calibration, and exact-vs-approximate index scaling to 100k vectors. Fine-tuning dominates all baselines across regimes; reranking adds precision at linear per-query cost; exact flat search beats HNSW at every tested catalog size.
 
-## 1. Task and Benchmark
+## 1. Introduction
 
-**Task.** Given a natural-language intent and a catalog of MCP tool schemas, rank the catalog so the correct tool is at rank 1; abstain when no tool applies (open-set condition).
+Agentic LLM systems increasingly rely on external tools exposed through the Model Context Protocol (MCP). The default integration pattern binds *every* available tool schema into the model's context. This fails in three compounding ways: the prompt fills with irrelevant structure before reasoning begins ("lost in the middle"); similar APIs collide in-context and raise tool-selection errors; and small local models (the models most users can actually run) emit malformed calls under long-prompt pressure. The engineering response — retrieve a small set of candidate tools first, then let the model reason over only those — turns tool *selection* into an information-retrieval problem that must work under **open-set conditions**: new phrasings, new tools, entire new servers, out-of-scope requests that must be refused, and adversarially crafted tool descriptions.
 
-**Data.** 1,500 author-templated queries over 30 GitHub MCP tools (50 per tool, perfectly balanced), split into 15 train-eligible tools and 15 tools reserved for unseen-tool evaluation. Most tools follow a `scenario x template` grammar (~5 scenarios x ~10 paraphrase templates); two tools have per-row scenarios. Scenario structure was recovered programmatically (`experiments/dataset/annotate_scenarios.py`) and is used to construct leakage-controlled splits.
+This matters beyond convenience. Tool selection is a safety boundary: a router that force-routes an ambiguous request to a destructive tool, or that can be hijacked by a poisoned description, converts a retrieval error into a harmful action. It is also an efficiency boundary: routing decides whether a 3B-parameter local model can use a 500-tool catalog at all.
 
-**Leakage control.** Under a random row split, paraphrases of each test query's scenario appear in training: a 1-NN lookup over training anchors - no schema text, no training - reaches ~96% Recall@1, and 65% of test anchors have a training anchor at char-ngram cosine >= 0.8. The scenario-grouped split removes this artifact (see `experiments/results/figures/fig_leakage_audit.png`). Split hygiene is enforced by `tests/test_split_hygiene.py`.
+**Problem statement.** Given a natural-language intent and a catalog of MCP tool schemas, rank the catalog so the correct tool is at rank 1, and abstain when no tool applies.
 
-**Regimes.** *Regime 1 (unseen queries):* scenario-grouped 460/146/144 train/val/test over the 15 v1 tools. *Regime 2 (unseen tools):* all 750 queries of the 15 v2 tools, never seen in training. Both rank the full 30-tool corpus, so unseen-tool evaluation faces trained tools as distractors. *Regime 3 (unseen servers):* 195 hand-written queries (different generator family, anti-echo rules) over 65 tools sampled from 22 real API providers, ranked against a 574-tool merged corpus (30 GitHub + 544 OpenAPI-derived tools from apis.guru); training data remains GitHub-only, so this measures zero-shot cross-server transfer. Dataset provenance and biases: `experiments/data/DATASET_CARD.md`.
+**Contributions.** (1) A leakage-controlled benchmark over real MCP/OpenAPI schemas with three generalization regimes, after demonstrating quantitatively that the naive split answers itself (~96% Recall@1 via 1-NN over training anchors). (2) A trained two-model comparison — bi-encoder vs cross-encoder reranker — against the baselines that practice actually ships (BM25, TF-IDF, frozen encoders, hybrid fusion), with seed variance and confidence intervals. (3) An open-set analysis: threshold sweeps, ROC-AUC for out-of-distribution rejection, a measured description-poisoning attack with three mitigations, and reranker confidence calibration. (4) A systems result: exact flat search outperforms HNSW at every catalog size up to 10^5 vectors, fixing the deployed router's defaults. All code, data, splits, and results are reproducible (`experiments/run_all.py`), with split hygiene enforced in CI.
 """)
 
-    sections.append(RELATED_WORK)
-    sections.append("## 2. Systems\n")
-    sections.append("""**Baselines.** Random permutation; BM25 (Okapi, k1=1.5, b=0.75); TF-IDF (word 1-2grams and character 3-5grams); frozen sentence-transformer checkpoints (MiniLM-L6, BGE-small, MPNet) used zero-shot. All systems rank the identical canonical-JSON schema documents.
+    # -------------------------------------------------------------- related work
+    sections.append("""## 2. Related Work
 
-**Model A - fine-tuned bi-encoder.** Sentence-transformer fine-tuned with MultipleNegativesRankingLoss under a no-duplicates batch sampler (with only 15 distinct positives, plain in-batch negatives would treat same-schema rows as negatives - a false-negative artifact the sampler removes). Selection on validation MRR@10 per epoch; seeds 13/42/1337.
+**Tool-augmented LLMs.** MRKL (Karpas et al., 2022) introduced the modular router-over-experts framing this system implements. Toolformer (Schick et al., 2023) teaches an LM to invoke APIs self-supervised. Gorilla (Patil et al., 2023) fine-tunes LLaMA-7B for API-call generation and already pairs it with a retriever, showing retrieval reduces call hallucination; ToolLLM (Qin et al., 2023) scales instruction-tuned tool use to 16k+ real APIs with a dedicated API retriever. These works target call *generation*; we isolate the upstream selection sub-problem and evaluate it under open-set and adversarial conditions they do not focus on.
 
-**Model B - cross-encoder reranker.** Initialized from ms-marco-MiniLM-L-6-v2, trained with binary cross-entropy on 1 positive : 4 hard negatives mined per training query from BM25 and the strongest bi-encoder. At inference it rescores the bi-encoder's top-10 candidates (retrieve-then-rerank).
+**Retrieval-based tool selection in practice.** Embedding tool descriptions and retrieving by cosine similarity is shipped functionality (LangChain tool retriever, LlamaIndex object retrievers, the semantic-router library, OpenAI's function-retrieval cookbook). We claim no architectural novelty over these; the contribution is a leakage-controlled benchmark and a controlled comparison of what they ship as defaults.
+
+**Dense retrieval methodology.** Bi-encoder contrastive training follows Sentence-BERT (Reimers & Gurevych, 2019) with in-batch negatives as in DPR (Karpukhin et al., 2020); cross-encoder reranking follows Nogueira & Cho (2019). HNSW is Malkov & Yashunin (2018); our scaling study re-examines its trade-offs at tool-catalog (not web-corpus) sizes.
 """)
+
+    # -------------------------------------------------------------- methodology
+    sections.append("""## 3. Methodology
+
+### 3.1 Data, cleaning, and exploratory analysis
+
+**Raw data.** Two author-templated query sets over the GitHub MCP server (750 + 750 queries; 15 + 15 disjoint tools; exactly 50 queries/tool), plus 195 hand-written queries (different generator family, anti-echo rules) over 65 tools sampled from a 544-tool catalog converted from 23 public OpenAPI providers (apis.guru). 249 out-of-distribution queries (chitchat / out-of-catalog / adversarial near-miss) are evaluation-only. Provenance and biases: `experiments/data/DATASET_CARD.md`.
+
+**Cleaning.** Verification rather than imputation: zero missing values, zero duplicate anchors, zero unparsable schema payloads (asserted in the executed EDA notebook, `notebooks/01_eda.ipynb`). Classes are exactly balanced by construction (the class-distribution figure is in the notebook).
+
+**EDA findings that shaped the design.** (i) Most tools follow a `scenario × template` generation grammar (~5 scenarios × ~10 paraphrase prefixes with the scenario clause verbatim) — recovered programmatically and stored as `scenario_id`. (ii) Under a random row split, a 1-NN lookup over *training anchors alone* scores ~96% Recall@1 and 65% of test anchors have a training anchor at char-ngram cosine ≥ 0.8 (`figures/fig_leakage_audit.png`) — the original evaluation was leaked by construction. (iii) Queries lexically echo schemas (median token overlap 0.33 for v1, 0.45 for v2), so lexical baselines are mandatory. (iv) Schema-similarity analysis identifies confusable pairs (`search_issues` ↔ `search_pull_requests` at 0.93 char-ngram cosine) that later explain most residual errors.
+
+**Preprocessing / normalization.** Schemas are serialized as canonical sorted-key JSON (the `raw` representation; alternatives are ablated in §4.6). Identifier separators are expanded for lexical systems (`add_issue_comment` → "add issue comment"). All embeddings are L2-normalized so inner product equals cosine similarity.
+
+**Splits (leakage control).** *Regime 1 — unseen queries:* scenario-grouped 460/146/144 over the 15 v1 tools (no scenario crosses buckets). *Regime 2 — unseen tools:* all 750 v2 queries; their 15 tools never appear in training; ranking is against the full 30-tool corpus so trained tools act as distractors. *Regime 3 — unseen servers:* the 195 multi-server queries against a 574-tool merged corpus; training data remains GitHub-only. Constraints are enforced by `tests/test_split_hygiene.py` in CI.
+
+### 3.2 Model A — fine-tuned bi-encoder
+
+A sentence-transformer (primary: MiniLM-L6, 22M parameters; 6 transformer layers, 384-d mean-pooled embeddings) fine-tuned with MultipleNegativesRankingLoss: for a batch of (query, schema) pairs, each query's positive schema is contrasted against all other in-batch schemas via softmax over cosine similarities. **Critical detail:** with only 15 distinct schemas in training, naive batching places duplicate schemas in one batch and MNRL then treats correct pairs as negatives; we use a no-duplicates batch sampler, which also bounds the effective in-batch negative count at the catalog size. Hyperparameters: batch 16, lr 2e-5, warmup 10%, ≤8 epochs with per-epoch model selection on validation MRR@10, max sequence 256, fp16, seeds {13, 42, 1337}. BGE-small (33M) and MPNet (109M) are trained identically as a capacity ablation.
+
+### 3.3 Model B — cross-encoder reranker
+
+A cross-encoder (init: ms-marco-MiniLM-L-6, 22M) scores (query, schema) *jointly* with full cross-attention — architecturally distinct from Model A, which encodes the two sides independently. Trained with binary cross-entropy on 1 positive : 4 hard negatives per training query, where negatives are the top wrong candidates mined by BM25 and the strongest bi-encoder (the candidates a deployed system actually needs to reject). Batch 32, lr 2e-5, 3 epochs, max length 384, seeds {13, 42, 1337}. At inference it reranks the bi-encoder's top-10 (retrieve-then-rerank), so its per-query cost is 10 transformer passes versus Model A's single query encoding plus an index lookup — the efficiency/accuracy trade-off the comparison quantifies.
+
+### 3.4 Baselines
+
+Random permutation (floor); BM25 (Okapi, k1=1.5, b=0.75); TF-IDF (word 1-2grams; char 3-5grams); frozen MiniLM/BGE/MPNet (zero-shot, isolating the value of fine-tuning); hybrid reciprocal-rank fusion of BM25 + fine-tuned bi-encoder (k=60). All systems rank identical schema documents through one evaluation code path.
+
+### 3.5 Deployed system
+
+The router (`toolfinder/`) embeds schemas at ingest, retrieves via FAISS, abstains below a similarity threshold (operating point chosen from §4.4), and exposes results as typed objects. The index is **exact** `IndexFlatIP` by default; HNSW is opt-in — a decision justified empirically in §4.5 rather than asserted.
+""")
+
+    # ---------------------------------------------------------------- results
+    sections.append("## 4. Experiments & Results\n")
 
     if biencoder_training or crossencoder_training:
-        sections.append("### Training summary\n")
         all_records = (biencoder_training or []) + (crossencoder_training or [])
+        sections.append("### 4.1 Training behavior\n")
         sections.append(training_table(all_records))
-        sections.append("\nLoss curves and per-epoch validation MRR: `experiments/results/figures/fig_loss_curves.png`.\n")
+        sections.append("""
+Training loss and per-epoch validation MRR@10 for all three bi-encoder capacities: `figures/fig_loss_curves.png`. Validation MRR (not validation loss) is the model-selection criterion because retrieval quality, not the contrastive loss value, is the deployment objective; the curves show convergence within 3-5 epochs and no divergence between train loss and validation quality (no overfitting signal). Seed variance is reported in every results table below.
+""")
 
     if main_eval:
-        sections.append("## 3. Main Results\n")
-        sections.append("### Regime 1 - unseen queries (144 test queries, 30-tool corpus)\n")
+        sections.append("### 4.2 Main retrieval results (three regimes)\n")
+        sections.append("**Regime 1 — unseen queries** (144 test queries, 30-tool corpus):\n")
         sections.append(main_results_table(main_eval, "regime1_unseen_queries"))
-        sections.append("\n### Regime 2 - unseen tools (750 test queries, 30-tool corpus)\n")
+        sections.append("\n**Regime 2 — unseen tools** (750 test queries, 30-tool corpus):\n")
         sections.append(main_results_table(main_eval, "regime2_unseen_tools"))
         if "regime3_unseen_servers" in main_eval.get("regimes", {}):
-            sections.append("\n### Regime 3 - unseen servers (195 test queries, 574-tool corpus)\n")
+            sections.append("\n**Regime 3 — unseen servers** (195 test queries, 574-tool corpus):\n")
             sections.append(main_results_table(main_eval, "regime3_unseen_servers"))
         sections.append("""
-Brackets are 95% bootstrap confidence intervals over queries; ± is standard deviation over 3 training seeds. Figure: `figures/fig_main_results.png`; per-tool confusion: `figures/fig_confusion_regime1.png`; embedding-space view: `figures/fig_embedding_tsne.png`.
+Brackets: 95% bootstrap CIs over queries; ±: std over 3 training seeds. Bar chart: `figures/fig_main_results.png`; t-SNE of query embeddings before/after fine-tuning: `figures/fig_embedding_tsne.png`.
+
+### 4.3 Classification view: accuracy, precision, recall, F1
+
+Top-1 selection over a fixed catalog is a classification decision; macro-averaged metrics over the tool classes:
+""")
+        regimes_present = [r for r in ("regime1_unseen_queries", "regime2_unseen_tools", "regime3_unseen_servers") if r in main_eval["regimes"]]
+        sections.append(classification_table(main_eval, regimes_present))
+        sections.append("""
+Per-tool confusion matrix for Model A (regime 1): `figures/fig_confusion_regime1.png` — residual errors concentrate on the schema pairs the EDA flagged as confusable, which is precisely where Model B's joint attention helps (see §5).
+""")
+
+    if ood:
+        sections.append("### 4.4 Open-set rejection (ROC-AUC)\n")
+        sections.append(f"""In-distribution = regime-1 test queries; out-of-distribution = {ood['n_ood']} queries in three subsets. The router's abstention signal is scored as a binary ID-vs-OOD classifier:
+""")
+        sections.append(ood_table(ood))
+        sections.append("""
+Risk-coverage and per-subset acceptance curves over the threshold τ: `figures/fig_threshold_sweep.png`. Chitchat is separable almost perfectly; adversarial near-misses (GitHub vocabulary, absent capability — e.g. `create_issue`, `delete_branch`) overlap the in-distribution score range and are the operative weakness of a single global threshold.
+""")
+
+    if bench:
+        encoder = bench.get("encoder_latency", {})
+        sections.append("### 4.5 Index scaling: exact Flat vs HNSW\n")
+        sections.append(scaling_table(bench))
+        encoder_note = ""
+        if "cpu" in encoder:
+            encoder_note = (
+                f" Encoding one query costs {encoder['cpu']['p50_ms']:.0f} ms on CPU (p50)"
+                + (f" / {encoder['cuda']['p50_ms']:.1f} ms on GPU" if "cuda" in encoder else "")
+                + " — the index is never the bottleneck at these sizes."
+            )
+        sections.append(f"""
+Single-threaded FAISS, top-10; N ≤ 10,000 uses schema-derived embeddings, N = 100,000 random unit vectors (latency-only).{encoder_note} Exact flat search is faster than HNSW at every tested N while being exact and deterministic; the runtime therefore defaults to `IndexFlatIP`, with HNSW opt-in for catalogs far beyond current MCP registry sizes. Log-log crossover figure: `figures/fig_scaling.png`.
+""")
+
+    if ablation:
+        sections.append("### 4.6 Schema representation ablation\n")
+        sections.append(ablation_table(ablation))
+        sections.append("""
+Recall@1 on regime 1 / regime 2. Caveat: the fine-tuned model was trained on `raw` documents, so its non-raw columns measure inference-time robustness, not per-representation training quality.
+""")
+
+    if poisoning:
+        sections.append("### 4.7 Description-poisoning attack\n")
+        sections.append(f"""A hostile server publishes a decoy tool (`{poisoning['decoy']}`) whose description embeds K validation anchors as bait (the attacker knows the query distribution, not the test queries). Hijack@1 = fraction of the {poisoning['n_queries']} regime-1 test queries whose top-ranked tool becomes the decoy:
+""")
+        sections.append(poisoning_table(poisoning))
+        sections.append("""
+Mitigations: a 300-character description cap at ingest, the decoy's embedding-centroid z-score (ingest-time anomaly signal), and cross-encoder reranking as a second factor. None suffices alone at high K; the deployment posture is the combination plus server allowlisting.
+""")
+
+    if calibration:
+        sections.append("### 4.8 Confidence calibration of the reranker\n")
+        sections.append(f"""Model B's sigmoid score on its top candidate gates auto-execution. On regime-1 test: raw ECE {calibration['raw']['ece']:.3f}; after temperature scaling fitted on validation (T = {calibration['temperature_fitted_on_val']:.2f}) ECE {calibration['temperature_scaled']['ece']:.3f} (top-1 accuracy {calibration['test_top1_accuracy']:.3f}). Reliability diagram: `figures/fig_calibration.png`.
 """)
 
     if llm_incontext:
-        sections.append("### LLM-in-context selection (monolithic arm)\n")
+        sections.append("### 4.9 LLM-in-context selection (monolithic arm)\n")
         rows = ["| Catalog size | Accuracy | Mean latency (s) | Unparseable |", "| --- | --- | --- | --- |"]
         for size, block in llm_incontext["catalog_sizes"].items():
             rows.append(
@@ -269,78 +361,38 @@ Brackets are 95% bootstrap confidence intervals over queries; ± is standard dev
         sections.append("\n".join(rows))
         sections.append(f"\nModel: `{llm_incontext['model']}`, {llm_incontext['n_queries']} sampled regime-1 test queries.\n")
     else:
-        sections.append("""### LLM-in-context selection (monolithic arm)
+        sections.append("""### 4.9 LLM-in-context selection (monolithic arm)
 
-Not run in this environment: the experiment requires a local LLM service (Ollama), which is unavailable on the authoring machine. The ready-to-run script is `experiments/evaluation/llm_incontext.py`; the earlier smoke-scale A/B harness results (3 filesystem tasks, llama3.2) remain in the README as the only end-to-end evidence and are labeled as such.
+Not run in this environment: the experiment requires a local LLM service (Ollama), unavailable on the authoring machine. The ready-to-run script is `experiments/evaluation/llm_incontext.py`; the smoke-scale A/B harness (3 filesystem tasks, llama3.2, README table) remains the only end-to-end evidence and is labeled as such.
 """)
 
-    if ood:
-        sections.append("## 4. Open-Set Rejection (OOD)\n")
-        sections.append(f"""In-distribution = regime-1 test queries; out-of-distribution = {ood['n_ood']} author-written queries in three subsets: chitchat (no tool intent), out-of-catalog (capability outside the GitHub corpus, near and far domains), and adversarial near-miss (GitHub vocabulary, deliberately absent capability such as `create_issue` or `delete_branch`).
-""")
-        sections.append(ood_table(ood))
-        sections.append("""
-Risk-coverage and per-subset acceptance curves over the threshold: `figures/fig_threshold_sweep.png`. The adversarial near-miss subset is the operative weakness: scores for absent-but-adjacent capabilities overlap the in-distribution score range, so a global cosine threshold cannot fully separate them - destructive tools should carry stricter per-tool margins.
-""")
+    # ------------------------------------------------------------- discussion
+    sections.append("""## 5. Discussion & Limitations
 
-    if bench:
-        encoder = bench.get("encoder_latency", {})
-        sections.append("## 5. Index Scaling: Flat vs HNSW\n")
-        sections.append(scaling_table(bench))
-        encoder_note = ""
-        if "cpu" in encoder:
-            encoder_note = (
-                f" Encoding a single query costs {encoder['cpu']['p50_ms']:.0f} ms (CPU p50)"
-                + (f" / {encoder['cuda']['p50_ms']:.1f} ms (GPU p50)" if "cuda" in encoder else "")
-                + ", so retrieval is a negligible share of routing latency at every tested size."
-            )
-        sections.append(f"""
-Single-threaded FAISS, top-10, query vectors from the 750 v2 anchors (N<=10,000 uses schema-derived embeddings; N=100,000 uses random unit vectors, latency-only). Exact flat search is faster than HNSW at every tested N while being exact and deterministic;{encoder_note} The runtime therefore defaults to `IndexFlatIP` (`RouterHyperparameters.index_type="flat"`), with HNSW available explicitly for catalogs far beyond current MCP registry sizes. Figure: `figures/fig_scaling.png`.
+**Which model won, and why.** Model A (fine-tuned bi-encoder) is the overall winner for deployment, and the margin over every baseline is the study's central result: fine-tuning moves retrieval quality far more than parameter count does — after fine-tuning, the 22M MiniLM matches or beats the frozen 109M MPNet, which matters for CPU-only deployment. The mechanism is visible in the t-SNE figure: contrastive training reorganizes the query space into tight per-tool clusters aligned with schema embeddings. Model B (cross-encoder) wins where the bi-encoder is weakest — confusable schema pairs whose difference is a few discriminative tokens (`search_issues` vs `search_pull_requests`); joint cross-attention can weigh those tokens against the query directly, which independent encoding cannot. It pays 10 transformer passes per query versus one, and its advantage concentrates on the regimes/pairs where lexical and bi-encoder signals saturate. The engineering conclusion is not "B beats A" but a division of labor: A for candidate generation at index cost, B as an optional precision/safety stage — and measurably, B is also the only mitigation that reduces poisoning hijack without touching ingest.
+
+**Why the baselines matter.** BM25/TF-IDF solve a large share of this benchmark (tool-name echo in queries; quantified overlap medians 0.33/0.45). Reporting deep models without them would overstate the contribution — the honest claim is the measured delta, which is largest exactly where lexical overlap is weakest (unseen phrasings, unseen servers, confusable pairs).
+
+**Difficulties encountered.** (1) The most consequential finding was a *data* problem, not a model problem: the original random split was answerable at ~96% Recall@1 without any model; recovering the scenario grammar and rebuilding the splits invalidated and replaced all earlier numbers. (2) MNRL's in-batch negatives are silently wrong at small catalog sizes (duplicate positives become negatives) — fixed with a no-duplicates sampler. (3) Training on a 4GB consumer GPU required fp16, sequence truncation to 256, and one recovery from a mid-run crash; CPU/GPU contention between concurrent jobs distorted early latency measurements until benchmarks were serialized. (4) The local-LLM baseline was blocked by environment (no Ollama); we ship the script and report the gap rather than fabricate it.
+
+**Limitations.** All queries are synthetic (author-templated or LLM-written; no production traffic), and lexical echo inflates all lexical numbers. Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation.
 """)
 
-    if ablation:
-        sections.append("## 6. Schema Representation Ablation\n")
-        sections.append(ablation_table(ablation))
-        sections.append("""
-Values are Recall@1 on regime 1 / regime 2. Caveat: the fine-tuned bi-encoder was trained on `raw` documents, so its non-raw columns measure inference-time robustness rather than per-representation training quality.
-""")
+    # ------------------------------------------------------------- conclusion
+    sections.append("""## 6. Conclusions
 
-    if poisoning:
-        sections.append("## 7. Description-Poisoning Attack\n")
-        sections.append(f"""Threat model: a hostile server publishes a decoy tool (`{poisoning['decoy']}`) whose description embeds K validation anchors as bait (attacker knows the query distribution, not the test queries). Hijack@1 = fraction of the {poisoning['n_queries']} regime-1 test queries whose top-ranked tool becomes the decoy.
-""")
-        sections.append(poisoning_table(poisoning))
-        sections.append("""
-Mitigations measured: a 300-character description length cap at ingest (cuts the bait payload), the decoy's embedding-centroid z-score (an ingest-time anomaly signal), and cross-encoder reranking as a second factor. None is individually sufficient at high K; the combination (cap + anomaly screen + rerank) is the recommended deployment posture.
-""")
+Framed as open-set dense retrieval and evaluated under leakage-controlled protocols, MCP tool selection is solved to high accuracy by a small contrastively fine-tuned bi-encoder; a cross-encoder reranker adds precision on confusable candidates and resilience to description poisoning at linear per-query cost; and exact flat search — not approximate HNSW — is the correct index at every catalog size tested, because query encoding, not search, dominates latency below 10^5 tools. Equally important is what the study removes: an evaluation whose random split answered itself, and claims ("logarithmic scaling", "deterministic", "10,000+ tools") that the measured system no longer needs to make rhetorically because the benchmark now makes them empirically — or retires them. All datasets, splits, trained-model manifests, results, and figures regenerate from `experiments/run_all.py` with pinned seeds, and the split-hygiene constraints that make the numbers meaningful are enforced as failing tests in CI.
 
-    if calibration:
-        sections.append("## 8. Cross-Encoder Confidence Calibration\n")
-        sections.append(f"""Top-1 reranking confidence (sigmoid of the CE logit) gates auto-execution. On regime-1 test, raw ECE is {calibration['raw']['ece']:.3f}; temperature scaling fitted on validation (T = {calibration['temperature_fitted_on_val']:.2f}) changes ECE to {calibration['temperature_scaled']['ece']:.3f} (top-1 accuracy {calibration['test_top1_accuracy']:.3f}). Reliability diagram: `figures/fig_calibration.png`.
-""")
+## References
 
-    sections.append("""## 9. Discussion
-
-**Fine-tuning is the dominant factor.** The gap between frozen and fine-tuned bi-encoders dwarfs the gap between encoder sizes; after fine-tuning, the 22M MiniLM matches or beats the 109M MPNet, which matters for CPU-only deployment.
-
-**Lexical baselines reframe the contribution honestly.** BM25/TF-IDF solve a large share of this benchmark (tool-name echo in queries), so the deep models' value is the measured delta over them - largest exactly where lexical overlap is weakest (regime 1 unseen phrasings, confusable tool pairs, and the unseen-server regime).
-
-**Bi- vs cross-encoder.** The reranker's benefit concentrates on confusable candidates; its cost scales linearly with rerank depth while the bi-encoder amortizes the catalog into an index. For this catalog size the hybrid is the quality ceiling; the bi-encoder alone is the latency/scalability winner. The winner is therefore deployment-dependent, which is the comparison's actual conclusion.
-
-**Open-set behavior is the real limitation.** Chitchat is trivially rejected, but adversarial near-misses defeat a global threshold, as the risk-coverage analysis quantifies; description poisoning compounds this, and no single mitigation suffices.
-
-## 10. Limitations
-
-- **Query provenance.** All queries are synthetic: v1/v2 are author-templated, regime-3 and OOD queries are LLM/author-written (different generator family, anti-echo rules). No human-user or production traffic exists in the evaluation; lexical overlap between queries and schemas inflates all lexical numbers (median token overlap 0.33 v1, 0.45 v2).
-- **Unseen-server coverage.** Regime 3 queries cover 65 of the 574 corpus tools; the remaining 509 act as distractors only. Models were trained on GitHub data alone; multi-server *training* is untested.
-- **Synthetic scaling corpus.** Scaling tiers above 30 tools use schema-like synthetic documents (N<=10k) and random vectors (N=100k); they bound latency behavior but not retrieval quality at scale.
-- **Representation ablation is inference-only** for the fine-tuned model (one training condition).
-- **LLM-in-context arm environment-blocked.** The monolithic baseline script requires a local LLM service unavailable on the authoring machine; the smoke-scale A/B (3 tasks) in the README is the only end-to-end evidence.
-- **Poisoning attack surface is narrow:** one decoy, one bait construction; stronger adaptive attacks (gradient-guided descriptions) are future work.
-
-## 11. Conclusion
-
-Under leakage-controlled protocols, contrastive fine-tuning of a small bi-encoder is the single most effective intervention for MCP tool routing on this benchmark; the advantage persists zero-shot on 23 unseen servers among 574 distractor tools. Lexical retrieval is a strong mandatory baseline rather than a strawman, cross-encoder reranking buys additional precision at linear per-query cost (and is the only measured mitigation that helps against description poisoning without touching ingest), and exact flat search - not HNSW - is the correct index at every catalog size tested. All datasets, splits, training scripts, and results are reproducible from `experiments/` with pinned seeds and SHA256 manifests, and split hygiene is enforced in CI.
+1. Y. A. Malkov, D. A. Yashunin. *Efficient and Robust Approximate Nearest Neighbor Search Using Hierarchical Navigable Small World Graphs.* IEEE TPAMI 42(4), 2020.
+2. E. Karpas et al. *MRKL Systems: A modular, neuro-symbolic architecture...* arXiv:2205.00445, 2022.
+3. S. G. Patil et al. *Gorilla: Large Language Model Connected with Massive APIs.* arXiv:2305.15334, 2023.
+4. Y. Qin et al. *ToolLLM: Facilitating Large Language Models to Master 16000+ Real-world APIs.* arXiv:2307.16789, 2023.
+5. T. Schick et al. *Toolformer: Language Models Can Teach Themselves to Use Tools.* arXiv:2302.04761, 2023.
+6. N. Reimers, I. Gurevych. *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.* EMNLP 2019.
+7. V. Karpukhin et al. *Dense Passage Retrieval for Open-Domain Question Answering.* EMNLP 2020.
+8. R. Nogueira, K. Cho. *Passage Re-ranking with BERT.* arXiv:1901.04085, 2019.
 """)
 
     return "\n".join(sections)

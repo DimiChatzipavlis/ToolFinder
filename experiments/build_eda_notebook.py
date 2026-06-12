@@ -67,7 +67,7 @@ queries.head(3)""",
     ),
     (
         "markdown",
-        "## 1. Dataset card: composition and balance",
+        "## 1. Dataset card: composition, balance, and data quality",
     ),
     (
         "code",
@@ -78,6 +78,47 @@ queries.head(3)""",
 )
 card["queries_per_tool"] = card["n_queries"] // card["n_tools"]
 card""",
+    ),
+    (
+        "markdown",
+        """### Data quality: missing values and duplicates
+
+The cleaning step verifies rather than imputes: the corpus is checked for
+missing values, duplicate anchors, and unparsable schema JSON. Anything found
+here would be a dataset-construction bug, not something to fill in.""",
+    ),
+    (
+        "code",
+        """missing = queries.isna().sum()
+print("missing values per column:")
+print(missing.to_string())
+print(f"\\nduplicate anchors: {queries['anchor'].duplicated().sum()}")
+unparsable = 0
+for schema in queries["positive_schema"]:
+    try:
+        json.loads(schema)
+    except json.JSONDecodeError:
+        unparsable += 1
+print(f"unparsable schema payloads: {unparsable}")
+assert missing.sum() == 0 and unparsable == 0, "data quality violation"
+print("\\nverdict: no missing values, no unparsable schemas; no imputation required")""",
+    ),
+    (
+        "markdown",
+        "### Class distribution (queries per tool)",
+    ),
+    (
+        "code",
+        """per_tool_counts = queries.groupby(["dataset", "tool"]).size().reset_index(name="n")
+fig, ax = plt.subplots(figsize=(10, 3.2))
+colors = per_tool_counts["dataset"].map({"v1": "#4878a8", "v2": "#e1812c"})
+ax.bar(range(len(per_tool_counts)), per_tool_counts["n"], color=colors)
+ax.set_xticks(range(len(per_tool_counts)))
+ax.set_xticklabels(per_tool_counts["tool"], rotation=90, fontsize=6)
+ax.set_ylabel("queries")
+ax.set_title("Class balance: 50 queries per tool by construction (blue=v1 train-eligible, orange=v2 eval-only)")
+plt.show()
+print(per_tool_counts["n"].describe().loc[["min", "max"]].to_string())""",
     ),
     (
         "code",

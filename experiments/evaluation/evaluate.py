@@ -91,6 +91,21 @@ def load_regime(regime: str) -> tuple[dict, pd.DataFrame, list[str], list[str]]:
     return split, queries, corpus_tools, corpus_texts
 
 
+def classification_block(predictions: list[str], truths: list[str]) -> dict:
+    """Top-1 selection viewed as classification: accuracy + macro P/R/F1."""
+    from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+
+    macro_p, macro_r, macro_f1, _ = precision_recall_fscore_support(
+        truths, predictions, average="macro", zero_division=0
+    )
+    return {
+        "accuracy": round(float(accuracy_score(truths, predictions)), 4),
+        "macro_precision": round(float(macro_p), 4),
+        "macro_recall": round(float(macro_r), 4),
+        "macro_f1": round(float(macro_f1), 4),
+    }
+
+
 def evaluate_system(system, queries: pd.DataFrame, test_ids: list[str]) -> dict:
     anchors = queries.loc[test_ids, "anchor"].tolist()
     truths = queries.loc[test_ids, "tool"].tolist()
@@ -104,6 +119,9 @@ def evaluate_system(system, queries: pd.DataFrame, test_ids: list[str]) -> dict:
 
     summary = metrics.summarize(rankings, truths)
     summary["latency_ms_per_query"] = round(elapsed_ms / len(anchors), 3)
+    summary["classification"] = classification_block(
+        [ranking[0] for ranking in rankings], truths
+    )
     ranks = metrics.ranks_from_rankings(rankings, truths)
     summary["per_query"] = {
         qid: (int(rank) if np.isfinite(rank) else None)
