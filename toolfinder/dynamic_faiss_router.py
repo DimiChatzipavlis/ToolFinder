@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Semantic routing for MCP tools backed by FAISS similarity search."""
+
+from __future__ import annotations
 
 import copy
 import gc

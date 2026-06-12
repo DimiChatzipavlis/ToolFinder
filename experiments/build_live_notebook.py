@@ -54,7 +54,9 @@ accuracy. The full multi-seed results are loaded from
     ),
     (
         "code",
-        f"""import os, sys, subprocess
+        f"""import os
+import subprocess
+import sys
 from pathlib import Path
 
 if Path.cwd().name == "notebooks":
@@ -65,7 +67,11 @@ if not Path("toolfinder").exists():
     os.chdir("ToolFinder")
 
 try:
-    import faiss, sentence_transformers, pandas, sklearn, matplotlib  # noqa: F401
+    import faiss  # noqa: F401
+    import matplotlib  # noqa: F401
+    import pandas  # noqa: F401
+    import sentence_transformers  # noqa: F401
+    import sklearn  # noqa: F401
 except ImportError:
     print("installing ToolFinder + experiment dependencies (a few minutes on Colab)...")
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[experiments]"], check=True)
@@ -86,7 +92,7 @@ why approximate search buys nothing at these catalog sizes.""",
     (
         "code",
         """import json
-from toolfinder import UniversalMCPRouter, RouteNotFoundError, to_openai_tools
+from toolfinder import UniversalMCPRouter, to_openai_tools
 
 corpus = json.loads((REPO_ROOT / "experiments/data/corpus.json").read_text(encoding="utf-8"))
 router = UniversalMCPRouter(model_name="sentence-transformers/all-MiniLM-L6-v2")

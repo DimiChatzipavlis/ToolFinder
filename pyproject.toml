@@ -33,3 +33,15 @@ experiments = [
 
 [tool.setuptools.packages.find]
 include = ["toolfinder*", "Enterprise*"]
+
+[tool.ruff]
+line-length = 120
+# Executed notebooks are generated artifacts (see experiments/build_*_notebook.py);
+# lint the generators, not the generated cells.
+extend-exclude = ["notebooks", "examples/ToolFinder_StepByStep.ipynb"]
+
+[tool.ruff.lint.per-file-ignores]
+# Standalone scripts bootstrap sys.path before importing the local packages.
+"experiments/**" = ["E402"]
+"examples/**" = ["E402"]
+"Enterprise/examples/**" = ["E402"]

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Autonomous MCP agent orchestration with ReAct-style tool execution."""
+
+from __future__ import annotations
 
 import asyncio
 import contextlib

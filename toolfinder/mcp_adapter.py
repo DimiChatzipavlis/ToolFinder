@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Dynamic stdio MCP client adapter with process lifecycle management."""
+
+from __future__ import annotations
 
 import asyncio
 import contextlib

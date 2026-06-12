@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """End-to-end hybrid pipeline: ToolFinder retrieval gate + OpenClaw agent execution.
 
 This module provides a unified pipeline that:
@@ -8,6 +6,8 @@ This module provides a unified pipeline that:
 3. Launches an OpenClaw agent session with the constrained tool set.
 4. Falls back to the existing heuristic orchestrator if openclaw fails.
 """
+
+from __future__ import annotations
 
 import asyncio
 import copy

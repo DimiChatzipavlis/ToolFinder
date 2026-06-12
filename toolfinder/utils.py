@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Utility helpers for resilient JSON extraction from model output."""
+
+from __future__ import annotations
 
 import ast
 import json
