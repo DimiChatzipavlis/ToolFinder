@@ -36,7 +36,7 @@ This matters beyond convenience. Tool selection is a safety boundary: a router t
 
 **Preprocessing / normalization.** Schemas are serialized as canonical sorted-key JSON (the `raw` representation; alternatives are ablated in §4.6). Identifier separators are expanded for lexical systems (`add_issue_comment` → "add issue comment"). All embeddings are L2-normalized so inner product equals cosine similarity.
 
-**Splits (leakage control).** *Regime 1 — unseen queries:* scenario-grouped 460/146/144 over the 15 v1 tools (no scenario crosses buckets). *Regime 2 — unseen tools:* all 750 v2 queries; their 15 tools never appear in training; ranking is against the full 30-tool corpus so trained tools act as distractors. *Regime 3 — unseen servers:* the 195 multi-server queries against a 574-tool merged corpus; training data remains GitHub-only. Constraints are enforced by `tests/test_split_hygiene.py` in CI.
+**Splits (leakage control).** *Regime 1 — unseen queries:* scenario-grouped 460/146/144 over the 15 v1 tools (no scenario crosses buckets). *Regime 1b — template-disjoint control:* because the grammar is `template × scenario`, regime 1 still shares the ten surface templates per tool across train and test, so a model could in principle score perfectly by memorizing template→tool mappings while ignoring the scenario clause; regime 1b holds out templates *and* scenarios jointly (304/42/40 rows after discarding mixed blocks) and is the controlled measurement of in-grammar generalization. Regime-1 numbers are therefore reported as in-grammar **upper bounds**. *Regime 2 — unseen tools:* all 750 v2 queries; their 15 tools never appear in training; ranking is against the full 30-tool corpus so trained tools act as distractors. *Regime 3 — unseen servers:* the 195 multi-server queries against a 574-tool merged corpus; training data remains GitHub-only. All constraints, including double disjointness for 1b, are enforced by `tests/test_split_hygiene.py` in CI.
 
 ### 3.2 Model A — fine-tuned bi-encoder
 
@@ -121,6 +121,20 @@ Training loss and per-epoch validation MRR@10 for all three bi-encoder capacitie
 | **Model B: FT MiniLM + CE rerank** (3 seeds) | 0.632 ± 0.009 | 0.863 ± 0.009 | 0.753 ± 0.005 | 0.800 ± 0.003 |
 
 Brackets: 95% bootstrap CIs over queries; ±: std over 3 training seeds. Bar chart: `figures/fig_main_results.png`; t-SNE of query embeddings before/after fine-tuning: `figures/fig_embedding_tsne.png`.
+
+**Template-disjoint control (regime 1b).** Regime 1's near-perfect scores are in-grammar upper bounds: its test rows reuse training-set surface templates. Retraining on the doubly-disjoint split (templates and scenarios both unseen; 40 test rows) gives the controlled number, with the 1-NN-over-training-queries probe quantifying residual surface leakage on each split:
+
+| System | R@1 | R@3 | MRR |
+| --- | --- | --- | --- |
+| Random | 0.025 [0.000, 0.075] | 0.025 [0.000, 0.075] | 0.104 [0.070, 0.161] |
+| 1-NN over training queries (leakage probe) | 0.650 [0.500, 0.800] | 0.875 [0.750, 0.975] | 0.774 [0.674, 0.877] |
+| BM25 | 0.475 [0.325, 0.625] | 0.650 [0.500, 0.800] | 0.588 [0.465, 0.711] |
+| TF-IDF (char 3-5g) | 0.425 [0.275, 0.575] | 0.725 [0.575, 0.850] | 0.603 [0.493, 0.711] |
+| Frozen MiniLM-L6 | 0.325 [0.200, 0.475] | 0.600 [0.450, 0.750] | 0.498 [0.385, 0.615] |
+| **FT MiniLM, retrained on 1b** (3 seeds) | 0.958 ± 0.012 | 1.000 ± 0.000 | 0.978 ± 0.007 |
+| *(same probe on regime 1, for contrast)* | 0.868 [0.806, 0.917] | 0.979 [0.951, 1.000] | 0.922 [0.886, 0.952] |
+
+**Statistical significance.** Paired bootstrap over test queries (10,000 resamples) of the fine-tuned MiniLM against BM25, per seed and regime — the fine-tuning advantage is significant everywhere, with confidence intervals excluding zero: regime1 unseen queries: ΔR@1 = +0.417..+0.424 (95% CI [+0.340, +0.507] across seeds), p ≤ 0.0001; regime2 unseen tools: ΔR@1 = +0.147..+0.155 (95% CI [+0.113, +0.189] across seeds), p ≤ 0.0001; regime3 unseen servers: ΔR@1 = +0.169..+0.190 (95% CI [+0.092, +0.267] across seeds), p ≤ 0.0001. Full table: `results/significance.json`.
 
 ### 4.3 Classification view: accuracy, precision, recall, F1
 
@@ -209,7 +223,7 @@ Not run in this environment: the experiment requires a local LLM service (Ollama
 
 **Difficulties encountered.** (1) The most consequential finding was a *data* problem, not a model problem: the original random split was answerable at ~96% Recall@1 without any model; recovering the scenario grammar and rebuilding the splits invalidated and replaced all earlier numbers. (2) MNRL's in-batch negatives are silently wrong at small catalog sizes (duplicate positives become negatives) — fixed with a no-duplicates sampler. (3) Training on a 4GB consumer GPU required fp16, sequence truncation to 256, and one recovery from a mid-run crash; CPU/GPU contention between concurrent jobs distorted early latency measurements until benchmarks were serialized. (4) The local-LLM baseline was blocked by environment (no Ollama); we ship the script and report the gap rather than fabricate it.
 
-**Limitations.** All queries are synthetic (author-templated or LLM-written; no production traffic), and lexical echo inflates all lexical numbers. Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation.
+**Limitations.** All queries are synthetic with a *known generation grammar* (author-templated or LLM-written; no production traffic, no human-written test set): regime-1 numbers are in-grammar upper bounds because surface templates cross the split — quantified and controlled by regime 1b, but the grammar itself remains the data's ceiling, and lexical echo inflates all lexical numbers. The library's **shipped default is the zero-shot encoder, not the evaluated best**: the fine-tuned weights that produce the headline numbers are regenerable from pinned seeds but not committed, and zero-shot dense retrieval loses to BM25 here (disclosed in README, router docstring, and STATUS.md). The LLM-in-context arm is environment-blocked (script ships, unrun). Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation. Latency numbers are single-hardware, English-only queries throughout.
 
 ## 6. Conclusions
 

@@ -254,10 +254,13 @@ def build() -> nbformat.NotebookNode:
 
 
 def main() -> None:
+    from experiments.build_live_notebook import scrub_user_paths
+
     NOTEBOOK_DIR.mkdir(exist_ok=True)
     notebook = build()
     client = NotebookClient(notebook, timeout=600, kernel_name="python3", resources={"metadata": {"path": str(NOTEBOOK_DIR)}})
     client.execute()
+    scrub_user_paths(notebook)
     out_path = NOTEBOOK_DIR / "01_eda.ipynb"
     nbformat.write(notebook, out_path)
     executed_code_cells = sum(1 for cell in notebook.cells if cell.cell_type == "code" and cell.outputs)

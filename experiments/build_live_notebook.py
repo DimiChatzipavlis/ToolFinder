@@ -349,6 +349,23 @@ def build() -> nbformat.NotebookNode:
     return notebook
 
 
+def scrub_user_paths(notebook: nbformat.NotebookNode) -> None:
+    """Replace the local home directory in any saved output with '~'.
+
+    Library warnings (e.g. tqdm on stderr) can embed absolute site-packages
+    paths; committed outputs must not reveal the author's username.
+    """
+    home = str(Path.home())
+    variants = [home, home.replace("\\", "\\\\"), home.replace("\\", "/")]
+    for cell in notebook.cells:
+        for output in cell.get("outputs", []):
+            if "text" in output:
+                text = "".join(output["text"]) if isinstance(output["text"], list) else output["text"]
+                for variant in variants:
+                    text = text.replace(variant, "~")
+                output["text"] = text
+
+
 def main() -> None:
     NOTEBOOK_DIR.mkdir(exist_ok=True)
     notebook = build()
@@ -357,6 +374,7 @@ def main() -> None:
         resources={"metadata": {"path": str(NOTEBOOK_DIR)}},
     )
     client.execute()
+    scrub_user_paths(notebook)
     out_path = NOTEBOOK_DIR / "02_toolfinder_live.ipynb"
     nbformat.write(notebook, out_path)
     executed = sum(1 for cell in notebook.cells if cell.cell_type == "code" and cell.outputs)

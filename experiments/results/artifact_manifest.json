@@ -8,8 +8,9 @@
   "experiments/data/ood/chitchat.csv": "27376560ad2bfd43dd93f2b59bf624400b8fd505adf8dd4f1880e2371d704be8",
   "experiments/data/ood/out_of_catalog.csv": "dbcf48dd2268aecfa0f61ccaa4ca5a340b796fad58fcab6e9924fdc747206b2a",
   "experiments/data/queries_multiserver.csv": "5fdc543c5ff0db5a46ad888d73aa8fb5928ad66523b15df12912684532cd016e",
-  "experiments/data/queries_with_scenarios.csv": "4a2ecec6ec8d473181deece2323c4f6e59554f5ecb7a206ff55ac35bf2d2e244",
+  "experiments/data/queries_with_scenarios.csv": "a70aa0c3716bb007145185348a9137d4a721234b6b326e101d0ec3597077e042",
   "experiments/data/splits/regime1_unseen_queries.json": "bd0fbd11f3429d5570c1eff82d91c8ecd48f76f190efc4211e969c1f01d276bd",
+  "experiments/data/splits/regime1b_template_disjoint.json": "6443e13496cca29b3cc10cb7b5e32eca036d6f1678f9886bcc8179b912e53d44",
   "experiments/data/splits/regime2_unseen_tools.json": "7f5fe648221fccefc5eb79ff51f57c19ea8814f395c87b446a45acf35b966f5b",
   "experiments/data/splits/regime3_unseen_servers.json": "331712b5223e9c487ff90e8bbd3cca1dd32c0a71793a944dde31cfadf762233a"
  },
@@ -41,6 +42,15 @@
   "experiments/artifacts/biencoder/mpnet/seed42/final/1_Pooling/config.json": "ec0eb6432a18121e7fdd1151be8e436cc894734d489a6f2c5bb6b446e2727017",
   "experiments/artifacts/biencoder/mpnet/seed42/final/config.json": "7163f992a904b51c7dae1af8dc647f8d123f50d82e2353ba326445a23ede54aa",
   "experiments/artifacts/biencoder/mpnet/seed42/final/model.safetensors": "03ca51be9fd9a1ffbdc627ae37d790337ab27fd09ef45356a1d346c2dd023a73",
+  "experiments/artifacts/biencoder_r1b/minilm/seed13/final/1_Pooling/config.json": "b4105bf48c5257a542a7e1968cef220b3ecd49ae24943143279650c4ac6e30a0",
+  "experiments/artifacts/biencoder_r1b/minilm/seed13/final/config.json": "520cd066b6272f0dc311dfb07217f020f5b16683d5de4b5db969a56926038a37",
+  "experiments/artifacts/biencoder_r1b/minilm/seed13/final/model.safetensors": "cfd1d54457fc72adcf40a0acc76daf564effe0d6163b12d7ce8f445bd93ade5e",
+  "experiments/artifacts/biencoder_r1b/minilm/seed1337/final/1_Pooling/config.json": "b4105bf48c5257a542a7e1968cef220b3ecd49ae24943143279650c4ac6e30a0",
+  "experiments/artifacts/biencoder_r1b/minilm/seed1337/final/config.json": "520cd066b6272f0dc311dfb07217f020f5b16683d5de4b5db969a56926038a37",
+  "experiments/artifacts/biencoder_r1b/minilm/seed1337/final/model.safetensors": "1a6c6248b59cec3e97e48c0ffdf6db253762b44312c2b6cbb48233c2d8003796",
+  "experiments/artifacts/biencoder_r1b/minilm/seed42/final/1_Pooling/config.json": "b4105bf48c5257a542a7e1968cef220b3ecd49ae24943143279650c4ac6e30a0",
+  "experiments/artifacts/biencoder_r1b/minilm/seed42/final/config.json": "520cd066b6272f0dc311dfb07217f020f5b16683d5de4b5db969a56926038a37",
+  "experiments/artifacts/biencoder_r1b/minilm/seed42/final/model.safetensors": "3ba6a47af85f77aa3ece6746591e6dbaf36b62cb3223889aa823a52958388a00",
   "experiments/artifacts/crossencoder/seed13/final/config.json": "c0b8c4f3ae7dd824a95e4abb8f135b60aae35d0be129aa2afb3c2415426a02d2",
   "experiments/artifacts/crossencoder/seed13/final/model.safetensors": "9aefaf51ee761c7a4e1672074c0be0845058892d00f02a0088df80b2e8c522b6",
   "experiments/artifacts/crossencoder/seed1337/final/config.json": "c0b8c4f3ae7dd824a95e4abb8f135b60aae35d0be129aa2afb3c2415426a02d2",
@@ -54,14 +64,17 @@
  },
  "results": {
   "experiments/results/ablation_representation.json": "16477b9732df27c5e35e548d9f56c70c8f66e9f3b07da5403deceb39ec4207b8",
-  "experiments/results/artifact_manifest.json": "afb3edc35196cd84f8b8ed303bf30fe3475aa2f5f7874a4c81c70f751819edf8",
+  "experiments/results/artifact_manifest.json": "001d8b667e15ba83d1ad0ff978c53ebf4ee365bfd30e0d354ac0fdaae7a3cbf8",
   "experiments/results/biencoder_training.json": "20dcfa22b64543d867d51c0decc6b05c5c410d7f762e688ca840e856e5f22418",
+  "experiments/results/biencoder_training_r1b.json": "350ac4f2cc24c24e183b54b3dc34fc698168aee0ca3efd4dd371ddb1e58c0c78",
   "experiments/results/calibration.json": "32d1e38a3692d1de29334976c13683213f51c4c58b2b93138de5117295765245",
   "experiments/results/crossencoder_training.json": "3c114a2fde03a4f0a0a82a79768dd7adb71d2dac4e4945c60bc33b964819e3e8",
   "experiments/results/diagnostics/main_eval_per_query.json": "9231611c81cb58b9ed1a7d4ee68a5535b8933edf6e256ed5ea90eaf316254cdc",
   "experiments/results/main_eval.json": "c894614100e469ca264934600056d5ceaf4cf3038b3d26113826c661c25a6186",
   "experiments/results/ood_eval.json": "3f5ee1030173c69e0dde7dda6a149c924e7394cc16c0fde970f06ac91d4d9cad",
   "experiments/results/poisoning.json": "998e81ba3a534c44beec3707c129b43783091817c435614df0cf504f4fb3175b",
-  "experiments/results/scaling_bench.json": "c4d4c4cddbe161280b52efdd92e8dd50e1edc9059d7c2e9e66b3b00f14e09f3c"
+  "experiments/results/scaling_bench.json": "c4d4c4cddbe161280b52efdd92e8dd50e1edc9059d7c2e9e66b3b00f14e09f3c",
+  "experiments/results/significance.json": "103db5e46e7350c2555a1b6e32bd3220a5f18201f93fd59c8f22263b22aa3dd0",
+  "experiments/results/template_disjoint_eval.json": "cbfa9a9f0c1f94c7b446e2942db2d5cc99c23e005129858a234c9cb3123c1fb7"
  }
 }
