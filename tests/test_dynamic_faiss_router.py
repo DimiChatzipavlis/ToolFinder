@@ -107,3 +107,41 @@ def test_to_openai_tools_formats_bindable_schema(monkeypatch: pytest.MonkeyPatch
     assert bindable[0]["type"] == "function"
     assert bindable[0]["function"]["name"] == "alpha_tool"
     assert "parameters" in bindable[0]["function"]
+
+
+def test_set_catalog_accepts_raw_mcp_payloads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raw MCP payloads use 'name', not 'tool_name'; set_catalog must normalize
+    them through the same path as add_tool instead of crashing in build_index."""
+    monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)
+    router = router_module.UniversalMCPRouter(model_name="dummy")
+
+    count = router.set_catalog(
+        {
+            "test-server": [
+                {
+                    "name": "alpha_tool",
+                    "description": "Tool for alpha query",
+                    "inputSchema": {"type": "object", "properties": {"x": {"type": "string"}}},
+                }
+            ]
+        }
+    )
+
+    assert count == 1
+    result = router.route("alpha query")
+    assert result.tool_name == "alpha_tool"
+    assert result.schema["inputSchema"]["additionalProperties"] is False
+
+
+def test_singleton_release_is_reference_counted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tearing down one router must not evict a model another live router shares."""
+    monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)
+    first = router_module.UniversalMCPRouter(model_name="dummy-shared")
+    second = router_module.UniversalMCPRouter(model_name="dummy-shared")
+    key = ("dummy-shared", first.device)
+
+    first.teardown()
+    assert key in router_module._EmbeddingModelSingleton._models
+
+    second.teardown()
+    assert key not in router_module._EmbeddingModelSingleton._models

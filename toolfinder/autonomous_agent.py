@@ -377,25 +377,39 @@ class AutonomousMCPAgent:
                 # Arguments are canonicalized (sorted keys, fixed separators) so
                 # semantically identical payloads with different key order cannot
                 # evade the duplicate guard.
+                #
+                # Design tradeoff (documented, not hidden): the guard blocks any
+                # exact repeat of (server, tool, arguments) for the rest of the
+                # run, which also forbids legitimate re-invocations such as
+                # polling a job status twice. For this agent's bounded ReAct
+                # loops, preventing infinite repeat-loops is worth that cost;
+                # polling-style workflows should vary an argument (e.g. attempt
+                # counter) or run in separate executions.
+                canonical_arguments = json.dumps(
+                    decision.get("arguments"),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                )
                 raw_signature = ":".join(
                     (
                         str(decision.get("server_name")),
                         str(decision.get("tool_name")),
-                        json.dumps(
-                            decision.get("arguments"),
-                            sort_keys=True,
-                            separators=(",", ":"),
-                            default=str,
-                        ),
+                        canonical_arguments,
                     )
                 )
                 action_signature = hashlib.sha256(raw_signature.encode()).hexdigest()
                 if action_signature in executed_actions:
+                    arguments_preview = canonical_arguments[:200]
                     scratchpad.add(
                         "system",
                         (
-                            f"Observation: ERROR. You already executed {action_signature}. "
-                            "DO NOT REPEAT IT. Look at the data and move to the next logical step."
+                            "Observation: ERROR. You already executed tool "
+                            f"'{decision.get('tool_name')}' on server "
+                            f"'{decision.get('server_name')}' with arguments "
+                            f"{arguments_preview} in this run. DO NOT repeat the identical "
+                            "call. Use the observation you already received, or choose a "
+                            "different tool/arguments for the next logical step."
                         ),
                         iteration=iteration,
                     )
