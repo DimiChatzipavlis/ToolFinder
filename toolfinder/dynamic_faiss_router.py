@@ -63,7 +63,16 @@ class RouteNotFoundError(LookupError):
 
 
 class _EmbeddingModelSingleton:
+    """Shared, reference-counted cache of loaded SentenceTransformer models.
+
+    Multiple routers using the same (model, device) share one instance; a
+    router's teardown releases its reference, and weights are evicted only when
+    the last holder releases — so one router cannot evict a model another live
+    router still depends on.
+    """
+
     _models: dict[tuple[str, str], SentenceTransformer] = {}
+    _refcounts: dict[tuple[str, str], int] = {}
     _lock = threading.Lock()
 
     @classmethod
@@ -74,29 +83,28 @@ class _EmbeddingModelSingleton:
             if model is None:
                 model = SentenceTransformer(model_name, device=device)
                 cls._models[key] = model
+            cls._refcounts[key] = cls._refcounts.get(key, 0) + 1
             return model
 
     @classmethod
-    def teardown(cls, model_name: str | None = None, device: str | None = None) -> None:
+    def release(cls, model_name: str, device: str) -> None:
+        key = (model_name, device)
+        evicted = False
         with cls._lock:
-            if model_name is None and device is None:
-                keys = list(cls._models.keys())
+            remaining = cls._refcounts.get(key, 0) - 1
+            if remaining > 0:
+                cls._refcounts[key] = remaining
             else:
-                keys = [
-                    key
-                    for key in cls._models
-                    if (model_name is None or key[0] == model_name)
-                    and (device is None or key[1] == device)
-                ]
-
-            for key in keys:
+                cls._refcounts.pop(key, None)
                 model = cls._models.pop(key, None)
                 if model is not None:
                     del model
+                    evicted = True
 
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        if evicted:
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
 
 def to_openai_tools(results: Iterable[RouteResult]) -> list[dict[str, Any]]:
@@ -174,11 +182,16 @@ class UniversalMCPRouter:
         return faiss.IndexFlatIP(self._embedding_dim)
 
     def set_catalog(self, catalog: dict[str, list[ToolSchema]]) -> int:
-        """Replace the staged tool catalog and rebuild only the FAISS index."""
+        """Replace the staged tool catalog and rebuild the FAISS index.
+
+        Accepts raw MCP payloads (`name`/`inputSchema`) or pre-normalized tools
+        (`tool_name`): both ingestion paths share `add_tool`'s normalization, so
+        a payload shape that works in one path cannot crash the other.
+        """
         self._staged_tools = []
         for server_name, tools in catalog.items():
             for tool in tools:
-                self._staged_tools.append((server_name, copy.deepcopy(tool)))
+                self.add_tool(tool, server_name=server_name)
         return self.build_index()
 
     def teardown(self) -> None:
@@ -191,7 +204,7 @@ class UniversalMCPRouter:
             del self.model
             self.model = None
 
-        _EmbeddingModelSingleton.teardown(self.model_name, self.device)
+        _EmbeddingModelSingleton.release(self.model_name, self.device)
 
     @staticmethod
     def canonicalize_schema(schema: ToolSchema) -> str:
@@ -238,17 +251,11 @@ class UniversalMCPRouter:
         self.faiss_index = self._create_index(expected_size=len(self._staged_tools))
         self.metadata.clear()
 
+        # Staged tools were normalized (and strict-schema injected) exactly once
+        # by add_tool; here they are only grouped per server and ingested.
         grouped_tools: dict[str, list[ToolSchema]] = {}
-        for default_server_name, raw_tool in self._staged_tools:
-            resolved_server_name = str(raw_tool.get("server_name", default_server_name))
-            normalized_tool = {
-                "tool_name": str(raw_tool["tool_name"]),
-                "description": str(raw_tool.get("description", "")),
-                "inputSchema": self._inject_additional_properties_false(
-                    copy.deepcopy(raw_tool.get("inputSchema", {}))
-                ),
-            }
-            grouped_tools.setdefault(resolved_server_name, []).append(normalized_tool)
+        for server_name, normalized_tool in self._staged_tools:
+            grouped_tools.setdefault(server_name, []).append(normalized_tool)
 
         ingested_count = 0
         for grouped_server_name, grouped_list in grouped_tools.items():
