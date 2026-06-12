@@ -17,13 +17,15 @@ Stages (each runnable standalone):
 | Stage | Script | Output |
 | --- | --- | --- |
 | Scenario recovery | `dataset/annotate_scenarios.py` | `data/queries_with_scenarios.csv`, `data/corpus.json` |
-| Splits | `dataset/make_splits.py` | `data/splits/regime{1,2}_*.json` |
+| Splits | `dataset/make_splits.py` | `data/splits/regime{1,1b,2}_*.json` |
 | OOD sets | `dataset/make_ood.py` | `data/ood/*.csv` (eval-only) |
 | Multi-server catalog | `dataset/build_multiserver_catalog.py` | `data/catalogs/multiserver_catalog.json` (544 real tools, 23 providers, apis.guru) |
 | Unseen-server regime | `dataset/make_multiserver_queries.py` | `data/queries_multiserver.csv`, `data/corpus_multiserver.json` (574 tools), `data/splits/regime3_unseen_servers.json` |
 | Bi-encoder training | `models/biencoder.py` | `artifacts/biencoder/*`, `results/biencoder_training.json` |
 | Hard negatives + cross-encoder | `models/hard_negatives.py`, `models/crossencoder.py` | `artifacts/crossencoder/*`, `results/crossencoder_training.json` |
 | Main evaluation (3 regimes) | `evaluation/evaluate.py` | `results/main_eval.json` |
+| Template-disjoint control (regime 1b) | `evaluation/eval_template_disjoint.py` (after the r1b training run) | `results/template_disjoint_eval.json` |
+| Paired significance vs BM25 | `evaluation/significance.py` | `results/significance.json` |
 | Open-set rejection | `evaluation/ood.py` | `results/ood_eval.json` |
 | Representation ablation | `ablation_representation.py` | `results/ablation_representation.json` |
 | Flat-vs-HNSW scaling | `benchmarks/scaling_bench.py` | `results/scaling_bench.json` |
@@ -40,7 +42,11 @@ The query datasets follow a `scenario × template` generation grammar
 (~5 scenarios × ~10 paraphrase templates per tool). A random row split puts
 paraphrases of every test scenario into training: a 1-NN lookup over training
 anchors scores ~96% Recall@1 on such a split without reading a single schema.
-Splits here are therefore **scenario-grouped** (regime 1, unseen queries) and
+Scenario grouping fixes the row-level leak but still shares surface templates
+across the split, so **regime 1b** additionally holds out templates *and*
+scenarios jointly (the template-disjoint control; regime-1 numbers are
+in-grammar upper bounds). Splits here are therefore **scenario-grouped**
+(regime 1, unseen queries), **doubly-disjoint** (regime 1b), and
 **tool-disjoint** (regime 2, unseen tools), both ranked against the full
 30-tool corpus. `tests/test_split_hygiene.py` enforces this in CI — if those
 tests fail, fix the data, never the test.

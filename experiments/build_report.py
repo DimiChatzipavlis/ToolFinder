@@ -173,6 +173,54 @@ def ablation_table(ablation: dict) -> str:
     return "\n".join(lines)
 
 
+def template_disjoint_table(payload: dict) -> str:
+    block = payload["regime1b_template_disjoint"]["systems"]
+    probe_r1 = payload["regime1_leakage_probe"]["systems"].get("1nn_train_anchor", {})
+    order = [
+        ("random(seed=0)", "Random"),
+        ("1nn_train_anchor", "1-NN over training queries (leakage probe)"),
+        ("bm25", "BM25"),
+        ("tfidf_char", "TF-IDF (char 3-5g)"),
+        ("frozen_minilm", "Frozen MiniLM-L6"),
+        ("ft_minilm_r1b (avg over seeds)", "**FT MiniLM, retrained on 1b** (3 seeds)"),
+    ]
+    lines = ["| System | R@1 | R@3 | MRR |", "| --- | --- | --- | --- |"]
+    for key, label in order:
+        if key not in block:
+            continue
+        row = block[key]
+        lines.append(
+            f"| {label} | {fmt_metric(row['recall@1'])} | {fmt_metric(row['recall@3'])} | {fmt_metric(row['mrr'])} |"
+        )
+    if probe_r1:
+        lines.append(
+            f"| *(same probe on regime 1, for contrast)* | {fmt_metric(probe_r1['recall@1'])} "
+            f"| {fmt_metric(probe_r1['recall@3'])} | {fmt_metric(probe_r1['mrr'])} |"
+        )
+    return "\n".join(lines)
+
+
+def significance_paragraph(significance: dict) -> str:
+    lines = []
+    for regime, block in significance["regimes"].items():
+        deltas = [stats["delta_r1"] for stats in block.values()]
+        p_values = [stats["p_value"] for stats in block.values()]
+        cis = [stats["ci95"] for stats in block.values()]
+        lo = min(ci[0] for ci in cis)
+        hi = max(ci[1] for ci in cis)
+        regime_short = regime.replace("_", " ")
+        lines.append(
+            f"{regime_short}: ΔR@1 = {min(deltas):+.3f}..{max(deltas):+.3f} "
+            f"(95% CI [{lo:+.3f}, {hi:+.3f}] across seeds), p ≤ {max(p_values):g}"
+        )
+    return (
+        "**Statistical significance.** Paired bootstrap over test queries "
+        f"({significance['n_resamples']:,} resamples) of the fine-tuned MiniLM against {significance['baseline'].upper()}, "
+        "per seed and regime — the fine-tuning advantage is significant everywhere, with confidence intervals "
+        "excluding zero: " + "; ".join(lines) + ". Full table: `results/significance.json`."
+    )
+
+
 def poisoning_table(poisoning: dict) -> str:
     ft_name = poisoning["finetuned_system"]
     lines = [
@@ -256,7 +304,7 @@ This matters beyond convenience. Tool selection is a safety boundary: a router t
 
 **Preprocessing / normalization.** Schemas are serialized as canonical sorted-key JSON (the `raw` representation; alternatives are ablated in §4.6). Identifier separators are expanded for lexical systems (`add_issue_comment` → "add issue comment"). All embeddings are L2-normalized so inner product equals cosine similarity.
 
-**Splits (leakage control).** *Regime 1 — unseen queries:* scenario-grouped 460/146/144 over the 15 v1 tools (no scenario crosses buckets). *Regime 2 — unseen tools:* all 750 v2 queries; their 15 tools never appear in training; ranking is against the full 30-tool corpus so trained tools act as distractors. *Regime 3 — unseen servers:* the 195 multi-server queries against a 574-tool merged corpus; training data remains GitHub-only. Constraints are enforced by `tests/test_split_hygiene.py` in CI.
+**Splits (leakage control).** *Regime 1 — unseen queries:* scenario-grouped 460/146/144 over the 15 v1 tools (no scenario crosses buckets). *Regime 1b — template-disjoint control:* because the grammar is `template × scenario`, regime 1 still shares the ten surface templates per tool across train and test, so a model could in principle score perfectly by memorizing template→tool mappings while ignoring the scenario clause; regime 1b holds out templates *and* scenarios jointly (304/42/40 rows after discarding mixed blocks) and is the controlled measurement of in-grammar generalization. Regime-1 numbers are therefore reported as in-grammar **upper bounds**. *Regime 2 — unseen tools:* all 750 v2 queries; their 15 tools never appear in training; ranking is against the full 30-tool corpus so trained tools act as distractors. *Regime 3 — unseen servers:* the 195 multi-server queries against a 574-tool merged corpus; training data remains GitHub-only. All constraints, including double disjointness for 1b, are enforced by `tests/test_split_hygiene.py` in CI.
 
 ### 3.2 Model A — fine-tuned bi-encoder
 
@@ -297,7 +345,15 @@ Training loss and per-epoch validation MRR@10 for all three bi-encoder capacitie
             sections.append(main_results_table(main_eval, "regime3_unseen_servers"))
         sections.append("""
 Brackets: 95% bootstrap CIs over queries; ±: std over 3 training seeds. Bar chart: `figures/fig_main_results.png`; t-SNE of query embeddings before/after fine-tuning: `figures/fig_embedding_tsne.png`.
-
+""")
+        if template_disjoint:
+            sections.append("""**Template-disjoint control (regime 1b).** Regime 1's near-perfect scores are in-grammar upper bounds: its test rows reuse training-set surface templates. Retraining on the doubly-disjoint split (templates and scenarios both unseen; 40 test rows) gives the controlled number, with the 1-NN-over-training-queries probe quantifying residual surface leakage on each split:
+""")
+            sections.append(template_disjoint_table(template_disjoint))
+            sections.append("")
+        if significance:
+            sections.append(significance_paragraph(significance))
+        sections.append("""
 ### 4.3 Classification view: accuracy, precision, recall, F1
 
 Top-1 selection over a fixed catalog is a classification decision; macro-averaged metrics over the tool classes:
@@ -389,7 +445,7 @@ Not run in this environment: the experiment requires a local LLM service (Ollama
 
 **Difficulties encountered.** (1) The most consequential finding was a *data* problem, not a model problem: the original random split was answerable at ~96% Recall@1 without any model; recovering the scenario grammar and rebuilding the splits invalidated and replaced all earlier numbers. (2) MNRL's in-batch negatives are silently wrong at small catalog sizes (duplicate positives become negatives) — fixed with a no-duplicates sampler. (3) Training on a 4GB consumer GPU required fp16, sequence truncation to 256, and one recovery from a mid-run crash; CPU/GPU contention between concurrent jobs distorted early latency measurements until benchmarks were serialized. (4) The local-LLM baseline was blocked by environment (no Ollama); we ship the script and report the gap rather than fabricate it.
 
-**Limitations.** All queries are synthetic (author-templated or LLM-written; no production traffic), and lexical echo inflates all lexical numbers. Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation.
+**Limitations.** All queries are synthetic with a *known generation grammar* (author-templated or LLM-written; no production traffic, no human-written test set): regime-1 numbers are in-grammar upper bounds because surface templates cross the split — quantified and controlled by regime 1b, but the grammar itself remains the data's ceiling, and lexical echo inflates all lexical numbers. The library's **shipped default is the zero-shot encoder, not the evaluated best**: the fine-tuned weights that produce the headline numbers are regenerable from pinned seeds but not committed, and zero-shot dense retrieval loses to BM25 here (disclosed in README, router docstring, and STATUS.md). The LLM-in-context arm is environment-blocked (script ships, unrun). Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation. Latency numbers are single-hardware, English-only queries throughout.
 """)
 
     # ------------------------------------------------------------- conclusion

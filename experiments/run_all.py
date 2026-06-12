@@ -26,7 +26,19 @@ STAGES: list[tuple[str, list[list[str]]]] = [
             ["experiments/dataset/make_multiserver_queries.py"],
         ],
     ),
-    ("train", [["experiments/models/biencoder.py"]]),
+    (
+        "train",
+        [
+            ["experiments/models/biencoder.py"],
+            [
+                "experiments/models/biencoder.py",
+                "--models", "minilm",
+                "--split-name", "regime1b_template_disjoint",
+                "--artifact-root", "biencoder_r1b",
+                "--results-name", "biencoder_training_r1b.json",
+            ],
+        ],
+    ),
     (
         "crossencoder",
         [
@@ -35,6 +47,13 @@ STAGES: list[tuple[str, list[list[str]]]] = [
         ],
     ),
     ("eval", [["experiments/evaluation/evaluate.py"]]),
+    (
+        "controls",
+        [
+            ["experiments/evaluation/eval_template_disjoint.py"],
+            ["experiments/evaluation/significance.py"],
+        ],
+    ),
     ("ood", [["experiments/evaluation/ood.py"]]),
     ("ablation", [["experiments/ablation_representation.py"]]),
     ("scaling", [["experiments/benchmarks/scaling_bench.py"]]),
