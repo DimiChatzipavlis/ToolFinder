@@ -1,0 +1,502 @@
+{
+ "embed_model": "sentence-transformers/all-mpnet-base-v2",
+ "top_k": 10,
+ "faiss_threads": 1,
+ "encoder_latency": {
+  "cpu": {
+   "p50_ms": 85.89,
+   "p95_ms": 91.64
+  },
+  "cuda": {
+   "p50_ms": 33.22,
+   "p95_ms": 54.3
+  }
+ },
+ "tiers": [
+  {
+   "n": 15,
+   "dim": 768,
+   "tier": "schema",
+   "indexes": {
+    "flat": {
+     "build_s": 0.0001,
+     "size_bytes": 46125,
+     "latency": {
+      "p50_ms": 0.0078,
+      "p95_ms": 0.0165,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef16": {
+     "build_s": 0.0037,
+     "size_bytes": 48558,
+     "latency": {
+      "p50_ms": 0.0117,
+      "p95_ms": 0.0195,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef64": {
+     "build_s": 0.0037,
+     "size_bytes": 48558,
+     "latency": {
+      "p50_ms": 0.0112,
+      "p95_ms": 0.0183,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef128": {
+     "build_s": 0.0037,
+     "size_bytes": 48558,
+     "latency": {
+      "p50_ms": 0.013,
+      "p95_ms": 0.0242,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef256": {
+     "build_s": 0.0037,
+     "size_bytes": 48558,
+     "latency": {
+      "p50_ms": 0.0112,
+      "p95_ms": 0.0238,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef16": {
+     "build_s": 0.0001,
+     "size_bytes": 50326,
+     "latency": {
+      "p50_ms": 0.0106,
+      "p95_ms": 0.0181,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef64": {
+     "build_s": 0.0001,
+     "size_bytes": 50326,
+     "latency": {
+      "p50_ms": 0.0108,
+      "p95_ms": 0.0206,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef128": {
+     "build_s": 0.0001,
+     "size_bytes": 50326,
+     "latency": {
+      "p50_ms": 0.0113,
+      "p95_ms": 0.0214,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef256": {
+     "build_s": 0.0001,
+     "size_bytes": 50326,
+     "latency": {
+      "p50_ms": 0.0119,
+      "p95_ms": 0.0215,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    }
+   }
+  },
+  {
+   "n": 100,
+   "dim": 768,
+   "tier": "schema",
+   "indexes": {
+    "flat": {
+     "build_s": 0.0001,
+     "size_bytes": 307245,
+     "latency": {
+      "p50_ms": 0.0192,
+      "p95_ms": 0.0463,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef16": {
+     "build_s": 0.0049,
+     "size_bytes": 321834,
+     "latency": {
+      "p50_ms": 0.0199,
+      "p95_ms": 0.0337,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9895
+    },
+    "hnsw_m16_ef64": {
+     "build_s": 0.0049,
+     "size_bytes": 321834,
+     "latency": {
+      "p50_ms": 0.0333,
+      "p95_ms": 0.0512,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef128": {
+     "build_s": 0.0049,
+     "size_bytes": 321834,
+     "latency": {
+      "p50_ms": 0.05,
+      "p95_ms": 0.0871,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef256": {
+     "build_s": 0.0049,
+     "size_bytes": 321834,
+     "latency": {
+      "p50_ms": 0.048,
+      "p95_ms": 0.079,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef16": {
+     "build_s": 0.0052,
+     "size_bytes": 334482,
+     "latency": {
+      "p50_ms": 0.0219,
+      "p95_ms": 0.0385,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef64": {
+     "build_s": 0.0052,
+     "size_bytes": 334482,
+     "latency": {
+      "p50_ms": 0.0317,
+      "p95_ms": 0.0482,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef128": {
+     "build_s": 0.0052,
+     "size_bytes": 334482,
+     "latency": {
+      "p50_ms": 0.041,
+      "p95_ms": 0.0677,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m32_ef256": {
+     "build_s": 0.0052,
+     "size_bytes": 334482,
+     "latency": {
+      "p50_ms": 0.04,
+      "p95_ms": 0.0586,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    }
+   }
+  },
+  {
+   "n": 1000,
+   "dim": 768,
+   "tier": "schema",
+   "indexes": {
+    "flat": {
+     "build_s": 0.0011,
+     "size_bytes": 3072045,
+     "latency": {
+      "p50_ms": 0.3183,
+      "p95_ms": 1.0562,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef16": {
+     "build_s": 0.1276,
+     "size_bytes": 3216090,
+     "latency": {
+      "p50_ms": 0.0372,
+      "p95_ms": 0.0963,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.8857
+    },
+    "hnsw_m16_ef64": {
+     "build_s": 0.1276,
+     "size_bytes": 3216090,
+     "latency": {
+      "p50_ms": 0.0786,
+      "p95_ms": 0.2156,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9673
+    },
+    "hnsw_m16_ef128": {
+     "build_s": 0.1276,
+     "size_bytes": 3216090,
+     "latency": {
+      "p50_ms": 0.1915,
+      "p95_ms": 0.5113,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9845
+    },
+    "hnsw_m16_ef256": {
+     "build_s": 0.1276,
+     "size_bytes": 3216090,
+     "latency": {
+      "p50_ms": 0.2927,
+      "p95_ms": 0.9008,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9964
+    },
+    "hnsw_m32_ef16": {
+     "build_s": 0.1505,
+     "size_bytes": 3343682,
+     "latency": {
+      "p50_ms": 0.0616,
+      "p95_ms": 0.1926,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9789
+    },
+    "hnsw_m32_ef64": {
+     "build_s": 0.1505,
+     "size_bytes": 3343682,
+     "latency": {
+      "p50_ms": 0.1561,
+      "p95_ms": 0.5668,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9975
+    },
+    "hnsw_m32_ef128": {
+     "build_s": 0.1505,
+     "size_bytes": 3343682,
+     "latency": {
+      "p50_ms": 0.266,
+      "p95_ms": 0.8325,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9999
+    },
+    "hnsw_m32_ef256": {
+     "build_s": 0.1505,
+     "size_bytes": 3343682,
+     "latency": {
+      "p50_ms": 0.3884,
+      "p95_ms": 1.2306,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    }
+   }
+  },
+  {
+   "n": 10000,
+   "dim": 768,
+   "tier": "schema",
+   "indexes": {
+    "flat": {
+     "build_s": 0.0219,
+     "size_bytes": 30720045,
+     "latency": {
+      "p50_ms": 6.137,
+      "p95_ms": 7.6147,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef16": {
+     "build_s": 2.6428,
+     "size_bytes": 32160442,
+     "latency": {
+      "p50_ms": 0.066,
+      "p95_ms": 0.2375,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.6688
+    },
+    "hnsw_m16_ef64": {
+     "build_s": 2.6428,
+     "size_bytes": 32160442,
+     "latency": {
+      "p50_ms": 0.2066,
+      "p95_ms": 0.6555,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.8381
+    },
+    "hnsw_m16_ef128": {
+     "build_s": 2.6428,
+     "size_bytes": 32160442,
+     "latency": {
+      "p50_ms": 0.4556,
+      "p95_ms": 1.1166,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.8867
+    },
+    "hnsw_m16_ef256": {
+     "build_s": 2.6428,
+     "size_bytes": 32160442,
+     "latency": {
+      "p50_ms": 0.7997,
+      "p95_ms": 1.7463,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9167
+    },
+    "hnsw_m32_ef16": {
+     "build_s": 3.5893,
+     "size_bytes": 33437858,
+     "latency": {
+      "p50_ms": 0.1021,
+      "p95_ms": 0.3713,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.7688
+    },
+    "hnsw_m32_ef64": {
+     "build_s": 3.5893,
+     "size_bytes": 33437858,
+     "latency": {
+      "p50_ms": 0.3381,
+      "p95_ms": 1.1539,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9136
+    },
+    "hnsw_m32_ef128": {
+     "build_s": 3.5893,
+     "size_bytes": 33437858,
+     "latency": {
+      "p50_ms": 0.6267,
+      "p95_ms": 1.7768,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9615
+    },
+    "hnsw_m32_ef256": {
+     "build_s": 3.5893,
+     "size_bytes": 33437858,
+     "latency": {
+      "p50_ms": 1.3354,
+      "p95_ms": 2.7732,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.9809
+    }
+   }
+  },
+  {
+   "n": 100000,
+   "dim": 768,
+   "tier": "random",
+   "indexes": {
+    "flat": {
+     "build_s": 0.216,
+     "size_bytes": 307200045,
+     "latency": {
+      "p50_ms": 42.6321,
+      "p95_ms": 74.1058,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 1.0
+    },
+    "hnsw_m16_ef16": {
+     "build_s": 207.1486,
+     "size_bytes": 321633274,
+     "latency": {
+      "p50_ms": 0.177,
+      "p95_ms": 0.2737,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.0156
+    },
+    "hnsw_m16_ef64": {
+     "build_s": 207.1486,
+     "size_bytes": 321633274,
+     "latency": {
+      "p50_ms": 0.546,
+      "p95_ms": 0.6853,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.0471
+    },
+    "hnsw_m16_ef128": {
+     "build_s": 207.1486,
+     "size_bytes": 321633274,
+     "latency": {
+      "p50_ms": 1.009,
+      "p95_ms": 1.2518,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.0899
+    },
+    "hnsw_m16_ef256": {
+     "build_s": 207.1486,
+     "size_bytes": 321633274,
+     "latency": {
+      "p50_ms": 1.8734,
+      "p95_ms": 2.2387,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.1588
+    },
+    "hnsw_m32_ef16": {
+     "build_s": 211.3709,
+     "size_bytes": 334420834,
+     "latency": {
+      "p50_ms": 0.3197,
+      "p95_ms": 0.5303,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.0303
+    },
+    "hnsw_m32_ef64": {
+     "build_s": 211.3709,
+     "size_bytes": 334420834,
+     "latency": {
+      "p50_ms": 1.051,
+      "p95_ms": 1.4956,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.0948
+    },
+    "hnsw_m32_ef128": {
+     "build_s": 211.3709,
+     "size_bytes": 334420834,
+     "latency": {
+      "p50_ms": 1.9054,
+      "p95_ms": 2.7635,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.1679
+    },
+    "hnsw_m32_ef256": {
+     "build_s": 211.3709,
+     "size_bytes": 334420834,
+     "latency": {
+      "p50_ms": 3.1084,
+      "p95_ms": 3.7547,
+      "n_measurements": 750
+     },
+     "recall@10_vs_exact": 0.2835
+    }
+   }
+  }
+ ]
+}

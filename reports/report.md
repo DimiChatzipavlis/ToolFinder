@@ -1,220 +1,6 @@
-"""Render reports/report.md from experiments/results/*.json.
+# ToolFinder: Dense Retrieval for Open-Set MCP Tool Routing — An Empirical Study
 
-Structure follows the course rubric: Abstract (~150 words), Introduction,
-Related Work, Methodology (data + preprocessing + two DL models), Experiments &
-Results (accuracy/precision/recall/F1, ROC-AUC, loss curves, comparison tables),
-Discussion & Limitations, Conclusions.
-
-Every number is read from a results file produced by a script in this package;
-nothing is hand-typed. Re-run after any experiment:
-
-    python experiments/build_report.py
-"""
-
-from __future__ import annotations
-
-import json
-import sys
-from datetime import date
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from experiments import paths  # noqa: E402
-
-REPORT_PATH = paths.REPO_ROOT / "reports" / "report.md"
-
-MAIN_SYSTEM_ORDER = [
-    ("random(seed=0)", "Random"),
-    ("bm25", "BM25"),
-    ("tfidf_word", "TF-IDF (word 1-2g)"),
-    ("tfidf_char", "TF-IDF (char 3-5g)"),
-    ("frozen_minilm", "Frozen MiniLM-L6 (22M)"),
-    ("frozen_bge", "Frozen BGE-small (33M)"),
-    ("frozen_mpnet", "Frozen MPNet (109M)"),
-    ("ft_minilm (avg over seeds)", "**Model A: FT bi-encoder MiniLM-L6** (3 seeds)"),
-    ("ft_bge (avg over seeds)", "FT bi-encoder BGE-small (3 seeds)"),
-    ("ft_mpnet (avg over seeds)", "FT bi-encoder MPNet (3 seeds)"),
-    ("hybrid_bm25+ft_minilm_seed42", "Hybrid RRF: BM25 + FT MiniLM (seed 42)"),
-    ("ft_minilm+ce_rerank (avg over seeds)", "**Model B: FT MiniLM + CE rerank** (3 seeds)"),
-]
-
-CLASSIFICATION_SYSTEMS = [
-    ("bm25", "BM25"),
-    ("frozen_minilm", "Frozen MiniLM-L6"),
-    ("ft_minilm_seed42", "Model A: FT bi-encoder (seed 42)"),
-    ("ft_minilm+ce_rerank_seed42", "Model B: + CE rerank (seed 42)"),
-]
-
-
-def load(name: str) -> dict | None:
-    path = paths.RESULTS_DIR / name
-    if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def fmt_metric(entry: dict) -> str:
-    if "ci95" in entry:
-        return f"{entry['mean']:.3f} [{entry['ci95'][0]:.3f}, {entry['ci95'][1]:.3f}]"
-    if "std" in entry:
-        return f"{entry['mean']:.3f} ± {entry['std']:.3f}"
-    return f"{entry['mean']:.3f}"
-
-
-def main_results_table(results: dict, regime: str) -> str:
-    block = results["regimes"][regime]
-    lines = [
-        "| System | R@1 | R@3 | MRR | NDCG@10 |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    for key, label in MAIN_SYSTEM_ORDER:
-        if key not in block:
-            continue
-        row = block[key]
-        lines.append(
-            f"| {label} | {fmt_metric(row['recall@1'])} | {fmt_metric(row['recall@3'])} "
-            f"| {fmt_metric(row['mrr'])} | {fmt_metric(row['ndcg@10'])} |"
-        )
-    return "\n".join(lines)
-
-
-def classification_table(results: dict, regimes: list[str]) -> str:
-    lines = [
-        "| System | Regime | Accuracy | Macro Precision | Macro Recall | Macro F1 |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
-    for key, label in CLASSIFICATION_SYSTEMS:
-        for regime in regimes:
-            block = results["regimes"].get(regime, {})
-            if key not in block or "classification" not in block[key]:
-                continue
-            cls = block[key]["classification"]
-            regime_short = regime.replace("regime", "R").split("_")[0]
-            lines.append(
-                f"| {label} | {regime_short} | {cls['accuracy']:.3f} | {cls['macro_precision']:.3f} "
-                f"| {cls['macro_recall']:.3f} | {cls['macro_f1']:.3f} |"
-            )
-    return "\n".join(lines)
-
-
-def training_table(records: list[dict]) -> str:
-    import numpy as np
-
-    lines = [
-        "| Model | Params | Seeds | Train time (s, mean) | Val MRR@10 (mean ± std) |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    by_model: dict[str, list[dict]] = {}
-    for record in records:
-        by_model.setdefault(record["model_key"], []).append(record)
-    params = {"minilm": "22M", "bge": "33M", "mpnet": "109M", "crossencoder": "22M"}
-    for model_key, runs in by_model.items():
-        mrr_key = "final_val_mrr@10" if "final_val_mrr@10" in runs[0] else "final_val_mrr_full_corpus"
-        mrrs = [run[mrr_key] for run in runs]
-        times = [run["train_duration_s"] for run in runs]
-        lines.append(
-            f"| {model_key} | {params.get(model_key, '?')} | {len(runs)} "
-            f"| {np.mean(times):.0f} | {np.mean(mrrs):.4f} ± {np.std(mrrs):.4f} |"
-        )
-    return "\n".join(lines)
-
-
-def ood_table(ood: dict) -> str:
-    lines = [
-        "| System | Score | ROC-AUC (pooled) | FPR@95TPR | AUC chitchat | AUC out-of-catalog | AUC near-miss |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
-    ]
-    for system_name, block in ood["systems"].items():
-        for score_name, stats in block["scores"].items():
-            per = stats["per_subset"]
-            lines.append(
-                f"| {system_name} | {score_name} | {stats['auroc_pooled']:.3f} | {stats['fpr@95tpr_pooled']:.3f} "
-                f"| {per['chitchat']['auroc']:.3f} | {per['out_of_catalog']['auroc']:.3f} "
-                f"| {per['adversarial_near_miss']['auroc']:.3f} |"
-            )
-    return "\n".join(lines)
-
-
-def scaling_table(bench: dict) -> str:
-    lines = [
-        "| N | Tier | Flat p50 (ms) | HNSW M32/ef64 p50 (ms) | HNSW recall@10 | Flat size | HNSW size |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
-    ]
-    for tier in bench["tiers"]:
-        flat = tier["indexes"]["flat"]
-        hnsw = tier["indexes"]["hnsw_m32_ef64"]
-        lines.append(
-            f"| {tier['n']:,} | {tier['tier']} | {flat['latency']['p50_ms']:.4f} "
-            f"| {hnsw['latency']['p50_ms']:.4f} | {hnsw['recall@10_vs_exact']:.4f} "
-            f"| {flat['size_bytes'] / 1e6:.1f} MB | {hnsw['size_bytes'] / 1e6:.1f} MB |"
-        )
-    return "\n".join(lines)
-
-
-def ablation_table(ablation: dict) -> str:
-    lines = [
-        "| Representation | BM25 R@1 (r1/r2) | TF-IDF char R@1 (r1/r2) | Frozen MPNet R@1 (r1/r2) | FT bi-encoder R@1 (r1/r2) |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    ft_name = None
-    for representation, block in ablation["representations"].items():
-        r1 = block["regime1_unseen_queries"]
-        r2 = block["regime2_unseen_tools"]
-        if ft_name is None:
-            ft_name = next(name for name in r1 if name.startswith("ft_"))
-        lines.append(
-            f"| {representation} "
-            f"| {r1['bm25']['recall@1']:.3f} / {r2['bm25']['recall@1']:.3f} "
-            f"| {r1['tfidf_char']['recall@1']:.3f} / {r2['tfidf_char']['recall@1']:.3f} "
-            f"| {r1['frozen_mpnet']['recall@1']:.3f} / {r2['frozen_mpnet']['recall@1']:.3f} "
-            f"| {r1[ft_name]['recall@1']:.3f} / {r2[ft_name]['recall@1']:.3f} |"
-        )
-    return "\n".join(lines)
-
-
-def poisoning_table(poisoning: dict) -> str:
-    ft_name = poisoning["finetuned_system"]
-    lines = [
-        "| Bait anchors K | BM25 hijack@1 | Frozen MPNet hijack@1 | FT bi-encoder hijack@1 | FT + length cap | FT + CE rerank | Decoy centroid z |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
-    ]
-    for attack in poisoning["attacks"]:
-        systems = attack["systems"]
-        ce_cell = (
-            f"{systems[f'{ft_name}+ce_rerank'][0]:.3f}"
-            if f"{ft_name}+ce_rerank" in systems
-            else "—"
-        )
-        lines.append(
-            f"| {attack['k_bait_anchors']} "
-            f"| {systems['bm25'][0]:.3f} "
-            f"| {systems['frozen_mpnet'][0]:.3f} "
-            f"| {systems[ft_name][0]:.3f} "
-            f"| {systems[f'{ft_name}+length_cap'][0]:.3f} "
-            f"| {ce_cell} "
-            f"| {systems[f'{ft_name}_centroid_z']:.1f} |"
-        )
-    return "\n".join(lines)
-
-
-def build() -> str:
-    main_eval = load("main_eval.json")
-    biencoder_training = load("biencoder_training.json")
-    crossencoder_training = load("crossencoder_training.json")
-    ood = load("ood_eval.json")
-    bench = load("scaling_bench.json")
-    ablation = load("ablation_representation.json")
-    poisoning = load("poisoning.json")
-    calibration = load("calibration.json")
-    llm_incontext = load("llm_incontext.json")
-
-    sections: list[str] = []
-
-    # ------------------------------------------------------------------ header
-    sections.append(f"""# ToolFinder: Dense Retrieval for Open-Set MCP Tool Routing — An Empirical Study
-
-*Generated from `experiments/results/` on {date.today().isoformat()}. Regenerate with `python experiments/build_report.py`. Figures referenced as `figures/...` live in `experiments/results/figures/`.*
+*Generated from `experiments/results/` on 2026-06-12. Regenerate with `python experiments/build_report.py`. Figures referenced as `figures/...` live in `experiments/results/figures/`.*
 
 ## Abstract
 
@@ -229,20 +15,16 @@ This matters beyond convenience. Tool selection is a safety boundary: a router t
 **Problem statement.** Given a natural-language intent and a catalog of MCP tool schemas, rank the catalog so the correct tool is at rank 1, and abstain when no tool applies.
 
 **Contributions.** (1) A leakage-controlled benchmark over real MCP/OpenAPI schemas with three generalization regimes, after demonstrating quantitatively that the naive split answers itself (~96% Recall@1 via 1-NN over training anchors). (2) A trained two-model comparison — bi-encoder vs cross-encoder reranker — against the baselines that practice actually ships (BM25, TF-IDF, frozen encoders, hybrid fusion), with seed variance and confidence intervals. (3) An open-set analysis: threshold sweeps, ROC-AUC for out-of-distribution rejection, a measured description-poisoning attack with three mitigations, and reranker confidence calibration. (4) A systems result: exact flat search outperforms HNSW at every catalog size up to 10^5 vectors, fixing the deployed router's defaults. All code, data, splits, and results are reproducible (`experiments/run_all.py`), with split hygiene enforced in CI.
-""")
 
-    # -------------------------------------------------------------- related work
-    sections.append("""## 2. Related Work
+## 2. Related Work
 
 **Tool-augmented LLMs.** MRKL (Karpas et al., 2022) introduced the modular router-over-experts framing this system implements. Toolformer (Schick et al., 2023) teaches an LM to invoke APIs self-supervised. Gorilla (Patil et al., 2023) fine-tunes LLaMA-7B for API-call generation and already pairs it with a retriever, showing retrieval reduces call hallucination; ToolLLM (Qin et al., 2023) scales instruction-tuned tool use to 16k+ real APIs with a dedicated API retriever. These works target call *generation*; we isolate the upstream selection sub-problem and evaluate it under open-set and adversarial conditions they do not focus on.
 
 **Retrieval-based tool selection in practice.** Embedding tool descriptions and retrieving by cosine similarity is shipped functionality (LangChain tool retriever, LlamaIndex object retrievers, the semantic-router library, OpenAI's function-retrieval cookbook). We claim no architectural novelty over these; the contribution is a leakage-controlled benchmark and a controlled comparison of what they ship as defaults.
 
 **Dense retrieval methodology.** Bi-encoder contrastive training follows Sentence-BERT (Reimers & Gurevych, 2019) with in-batch negatives as in DPR (Karpukhin et al., 2020); cross-encoder reranking follows Nogueira & Cho (2019). HNSW is Malkov & Yashunin (2018); our scaling study re-examines its trade-offs at tool-catalog (not web-corpus) sizes.
-""")
 
-    # -------------------------------------------------------------- methodology
-    sections.append("""## 3. Methodology
+## 3. Methodology
 
 ### 3.1 Data, cleaning, and exploratory analysis
 
@@ -271,115 +53,155 @@ Random permutation (floor); BM25 (Okapi, k1=1.5, b=0.75); TF-IDF (word 1-2grams;
 ### 3.5 Deployed system
 
 The router (`toolfinder/`) embeds schemas at ingest, retrieves via FAISS, abstains below a similarity threshold (operating point chosen from §4.4), and exposes results as typed objects. The index is **exact** `IndexFlatIP` by default; HNSW is opt-in — a decision justified empirically in §4.5 rather than asserted.
-""")
 
-    # ---------------------------------------------------------------- results
-    sections.append("## 4. Experiments & Results\n")
+## 4. Experiments & Results
 
-    if biencoder_training or crossencoder_training:
-        all_records = (biencoder_training or []) + (crossencoder_training or [])
-        sections.append("### 4.1 Training behavior\n")
-        sections.append(training_table(all_records))
-        sections.append("""
+### 4.1 Training behavior
+
+| Model | Params | Seeds | Train time (s, mean) | Val MRR@10 (mean ± std) |
+| --- | --- | --- | --- | --- |
+| minilm | 22M | 3 | 221 | 0.9863 ± 0.0000 |
+| bge | 33M | 3 | 430 | 1.0000 ± 0.0000 |
+| mpnet | 109M | 3 | 1957 | 1.0000 ± 0.0000 |
+| crossencoder | 22M | 3 | 535 | 0.9591 ± 0.0029 |
+
 Training loss and per-epoch validation MRR@10 for all three bi-encoder capacities: `figures/fig_loss_curves.png`. Validation MRR (not validation loss) is the model-selection criterion because retrieval quality, not the contrastive loss value, is the deployment objective; the curves show convergence within 3-5 epochs and no divergence between train loss and validation quality (no overfitting signal). Seed variance is reported in every results table below.
-""")
 
-    if main_eval:
-        sections.append("### 4.2 Main retrieval results (three regimes)\n")
-        sections.append("**Regime 1 — unseen queries** (144 test queries, 30-tool corpus):\n")
-        sections.append(main_results_table(main_eval, "regime1_unseen_queries"))
-        sections.append("\n**Regime 2 — unseen tools** (750 test queries, 30-tool corpus):\n")
-        sections.append(main_results_table(main_eval, "regime2_unseen_tools"))
-        if "regime3_unseen_servers" in main_eval.get("regimes", {}):
-            sections.append("\n**Regime 3 — unseen servers** (195 test queries, 574-tool corpus):\n")
-            sections.append(main_results_table(main_eval, "regime3_unseen_servers"))
-        sections.append("""
+### 4.2 Main retrieval results (three regimes)
+
+**Regime 1 — unseen queries** (144 test queries, 30-tool corpus):
+
+| System | R@1 | R@3 | MRR | NDCG@10 |
+| --- | --- | --- | --- | --- |
+| Random | 0.035 [0.007, 0.069] | 0.083 [0.042, 0.132] | 0.126 [0.098, 0.156] | 0.136 [0.099, 0.173] |
+| BM25 | 0.569 [0.493, 0.646] | 0.771 [0.701, 0.833] | 0.688 [0.629, 0.745] | 0.748 [0.695, 0.796] |
+| TF-IDF (word 1-2g) | 0.576 [0.493, 0.660] | 0.771 [0.701, 0.840] | 0.692 [0.633, 0.752] | 0.746 [0.694, 0.799] |
+| TF-IDF (char 3-5g) | 0.486 [0.403, 0.569] | 0.792 [0.729, 0.854] | 0.663 [0.606, 0.720] | 0.738 [0.691, 0.784] |
+| Frozen MiniLM-L6 (22M) | 0.326 [0.257, 0.403] | 0.625 [0.549, 0.694] | 0.510 [0.456, 0.564] | 0.604 [0.557, 0.650] |
+| Frozen BGE-small (33M) | 0.604 [0.528, 0.688] | 0.826 [0.764, 0.889] | 0.731 [0.676, 0.784] | 0.789 [0.745, 0.833] |
+| Frozen MPNet (109M) | 0.611 [0.528, 0.694] | 0.931 [0.889, 0.965] | 0.772 [0.723, 0.820] | 0.827 [0.790, 0.864] |
+| **Model A: FT bi-encoder MiniLM-L6** (3 seeds) | 0.988 ± 0.003 | 1.000 ± 0.000 | 0.994 ± 0.002 | 0.996 ± 0.001 |
+| FT bi-encoder BGE-small (3 seeds) | 0.991 ± 0.003 | 1.000 ± 0.000 | 0.995 ± 0.002 | 0.997 ± 0.001 |
+| FT bi-encoder MPNet (3 seeds) | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 |
+| Hybrid RRF: BM25 + FT MiniLM (seed 42) | 0.826 [0.764, 0.889] | 0.958 [0.924, 0.993] | 0.891 [0.851, 0.928] | 0.914 [0.881, 0.945] |
+| **Model B: FT MiniLM + CE rerank** (3 seeds) | 0.944 ± 0.011 | 1.000 ± 0.000 | 0.972 ± 0.006 | 0.979 ± 0.004 |
+
+**Regime 2 — unseen tools** (750 test queries, 30-tool corpus):
+
+| System | R@1 | R@3 | MRR | NDCG@10 |
+| --- | --- | --- | --- | --- |
+| Random | 0.043 [0.028, 0.057] | 0.115 [0.092, 0.139] | 0.145 [0.129, 0.160] | 0.168 [0.149, 0.186] |
+| BM25 | 0.759 [0.729, 0.788] | 0.945 [0.928, 0.961] | 0.856 [0.837, 0.874] | 0.889 [0.874, 0.903] |
+| TF-IDF (word 1-2g) | 0.773 [0.744, 0.803] | 0.965 [0.951, 0.977] | 0.869 [0.851, 0.885] | 0.900 [0.887, 0.913] |
+| TF-IDF (char 3-5g) | 0.767 [0.736, 0.795] | 0.969 [0.956, 0.980] | 0.863 [0.844, 0.880] | 0.896 [0.882, 0.909] |
+| Frozen MiniLM-L6 (22M) | 0.701 [0.671, 0.736] | 0.956 [0.940, 0.971] | 0.824 [0.806, 0.845] | 0.866 [0.851, 0.882] |
+| Frozen BGE-small (33M) | 0.864 [0.839, 0.888] | 1.000 [1.000, 1.000] | 0.929 [0.916, 0.942] | 0.948 [0.938, 0.957] |
+| Frozen MPNet (109M) | 0.755 [0.723, 0.783] | 0.967 [0.953, 0.979] | 0.862 [0.843, 0.879] | 0.894 [0.880, 0.908] |
+| **Model A: FT bi-encoder MiniLM-L6** (3 seeds) | 0.909 ± 0.003 | 1.000 ± 0.001 | 0.953 ± 0.002 | 0.965 ± 0.001 |
+| FT bi-encoder BGE-small (3 seeds) | 0.865 ± 0.002 | 0.994 ± 0.003 | 0.924 ± 0.002 | 0.944 ± 0.002 |
+| FT bi-encoder MPNet (3 seeds) | 0.915 ± 0.001 | 1.000 ± 0.000 | 0.958 ± 0.001 | 0.969 ± 0.000 |
+| Hybrid RRF: BM25 + FT MiniLM (seed 42) | 0.835 [0.809, 0.859] | 0.989 [0.981, 0.996] | 0.910 [0.896, 0.924] | 0.933 [0.923, 0.944] |
+| **Model B: FT MiniLM + CE rerank** (3 seeds) | 0.867 ± 0.004 | 0.978 ± 0.002 | 0.922 ± 0.002 | 0.942 ± 0.002 |
+
+**Regime 3 — unseen servers** (195 test queries, 574-tool corpus):
+
+| System | R@1 | R@3 | MRR | NDCG@10 |
+| --- | --- | --- | --- | --- |
+| Random | 0.005 [0.000, 0.015] | 0.005 [0.000, 0.015] | 0.014 [0.007, 0.026] | 0.007 [0.000, 0.021] |
+| BM25 | 0.487 [0.420, 0.554] | 0.672 [0.605, 0.733] | 0.597 [0.538, 0.652] | 0.636 [0.575, 0.690] |
+| TF-IDF (word 1-2g) | 0.359 [0.292, 0.426] | 0.610 [0.544, 0.682] | 0.502 [0.448, 0.557] | 0.554 [0.503, 0.610] |
+| TF-IDF (char 3-5g) | 0.426 [0.359, 0.497] | 0.672 [0.605, 0.733] | 0.568 [0.512, 0.625] | 0.625 [0.573, 0.676] |
+| Frozen MiniLM-L6 (22M) | 0.451 [0.385, 0.523] | 0.667 [0.600, 0.728] | 0.577 [0.523, 0.635] | 0.623 [0.569, 0.678] |
+| Frozen BGE-small (33M) | 0.554 [0.482, 0.621] | 0.774 [0.718, 0.831] | 0.681 [0.629, 0.730] | 0.736 [0.691, 0.779] |
+| Frozen MPNet (109M) | 0.436 [0.364, 0.508] | 0.703 [0.641, 0.764] | 0.595 [0.541, 0.651] | 0.649 [0.598, 0.703] |
+| **Model A: FT bi-encoder MiniLM-L6** (3 seeds) | 0.667 ± 0.008 | 0.874 ± 0.011 | 0.775 ± 0.004 | 0.817 ± 0.003 |
+| FT bi-encoder BGE-small (3 seeds) | 0.644 ± 0.005 | 0.863 ± 0.011 | 0.761 ± 0.005 | 0.802 ± 0.007 |
+| FT bi-encoder MPNet (3 seeds) | 0.727 ± 0.005 | 0.942 ± 0.002 | 0.831 ± 0.004 | 0.866 ± 0.004 |
+| Hybrid RRF: BM25 + FT MiniLM (seed 42) | 0.595 [0.523, 0.661] | 0.769 [0.713, 0.831] | 0.707 [0.656, 0.757] | 0.752 [0.704, 0.798] |
+| **Model B: FT MiniLM + CE rerank** (3 seeds) | 0.632 ± 0.009 | 0.863 ± 0.009 | 0.753 ± 0.005 | 0.800 ± 0.003 |
+
 Brackets: 95% bootstrap CIs over queries; ±: std over 3 training seeds. Bar chart: `figures/fig_main_results.png`; t-SNE of query embeddings before/after fine-tuning: `figures/fig_embedding_tsne.png`.
 
 ### 4.3 Classification view: accuracy, precision, recall, F1
 
 Top-1 selection over a fixed catalog is a classification decision; macro-averaged metrics over the tool classes:
-""")
-        regimes_present = [r for r in ("regime1_unseen_queries", "regime2_unseen_tools", "regime3_unseen_servers") if r in main_eval["regimes"]]
-        sections.append(classification_table(main_eval, regimes_present))
-        sections.append("""
+
+| System | Regime | Accuracy | Macro Precision | Macro Recall | Macro F1 |
+| --- | --- | --- | --- | --- | --- |
+| BM25 | R1 | 0.569 | 0.509 | 0.395 | 0.426 |
+| BM25 | R2 | 0.759 | 0.574 | 0.517 | 0.530 |
+| BM25 | R3 | 0.487 | 0.345 | 0.244 | 0.272 |
+| Frozen MiniLM-L6 | R1 | 0.326 | 0.242 | 0.186 | 0.180 |
+| Frozen MiniLM-L6 | R2 | 0.701 | 0.580 | 0.526 | 0.526 |
+| Frozen MiniLM-L6 | R3 | 0.451 | 0.300 | 0.214 | 0.235 |
+| Model A: FT bi-encoder (seed 42) | R1 | 0.993 | 0.938 | 0.931 | 0.934 |
+| Model A: FT bi-encoder (seed 42) | R2 | 0.905 | 0.772 | 0.754 | 0.756 |
+| Model A: FT bi-encoder (seed 42) | R3 | 0.667 | 0.507 | 0.380 | 0.416 |
+| Model B: + CE rerank (seed 42) | R1 | 0.944 | 0.896 | 0.882 | 0.885 |
+| Model B: + CE rerank (seed 42) | R2 | 0.867 | 0.585 | 0.542 | 0.558 |
+| Model B: + CE rerank (seed 42) | R3 | 0.641 | 0.499 | 0.375 | 0.410 |
+
 Per-tool confusion matrix for Model A (regime 1): `figures/fig_confusion_regime1.png` — residual errors concentrate on the schema pairs the EDA flagged as confusable (`search_issues` ↔ `search_pull_requests`). Whether Model B's joint attention recovers these is examined — with a negative answer — in §5.
-""")
 
-    if ood:
-        sections.append("### 4.4 Open-set rejection (ROC-AUC)\n")
-        sections.append(f"""In-distribution = regime-1 test queries; out-of-distribution = {ood['n_ood']} queries in three subsets. The router's abstention signal is scored as a binary ID-vs-OOD classifier:
-""")
-        sections.append(ood_table(ood))
-        sections.append("""
+### 4.4 Open-set rejection (ROC-AUC)
+
+In-distribution = regime-1 test queries; out-of-distribution = 249 queries in three subsets. The router's abstention signal is scored as a binary ID-vs-OOD classifier:
+
+| System | Score | ROC-AUC (pooled) | FPR@95TPR | AUC chitchat | AUC out-of-catalog | AUC near-miss |
+| --- | --- | --- | --- | --- | --- | --- |
+| ft_bge_seed13 | max_sim | 0.988 | 0.076 | 1.000 | 0.988 | 0.964 |
+| ft_bge_seed13 | margin | 0.968 | 0.185 | 0.982 | 0.972 | 0.931 |
+| frozen_mpnet | max_sim | 0.910 | 0.369 | 0.991 | 0.906 | 0.757 |
+| frozen_mpnet | margin | 0.681 | 0.912 | 0.741 | 0.653 | 0.618 |
+
 Risk-coverage and per-subset acceptance curves over the threshold τ: `figures/fig_threshold_sweep.png`. Chitchat is separable almost perfectly; adversarial near-misses (GitHub vocabulary, absent capability — e.g. `create_issue`, `delete_branch`) overlap the in-distribution score range and are the operative weakness of a single global threshold.
-""")
 
-    if bench:
-        encoder = bench.get("encoder_latency", {})
-        sections.append("### 4.5 Index scaling: exact Flat vs HNSW\n")
-        sections.append(scaling_table(bench))
-        encoder_note = ""
-        if "cpu" in encoder:
-            encoder_note = (
-                f"Encoding one query costs {encoder['cpu']['p50_ms']:.0f} ms on CPU (p50)"
-                + (f" / {encoder['cuda']['p50_ms']:.1f} ms on GPU" if "cuda" in encoder else "")
-                + ", so search is a minority share of routing latency at every size up to 10^5."
-            )
-        ef_sweep_note = ""
-        schema_tiers = [tier for tier in bench["tiers"] if tier["tier"] == "schema"]
-        if schema_tiers:
-            top_tier = schema_tiers[-1]
-            ef_points = []
-            for key in sorted(top_tier["indexes"]):
-                if key.startswith("hnsw_m32_ef"):
-                    entry = top_tier["indexes"][key]
-                    ef_points.append(
-                        f"ef={key.split('ef')[-1]}: {entry['recall@10_vs_exact']:.3f} recall at {entry['latency']['p50_ms']:.2f} ms"
-                    )
-            ef_sweep_note = f" At N={top_tier['n']:,}, the HNSW recall/latency frontier is {'; '.join(ef_points)}."
-        sections.append(f"""
-Single-threaded FAISS, top-10; N ≤ 10,000 uses schema-derived embeddings, N = 100,000 random unit vectors (a latency-only stress tier: structureless random vectors are pathological for graph ANN, hence the collapsed recall there). The measured picture is more nuanced than the folk claim "HNSW scales, flat doesn't": flat is faster *and* exact below ~10^3 vectors; beyond that HNSW reduces search latency (0.34 ms vs 6.1 ms at 10^4) but pays in recall under default settings.{ef_sweep_note} {encoder_note} Because the encoder dominates end-to-end routing latency and flat search is exact, the runtime defaults to `IndexFlatIP`; HNSW is opt-in and becomes the rational choice only as catalogs approach ~10^5 *and* an efSearch-tuned recall trade-off is acceptable. Log-log figure: `figures/fig_scaling.png`.
-""")
+### 4.5 Index scaling: exact Flat vs HNSW
 
-    if ablation:
-        sections.append("### 4.6 Schema representation ablation\n")
-        sections.append(ablation_table(ablation))
-        sections.append("""
+| N | Tier | Flat p50 (ms) | HNSW M32/ef64 p50 (ms) | HNSW recall@10 | Flat size | HNSW size |
+| --- | --- | --- | --- | --- | --- | --- |
+| 15 | schema | 0.0078 | 0.0108 | 1.0000 | 0.0 MB | 0.1 MB |
+| 100 | schema | 0.0192 | 0.0317 | 1.0000 | 0.3 MB | 0.3 MB |
+| 1,000 | schema | 0.3183 | 0.1561 | 0.9975 | 3.1 MB | 3.3 MB |
+| 10,000 | schema | 6.1370 | 0.3381 | 0.9136 | 30.7 MB | 33.4 MB |
+| 100,000 | random | 42.6321 | 1.0510 | 0.0948 | 307.2 MB | 334.4 MB |
+
+Single-threaded FAISS, top-10; N ≤ 10,000 uses schema-derived embeddings, N = 100,000 random unit vectors (a latency-only stress tier: structureless random vectors are pathological for graph ANN, hence the collapsed recall there). The measured picture is more nuanced than the folk claim "HNSW scales, flat doesn't": flat is faster *and* exact below ~10^3 vectors; beyond that HNSW reduces search latency (0.34 ms vs 6.1 ms at 10^4) but pays in recall under default settings. At N=10,000, the HNSW recall/latency frontier is ef=128: 0.962 recall at 0.63 ms; ef=16: 0.769 recall at 0.10 ms; ef=256: 0.981 recall at 1.34 ms; ef=64: 0.914 recall at 0.34 ms. Encoding one query costs 86 ms on CPU (p50) / 33.2 ms on GPU, so search is a minority share of routing latency at every size up to 10^5. Because the encoder dominates end-to-end routing latency and flat search is exact, the runtime defaults to `IndexFlatIP`; HNSW is opt-in and becomes the rational choice only as catalogs approach ~10^5 *and* an efSearch-tuned recall trade-off is acceptable. Log-log figure: `figures/fig_scaling.png`.
+
+### 4.6 Schema representation ablation
+
+| Representation | BM25 R@1 (r1/r2) | TF-IDF char R@1 (r1/r2) | Frozen MPNet R@1 (r1/r2) | FT bi-encoder R@1 (r1/r2) |
+| --- | --- | --- | --- | --- |
+| raw | 0.569 / 0.759 | 0.486 / 0.767 | 0.611 / 0.755 | 0.986 / 0.865 |
+| minified | 0.514 / 0.753 | 0.514 / 0.749 | 0.625 / 0.796 | 0.986 / 0.860 |
+| name_desc | 0.646 / 0.749 | 0.688 / 0.809 | 0.750 / 0.811 | 0.986 / 0.907 |
+| desc_only | 0.590 / 0.715 | 0.653 / 0.664 | 0.715 / 0.768 | 0.986 / 0.876 |
+
 Recall@1 on regime 1 / regime 2. Caveat: the fine-tuned model was trained on `raw` documents, so its non-raw columns measure inference-time robustness, not per-representation training quality.
-""")
 
-    if poisoning:
-        sections.append("### 4.7 Description-poisoning attack\n")
-        sections.append(f"""A hostile server publishes a decoy tool (`{poisoning['decoy']}`) whose description embeds K validation anchors as bait (the attacker knows the query distribution, not the test queries). Hijack@1 = fraction of the {poisoning['n_queries']} regime-1 test queries whose top-ranked tool becomes the decoy:
-""")
-        sections.append(poisoning_table(poisoning))
-        sections.append("""
+### 4.7 Description-poisoning attack
+
+A hostile server publishes a decoy tool (`workspace_notes_sync`) whose description embeds K validation anchors as bait (the attacker knows the query distribution, not the test queries). Hijack@1 = fraction of the 144 regime-1 test queries whose top-ranked tool becomes the decoy:
+
+| Bait anchors K | BM25 hijack@1 | Frozen MPNet hijack@1 | FT bi-encoder hijack@1 | FT + length cap | FT + CE rerank | Decoy centroid z |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.3 |
+| 1 | 0.035 | 0.000 | 0.000 | 0.000 | 0.000 | 0.6 |
+| 5 | 0.514 | 0.153 | 0.000 | 0.000 | 0.028 | 1.0 |
+| 10 | 0.729 | 0.410 | 0.000 | 0.000 | 0.014 | 1.3 |
+| 20 | 0.833 | 0.188 | 0.000 | 0.000 | 0.035 | 1.2 |
+
 The outcome inverts the expected story. BM25 is catastrophically hijackable (83% at K=20 — bait text lexically matches everything), the frozen encoder leaks substantially (41% at K=10), but **the fine-tuned bi-encoder is not hijacked once at any attack strength**: contrastive training reshapes the embedding space so a description stuffed with many unrelated anchors resembles no individual query. Fine-tuning is itself the strongest measured defense — which also means the BM25 arm of any hybrid fusion is the attack surface, and the cross-encoder "second factor" actually *re-admits* a small leak (1-3%) by scoring bait text pairwise. The 300-character ingest cap neutralizes the attack mechanically; the embedding-centroid z-score is a weak detector (max z = 1.32, not separable). Caveats: one decoy, one bait construction, attacker knows the query distribution but not the test queries; adaptive attacks against the fine-tuned space are future work. Deployment posture: server allowlisting + ingest length cap first, fine-tuned retrieval as the routing layer, rerank treated as a quality stage rather than a security control.
-""")
 
-    if calibration:
-        sections.append("### 4.8 Confidence calibration of the reranker\n")
-        sections.append(f"""Model B's sigmoid score on its top candidate gates auto-execution. On regime-1 test: raw ECE {calibration['raw']['ece']:.3f}; after temperature scaling fitted on validation (T = {calibration['temperature_fitted_on_val']:.2f}) ECE {calibration['temperature_scaled']['ece']:.3f} (top-1 accuracy {calibration['test_top1_accuracy']:.3f}). Reliability diagram: `figures/fig_calibration.png`.
-""")
+### 4.8 Confidence calibration of the reranker
 
-    if llm_incontext:
-        sections.append("### 4.9 LLM-in-context selection (monolithic arm)\n")
-        rows = ["| Catalog size | Accuracy | Mean latency (s) | Unparseable |", "| --- | --- | --- | --- |"]
-        for size, block in llm_incontext["catalog_sizes"].items():
-            rows.append(
-                f"| {size} | {block['accuracy']:.3f} | {block['latency_s_mean']:.2f} | {block['unparseable']} |"
-            )
-        sections.append("\n".join(rows))
-        sections.append(f"\nModel: `{llm_incontext['model']}`, {llm_incontext['n_queries']} sampled regime-1 test queries.\n")
-    else:
-        sections.append("""### 4.9 LLM-in-context selection (monolithic arm)
+Model B's sigmoid score on its top candidate gates auto-execution. On regime-1 test: raw ECE 0.131; after temperature scaling fitted on validation (T = 0.95) ECE 0.128 (top-1 accuracy 0.944). Reliability diagram: `figures/fig_calibration.png`.
+
+### 4.9 LLM-in-context selection (monolithic arm)
 
 Not run in this environment: the experiment requires a local LLM service (Ollama), unavailable on the authoring machine. The ready-to-run script is `experiments/evaluation/llm_incontext.py`; the smoke-scale A/B harness (3 filesystem tasks, llama3.2, README table) remains the only end-to-end evidence and is labeled as such.
-""")
 
-    # ------------------------------------------------------------- discussion
-    sections.append("""## 5. Discussion & Limitations
+## 5. Discussion & Limitations
 
 **Which model won, and why.** Model A (the fine-tuned bi-encoder) wins outright — on every regime, on every metric, and by 137× on per-query cost (0.5 ms vs 73 ms). Two findings explain it. First, fine-tuning moves retrieval quality far more than parameter count does: the 22M MiniLM jumps from 0.33 to 0.99 Recall@1 on regime 1 and matches or beats the frozen 109M MPNet everywhere, which matters for CPU-only deployment; the t-SNE figure shows the mechanism — contrastive training reorganizes queries into tight per-tool clusters aligned with schema embeddings. Second, Model B (the cross-encoder reranker) *fails to improve A and slightly degrades it* (regime 1: 0.944 vs 0.988; regime 2: 0.867 vs 0.909; regime 3: 0.633 vs 0.667). This is an instructive negative result, not an implementation accident: (i) A is near ceiling, so a reranker can mostly only preserve or damage its rankings; (ii) B trained on just 460 queries with mined negatives concentrated on A's confusion cases, so it gained discrimination there at the price of new errors on cases A already solved; (iii) under regime shift (unseen tools/servers) B's pairwise scores transfer worse than A's embedding geometry. The architectural folklore "retrieve-then-rerank always helps" assumes a reranker trained on far more supervision than the retriever it corrects — at course-project data scale, the opposite holds, and joint cross-attention's per-pair precision (visible in its standalone val MRR of 0.96) does not survive composition with a stronger retriever.
 
@@ -388,10 +210,8 @@ Not run in this environment: the experiment requires a local LLM service (Ollama
 **Difficulties encountered.** (1) The most consequential finding was a *data* problem, not a model problem: the original random split was answerable at ~96% Recall@1 without any model; recovering the scenario grammar and rebuilding the splits invalidated and replaced all earlier numbers. (2) MNRL's in-batch negatives are silently wrong at small catalog sizes (duplicate positives become negatives) — fixed with a no-duplicates sampler. (3) Training on a 4GB consumer GPU required fp16, sequence truncation to 256, and one recovery from a mid-run crash; CPU/GPU contention between concurrent jobs distorted early latency measurements until benchmarks were serialized. (4) The local-LLM baseline was blocked by environment (no Ollama); we ship the script and report the gap rather than fabricate it.
 
 **Limitations.** All queries are synthetic (author-templated or LLM-written; no production traffic), and lexical echo inflates all lexical numbers. Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation.
-""")
 
-    # ------------------------------------------------------------- conclusion
-    sections.append("""## 6. Conclusions
+## 6. Conclusions
 
 Framed as open-set dense retrieval and evaluated under leakage-controlled protocols, MCP tool selection is solved to high accuracy by a small contrastively fine-tuned bi-encoder — which also proves to be the strongest measured defense against description poisoning and the better open-set rejector. The trained cross-encoder comparison yields a deliberate negative result: at this supervision scale, reranking a stronger retriever with a weaker reranker degrades quality while multiplying cost, so the deployed system uses the bi-encoder alone. On indexing, exact flat search is the correct *default*: it is faster and exact below ~10^3 tools, and although HNSW searches faster beyond that, routing latency stays encoder-dominated to 10^5 vectors while HNSW pays up to 23% recall at default settings — approximation buys nothing until catalogs far exceed today's MCP registries. Equally important is what the study removes: an evaluation whose random split answered itself, and claims ("logarithmic scaling", "deterministic", "10,000+ tools") that the system no longer needs to make rhetorically because the benchmark now tests them empirically — or retires them. All datasets, splits, trained-model manifests, results, and figures regenerate from `experiments/run_all.py` with pinned seeds, and the split-hygiene constraints that make the numbers meaningful are enforced as failing tests in CI.
 
@@ -405,16 +225,3 @@ Framed as open-set dense retrieval and evaluated under leakage-controlled protoc
 6. N. Reimers, I. Gurevych. *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.* EMNLP 2019.
 7. V. Karpukhin et al. *Dense Passage Retrieval for Open-Domain Question Answering.* EMNLP 2020.
 8. R. Nogueira, K. Cho. *Passage Re-ranking with BERT.* arXiv:1901.04085, 2019.
-""")
-
-    return "\n".join(sections)
-
-
-def main() -> None:
-    REPORT_PATH.parent.mkdir(exist_ok=True)
-    REPORT_PATH.write_text(build(), encoding="utf-8")
-    print(f"wrote {REPORT_PATH}")
-
-
-if __name__ == "__main__":
-    main()

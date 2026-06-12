@@ -20,14 +20,17 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments import paths  # noqa: E402
 from experiments.baselines import Bm25Ranker, EncoderRanker, TfidfRanker  # noqa: E402
 from experiments.evaluation import metrics  # noqa: E402
-from experiments.evaluation.evaluate import REGIMES  # noqa: E402
 from experiments.evaluation.ood import best_finetuned_artifact  # noqa: E402
 from experiments.representation import REPRESENTATIONS  # noqa: E402
+
+# The ablation varies the schema-to-text representation over the 30-tool GitHub
+# corpus, so it covers the two GitHub regimes (regime 3 uses its own corpus).
+REGIMES = ("regime1_unseen_queries", "regime2_unseen_tools")
 
 
 def main() -> None:

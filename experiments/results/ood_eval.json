@@ -1,0 +1,3349 @@
+{
+ "id_set": "regime1_test",
+ "n_id": 144,
+ "n_ood": 249,
+ "systems": {
+  "ft_bge_seed13": {
+   "id_top1_accuracy": 0.9861,
+   "scores": {
+    "max_sim": {
+     "auroc_pooled": 0.9879,
+     "fpr@95tpr_pooled": 0.0763,
+     "per_subset": {
+      "adversarial_near_miss": {
+       "auroc": 0.9639,
+       "fpr@95tpr": 0.22,
+       "n": 50
+      },
+      "chitchat": {
+       "auroc": 0.9999,
+       "fpr@95tpr": 0.0,
+       "n": 99
+      },
+      "out_of_catalog": {
+       "auroc": 0.9881,
+       "fpr@95tpr": 0.08,
+       "n": 100
+      }
+     },
+     "sweep": [
+      {
+       "tau": 0.0,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.01,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.02,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.03,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.04,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.05,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.06,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.07,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.08,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.09,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.1,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.11,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.12,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.13,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.14,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.15,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.16,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.17,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.18,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.19,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.2,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.21,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.22,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.9899,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.23,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.9899,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.24,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.9596,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.25,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.9394,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.26,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.8889,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.27,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.8485,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.28,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.7879,
+       "accept_out_of_catalog": 0.97,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.29,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.7374,
+       "accept_out_of_catalog": 0.97,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.3,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.6465,
+       "accept_out_of_catalog": 0.94,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.31,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.5455,
+       "accept_out_of_catalog": 0.93,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.32,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.4242,
+       "accept_out_of_catalog": 0.91,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.33,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.3636,
+       "accept_out_of_catalog": 0.89,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.34,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.3232,
+       "accept_out_of_catalog": 0.87,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.35,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.2626,
+       "accept_out_of_catalog": 0.81,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.36,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.2424,
+       "accept_out_of_catalog": 0.77,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.37,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.2121,
+       "accept_out_of_catalog": 0.72,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.38,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.1111,
+       "accept_out_of_catalog": 0.71,
+       "accept_adversarial_near_miss": 0.94
+      },
+      {
+       "tau": 0.39,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0808,
+       "accept_out_of_catalog": 0.68,
+       "accept_adversarial_near_miss": 0.92
+      },
+      {
+       "tau": 0.4,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0707,
+       "accept_out_of_catalog": 0.64,
+       "accept_adversarial_near_miss": 0.92
+      },
+      {
+       "tau": 0.41,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0505,
+       "accept_out_of_catalog": 0.61,
+       "accept_adversarial_near_miss": 0.9
+      },
+      {
+       "tau": 0.42,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0303,
+       "accept_out_of_catalog": 0.52,
+       "accept_adversarial_near_miss": 0.88
+      },
+      {
+       "tau": 0.43,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0303,
+       "accept_out_of_catalog": 0.44,
+       "accept_adversarial_near_miss": 0.88
+      },
+      {
+       "tau": 0.44,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0202,
+       "accept_out_of_catalog": 0.41,
+       "accept_adversarial_near_miss": 0.88
+      },
+      {
+       "tau": 0.45,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0202,
+       "accept_out_of_catalog": 0.33,
+       "accept_adversarial_near_miss": 0.86
+      },
+      {
+       "tau": 0.46,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.3,
+       "accept_adversarial_near_miss": 0.8
+      },
+      {
+       "tau": 0.47,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.29,
+       "accept_adversarial_near_miss": 0.78
+      },
+      {
+       "tau": 0.48,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.24,
+       "accept_adversarial_near_miss": 0.78
+      },
+      {
+       "tau": 0.49,
+       "coverage": 0.9861,
+       "selective_risk": 0.0141,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.22,
+       "accept_adversarial_near_miss": 0.78
+      },
+      {
+       "tau": 0.5,
+       "coverage": 0.9861,
+       "selective_risk": 0.0141,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.21,
+       "accept_adversarial_near_miss": 0.74
+      },
+      {
+       "tau": 0.51,
+       "coverage": 0.9861,
+       "selective_risk": 0.0141,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.21,
+       "accept_adversarial_near_miss": 0.64
+      },
+      {
+       "tau": 0.52,
+       "coverage": 0.9861,
+       "selective_risk": 0.0141,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.21,
+       "accept_adversarial_near_miss": 0.64
+      },
+      {
+       "tau": 0.53,
+       "coverage": 0.9861,
+       "selective_risk": 0.0141,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.15,
+       "accept_adversarial_near_miss": 0.5
+      },
+      {
+       "tau": 0.54,
+       "coverage": 0.9792,
+       "selective_risk": 0.0142,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.13,
+       "accept_adversarial_near_miss": 0.46
+      },
+      {
+       "tau": 0.55,
+       "coverage": 0.9722,
+       "selective_risk": 0.0143,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.11,
+       "accept_adversarial_near_miss": 0.38
+      },
+      {
+       "tau": 0.56,
+       "coverage": 0.9722,
+       "selective_risk": 0.0143,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.1,
+       "accept_adversarial_near_miss": 0.3
+      },
+      {
+       "tau": 0.57,
+       "coverage": 0.9583,
+       "selective_risk": 0.0145,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.1,
+       "accept_adversarial_near_miss": 0.26
+      },
+      {
+       "tau": 0.58,
+       "coverage": 0.9444,
+       "selective_risk": 0.0147,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.08,
+       "accept_adversarial_near_miss": 0.24
+      },
+      {
+       "tau": 0.59,
+       "coverage": 0.9444,
+       "selective_risk": 0.0147,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.07,
+       "accept_adversarial_near_miss": 0.22
+      },
+      {
+       "tau": 0.6,
+       "coverage": 0.9444,
+       "selective_risk": 0.0147,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.07,
+       "accept_adversarial_near_miss": 0.22
+      },
+      {
+       "tau": 0.61,
+       "coverage": 0.9444,
+       "selective_risk": 0.0147,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.06,
+       "accept_adversarial_near_miss": 0.16
+      },
+      {
+       "tau": 0.62,
+       "coverage": 0.9306,
+       "selective_risk": 0.0075,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.16
+      },
+      {
+       "tau": 0.63,
+       "coverage": 0.9236,
+       "selective_risk": 0.0075,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.1
+      },
+      {
+       "tau": 0.64,
+       "coverage": 0.9236,
+       "selective_risk": 0.0075,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.08
+      },
+      {
+       "tau": 0.65,
+       "coverage": 0.8889,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.66,
+       "coverage": 0.875,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.04,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.67,
+       "coverage": 0.8681,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.03,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.68,
+       "coverage": 0.8542,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.69,
+       "coverage": 0.8472,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.7,
+       "coverage": 0.8403,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.71,
+       "coverage": 0.7986,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.72,
+       "coverage": 0.75,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.73,
+       "coverage": 0.6944,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.74,
+       "coverage": 0.6528,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.75,
+       "coverage": 0.6181,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.76,
+       "coverage": 0.5972,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.77,
+       "coverage": 0.5417,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.78,
+       "coverage": 0.5208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.79,
+       "coverage": 0.4583,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.8,
+       "coverage": 0.4097,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.81,
+       "coverage": 0.3542,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.82,
+       "coverage": 0.3125,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.83,
+       "coverage": 0.2708,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.84,
+       "coverage": 0.2083,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.85,
+       "coverage": 0.1528,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.86,
+       "coverage": 0.1042,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.87,
+       "coverage": 0.0625,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.88,
+       "coverage": 0.0417,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.89,
+       "coverage": 0.0347,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.9,
+       "coverage": 0.0139,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.91,
+       "coverage": 0.0139,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.92,
+       "coverage": 0.0069,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.93,
+       "coverage": 0.0069,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.94,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.95,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.96,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.97,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.98,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.99,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 1.0,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      }
+     ],
+     "id_score_mean": 0.767,
+     "ood_score_mean": 0.4089
+    },
+    "margin": {
+     "auroc_pooled": 0.9677,
+     "fpr@95tpr_pooled": 0.1847,
+     "per_subset": {
+      "adversarial_near_miss": {
+       "auroc": 0.931,
+       "fpr@95tpr": 0.44,
+       "n": 50
+      },
+      "chitchat": {
+       "auroc": 0.9821,
+       "fpr@95tpr": 0.0909,
+       "n": 99
+      },
+      "out_of_catalog": {
+       "auroc": 0.9718,
+       "fpr@95tpr": 0.15,
+       "n": 100
+      }
+     },
+     "sweep": [
+      {
+       "tau": 0.0,
+       "coverage": 1.0,
+       "selective_risk": 0.0139,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.01,
+       "coverage": 0.9931,
+       "selective_risk": 0.014,
+       "accept_chitchat": 0.8081,
+       "accept_out_of_catalog": 0.91,
+       "accept_adversarial_near_miss": 0.94
+      },
+      {
+       "tau": 0.02,
+       "coverage": 0.9931,
+       "selective_risk": 0.014,
+       "accept_chitchat": 0.6162,
+       "accept_out_of_catalog": 0.74,
+       "accept_adversarial_near_miss": 0.82
+      },
+      {
+       "tau": 0.03,
+       "coverage": 0.9931,
+       "selective_risk": 0.014,
+       "accept_chitchat": 0.4545,
+       "accept_out_of_catalog": 0.58,
+       "accept_adversarial_near_miss": 0.78
+      },
+      {
+       "tau": 0.04,
+       "coverage": 0.9792,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.3636,
+       "accept_out_of_catalog": 0.43,
+       "accept_adversarial_near_miss": 0.72
+      },
+      {
+       "tau": 0.05,
+       "coverage": 0.9792,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.303,
+       "accept_out_of_catalog": 0.36,
+       "accept_adversarial_near_miss": 0.64
+      },
+      {
+       "tau": 0.06,
+       "coverage": 0.9722,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.2323,
+       "accept_out_of_catalog": 0.33,
+       "accept_adversarial_near_miss": 0.62
+      },
+      {
+       "tau": 0.07,
+       "coverage": 0.9722,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.1818,
+       "accept_out_of_catalog": 0.26,
+       "accept_adversarial_near_miss": 0.56
+      },
+      {
+       "tau": 0.08,
+       "coverage": 0.9653,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.1111,
+       "accept_out_of_catalog": 0.23,
+       "accept_adversarial_near_miss": 0.56
+      },
+      {
+       "tau": 0.09,
+       "coverage": 0.9583,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0909,
+       "accept_out_of_catalog": 0.15,
+       "accept_adversarial_near_miss": 0.44
+      },
+      {
+       "tau": 0.1,
+       "coverage": 0.9306,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0404,
+       "accept_out_of_catalog": 0.15,
+       "accept_adversarial_near_miss": 0.36
+      },
+      {
+       "tau": 0.11,
+       "coverage": 0.9306,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0303,
+       "accept_out_of_catalog": 0.14,
+       "accept_adversarial_near_miss": 0.32
+      },
+      {
+       "tau": 0.12,
+       "coverage": 0.9236,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0202,
+       "accept_out_of_catalog": 0.11,
+       "accept_adversarial_near_miss": 0.28
+      },
+      {
+       "tau": 0.13,
+       "coverage": 0.9097,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0202,
+       "accept_out_of_catalog": 0.08,
+       "accept_adversarial_near_miss": 0.22
+      },
+      {
+       "tau": 0.14,
+       "coverage": 0.9028,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.06,
+       "accept_adversarial_near_miss": 0.22
+      },
+      {
+       "tau": 0.15,
+       "coverage": 0.9028,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.03,
+       "accept_adversarial_near_miss": 0.18
+      },
+      {
+       "tau": 0.16,
+       "coverage": 0.9028,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.03,
+       "accept_adversarial_near_miss": 0.18
+      },
+      {
+       "tau": 0.17,
+       "coverage": 0.9028,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.16
+      },
+      {
+       "tau": 0.18,
+       "coverage": 0.9028,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.14
+      },
+      {
+       "tau": 0.19,
+       "coverage": 0.8889,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.14
+      },
+      {
+       "tau": 0.2,
+       "coverage": 0.8681,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.12
+      },
+      {
+       "tau": 0.21,
+       "coverage": 0.8542,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.12
+      },
+      {
+       "tau": 0.22,
+       "coverage": 0.8264,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.12
+      },
+      {
+       "tau": 0.23,
+       "coverage": 0.8194,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.1
+      },
+      {
+       "tau": 0.24,
+       "coverage": 0.8125,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.08
+      },
+      {
+       "tau": 0.25,
+       "coverage": 0.7778,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.26,
+       "coverage": 0.7569,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.27,
+       "coverage": 0.7361,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.28,
+       "coverage": 0.7222,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.29,
+       "coverage": 0.7153,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.3,
+       "coverage": 0.6944,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.31,
+       "coverage": 0.6736,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.32,
+       "coverage": 0.6111,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.33,
+       "coverage": 0.5694,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.34,
+       "coverage": 0.5278,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.35,
+       "coverage": 0.4931,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.36,
+       "coverage": 0.4792,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.37,
+       "coverage": 0.4167,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.38,
+       "coverage": 0.3681,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.39,
+       "coverage": 0.3264,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.4,
+       "coverage": 0.2708,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.41,
+       "coverage": 0.2292,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.42,
+       "coverage": 0.2014,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.43,
+       "coverage": 0.1806,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.44,
+       "coverage": 0.1319,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.45,
+       "coverage": 0.1181,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.46,
+       "coverage": 0.0833,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.47,
+       "coverage": 0.0625,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.48,
+       "coverage": 0.0417,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.49,
+       "coverage": 0.0278,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.5,
+       "coverage": 0.0208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.51,
+       "coverage": 0.0208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.52,
+       "coverage": 0.0069,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.53,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.54,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.55,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.56,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.57,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.58,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.59,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.6,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.61,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.62,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.63,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.64,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.65,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.66,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.67,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.68,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.69,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.7,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.71,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.72,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.73,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.74,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.75,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.76,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.77,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.78,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.79,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.8,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.81,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.82,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.83,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.84,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.85,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.86,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.87,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.88,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.89,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.9,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.91,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.92,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.93,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.94,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.95,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.96,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.97,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.98,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.99,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 1.0,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      }
+     ],
+     "id_score_mean": 0.3285,
+     "ood_score_mean": 0.0554
+    }
+   }
+  },
+  "frozen_mpnet": {
+   "id_top1_accuracy": 0.6111,
+   "scores": {
+    "max_sim": {
+     "auroc_pooled": 0.9099,
+     "fpr@95tpr_pooled": 0.3695,
+     "per_subset": {
+      "adversarial_near_miss": {
+       "auroc": 0.7571,
+       "fpr@95tpr": 0.92,
+       "n": 50
+      },
+      "chitchat": {
+       "auroc": 0.9907,
+       "fpr@95tpr": 0.0101,
+       "n": 99
+      },
+      "out_of_catalog": {
+       "auroc": 0.9063,
+       "fpr@95tpr": 0.45,
+       "n": 100
+      }
+     },
+     "sweep": [
+      {
+       "tau": 0.0,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.9798,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.01,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.9798,
+       "accept_out_of_catalog": 0.99,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.02,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.9596,
+       "accept_out_of_catalog": 0.98,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.03,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.9293,
+       "accept_out_of_catalog": 0.98,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.04,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.8788,
+       "accept_out_of_catalog": 0.97,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.05,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.8384,
+       "accept_out_of_catalog": 0.97,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.06,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.7677,
+       "accept_out_of_catalog": 0.94,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.07,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.7475,
+       "accept_out_of_catalog": 0.88,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.08,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.6465,
+       "accept_out_of_catalog": 0.86,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.09,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 0.5455,
+       "accept_out_of_catalog": 0.83,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.1,
+       "coverage": 0.9931,
+       "selective_risk": 0.3846,
+       "accept_chitchat": 0.4444,
+       "accept_out_of_catalog": 0.78,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.11,
+       "coverage": 0.9931,
+       "selective_risk": 0.3846,
+       "accept_chitchat": 0.3333,
+       "accept_out_of_catalog": 0.74,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.12,
+       "coverage": 0.9861,
+       "selective_risk": 0.3803,
+       "accept_chitchat": 0.2525,
+       "accept_out_of_catalog": 0.7,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.13,
+       "coverage": 0.9861,
+       "selective_risk": 0.3803,
+       "accept_chitchat": 0.1919,
+       "accept_out_of_catalog": 0.68,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.14,
+       "coverage": 0.9861,
+       "selective_risk": 0.3803,
+       "accept_chitchat": 0.1515,
+       "accept_out_of_catalog": 0.63,
+       "accept_adversarial_near_miss": 0.98
+      },
+      {
+       "tau": 0.15,
+       "coverage": 0.9792,
+       "selective_risk": 0.3759,
+       "accept_chitchat": 0.1111,
+       "accept_out_of_catalog": 0.59,
+       "accept_adversarial_near_miss": 0.96
+      },
+      {
+       "tau": 0.16,
+       "coverage": 0.9792,
+       "selective_risk": 0.3759,
+       "accept_chitchat": 0.0808,
+       "accept_out_of_catalog": 0.57,
+       "accept_adversarial_near_miss": 0.96
+      },
+      {
+       "tau": 0.17,
+       "coverage": 0.9722,
+       "selective_risk": 0.3786,
+       "accept_chitchat": 0.0808,
+       "accept_out_of_catalog": 0.52,
+       "accept_adversarial_near_miss": 0.96
+      },
+      {
+       "tau": 0.18,
+       "coverage": 0.9653,
+       "selective_risk": 0.3741,
+       "accept_chitchat": 0.0404,
+       "accept_out_of_catalog": 0.48,
+       "accept_adversarial_near_miss": 0.94
+      },
+      {
+       "tau": 0.19,
+       "coverage": 0.9514,
+       "selective_risk": 0.3796,
+       "accept_chitchat": 0.0303,
+       "accept_out_of_catalog": 0.47,
+       "accept_adversarial_near_miss": 0.94
+      },
+      {
+       "tau": 0.2,
+       "coverage": 0.9444,
+       "selective_risk": 0.375,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.44,
+       "accept_adversarial_near_miss": 0.92
+      },
+      {
+       "tau": 0.21,
+       "coverage": 0.9444,
+       "selective_risk": 0.375,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.42,
+       "accept_adversarial_near_miss": 0.88
+      },
+      {
+       "tau": 0.22,
+       "coverage": 0.9306,
+       "selective_risk": 0.3731,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.38,
+       "accept_adversarial_near_miss": 0.84
+      },
+      {
+       "tau": 0.23,
+       "coverage": 0.9236,
+       "selective_risk": 0.3759,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.35,
+       "accept_adversarial_near_miss": 0.78
+      },
+      {
+       "tau": 0.24,
+       "coverage": 0.9167,
+       "selective_risk": 0.3712,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.34,
+       "accept_adversarial_near_miss": 0.74
+      },
+      {
+       "tau": 0.25,
+       "coverage": 0.9167,
+       "selective_risk": 0.3712,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.29,
+       "accept_adversarial_near_miss": 0.7
+      },
+      {
+       "tau": 0.26,
+       "coverage": 0.8958,
+       "selective_risk": 0.3643,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.25,
+       "accept_adversarial_near_miss": 0.7
+      },
+      {
+       "tau": 0.27,
+       "coverage": 0.875,
+       "selective_risk": 0.3571,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.2,
+       "accept_adversarial_near_miss": 0.66
+      },
+      {
+       "tau": 0.28,
+       "coverage": 0.8611,
+       "selective_risk": 0.3548,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.19,
+       "accept_adversarial_near_miss": 0.62
+      },
+      {
+       "tau": 0.29,
+       "coverage": 0.8542,
+       "selective_risk": 0.3577,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.14,
+       "accept_adversarial_near_miss": 0.54
+      },
+      {
+       "tau": 0.3,
+       "coverage": 0.8403,
+       "selective_risk": 0.3636,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.14,
+       "accept_adversarial_near_miss": 0.5
+      },
+      {
+       "tau": 0.31,
+       "coverage": 0.8056,
+       "selective_risk": 0.3707,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.13,
+       "accept_adversarial_near_miss": 0.48
+      },
+      {
+       "tau": 0.32,
+       "coverage": 0.7708,
+       "selective_risk": 0.3784,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.1,
+       "accept_adversarial_near_miss": 0.44
+      },
+      {
+       "tau": 0.33,
+       "coverage": 0.7431,
+       "selective_risk": 0.3925,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.09,
+       "accept_adversarial_near_miss": 0.38
+      },
+      {
+       "tau": 0.34,
+       "coverage": 0.7153,
+       "selective_risk": 0.3981,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.08,
+       "accept_adversarial_near_miss": 0.38
+      },
+      {
+       "tau": 0.35,
+       "coverage": 0.6944,
+       "selective_risk": 0.4,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.08,
+       "accept_adversarial_near_miss": 0.36
+      },
+      {
+       "tau": 0.36,
+       "coverage": 0.6597,
+       "selective_risk": 0.4,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.08,
+       "accept_adversarial_near_miss": 0.32
+      },
+      {
+       "tau": 0.37,
+       "coverage": 0.6458,
+       "selective_risk": 0.3978,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.07,
+       "accept_adversarial_near_miss": 0.26
+      },
+      {
+       "tau": 0.38,
+       "coverage": 0.6181,
+       "selective_risk": 0.3933,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.07,
+       "accept_adversarial_near_miss": 0.24
+      },
+      {
+       "tau": 0.39,
+       "coverage": 0.5972,
+       "selective_risk": 0.407,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.07,
+       "accept_adversarial_near_miss": 0.2
+      },
+      {
+       "tau": 0.4,
+       "coverage": 0.5625,
+       "selective_risk": 0.4198,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.06,
+       "accept_adversarial_near_miss": 0.18
+      },
+      {
+       "tau": 0.41,
+       "coverage": 0.5417,
+       "selective_risk": 0.4103,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.06,
+       "accept_adversarial_near_miss": 0.16
+      },
+      {
+       "tau": 0.42,
+       "coverage": 0.5278,
+       "selective_risk": 0.4211,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.06,
+       "accept_adversarial_near_miss": 0.14
+      },
+      {
+       "tau": 0.43,
+       "coverage": 0.5069,
+       "selective_risk": 0.411,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.12
+      },
+      {
+       "tau": 0.44,
+       "coverage": 0.4792,
+       "selective_risk": 0.4058,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.12
+      },
+      {
+       "tau": 0.45,
+       "coverage": 0.4722,
+       "selective_risk": 0.4118,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.05,
+       "accept_adversarial_near_miss": 0.08
+      },
+      {
+       "tau": 0.46,
+       "coverage": 0.4444,
+       "selective_risk": 0.4062,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.04,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.47,
+       "coverage": 0.4167,
+       "selective_risk": 0.3833,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.04,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.48,
+       "coverage": 0.3889,
+       "selective_risk": 0.3929,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.04,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.49,
+       "coverage": 0.3542,
+       "selective_risk": 0.3922,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.03,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.5,
+       "coverage": 0.3264,
+       "selective_risk": 0.383,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.51,
+       "coverage": 0.2986,
+       "selective_risk": 0.3953,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.52,
+       "coverage": 0.2778,
+       "selective_risk": 0.4,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.53,
+       "coverage": 0.2639,
+       "selective_risk": 0.3947,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.54,
+       "coverage": 0.25,
+       "selective_risk": 0.3611,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.55,
+       "coverage": 0.2153,
+       "selective_risk": 0.3226,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.56,
+       "coverage": 0.1736,
+       "selective_risk": 0.32,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.57,
+       "coverage": 0.1528,
+       "selective_risk": 0.3636,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.58,
+       "coverage": 0.1319,
+       "selective_risk": 0.3684,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.59,
+       "coverage": 0.1111,
+       "selective_risk": 0.375,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.02
+      },
+      {
+       "tau": 0.6,
+       "coverage": 0.0972,
+       "selective_risk": 0.3571,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.61,
+       "coverage": 0.0625,
+       "selective_risk": 0.4444,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.62,
+       "coverage": 0.0417,
+       "selective_risk": 0.3333,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.63,
+       "coverage": 0.0208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.64,
+       "coverage": 0.0208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.65,
+       "coverage": 0.0208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.66,
+       "coverage": 0.0139,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.67,
+       "coverage": 0.0139,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.68,
+       "coverage": 0.0069,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.69,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.7,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.71,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.72,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.73,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.74,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.75,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.76,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.77,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.78,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.79,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.8,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.81,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.82,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.83,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.84,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.85,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.86,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.87,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.88,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.89,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.9,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.91,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.92,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.93,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.94,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.95,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.96,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.97,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.98,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.99,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 1.0,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      }
+     ],
+     "id_score_mean": 0.4262,
+     "ood_score_mean": 0.1792
+    },
+    "margin": {
+     "auroc_pooled": 0.6809,
+     "fpr@95tpr_pooled": 0.9116,
+     "per_subset": {
+      "adversarial_near_miss": {
+       "auroc": 0.6181,
+       "fpr@95tpr": 0.92,
+       "n": 50
+      },
+      "chitchat": {
+       "auroc": 0.7412,
+       "fpr@95tpr": 0.9091,
+       "n": 99
+      },
+      "out_of_catalog": {
+       "auroc": 0.6526,
+       "fpr@95tpr": 0.91,
+       "n": 100
+      }
+     },
+     "sweep": [
+      {
+       "tau": 0.0,
+       "coverage": 1.0,
+       "selective_risk": 0.3889,
+       "accept_chitchat": 1.0,
+       "accept_out_of_catalog": 1.0,
+       "accept_adversarial_near_miss": 1.0
+      },
+      {
+       "tau": 0.01,
+       "coverage": 0.7778,
+       "selective_risk": 0.3214,
+       "accept_chitchat": 0.4646,
+       "accept_out_of_catalog": 0.6,
+       "accept_adversarial_near_miss": 0.58
+      },
+      {
+       "tau": 0.02,
+       "coverage": 0.6181,
+       "selective_risk": 0.2584,
+       "accept_chitchat": 0.2222,
+       "accept_out_of_catalog": 0.34,
+       "accept_adversarial_near_miss": 0.42
+      },
+      {
+       "tau": 0.03,
+       "coverage": 0.4792,
+       "selective_risk": 0.1739,
+       "accept_chitchat": 0.0606,
+       "accept_out_of_catalog": 0.24,
+       "accept_adversarial_near_miss": 0.26
+      },
+      {
+       "tau": 0.04,
+       "coverage": 0.3472,
+       "selective_risk": 0.08,
+       "accept_chitchat": 0.0404,
+       "accept_out_of_catalog": 0.21,
+       "accept_adversarial_near_miss": 0.2
+      },
+      {
+       "tau": 0.05,
+       "coverage": 0.3056,
+       "selective_risk": 0.0682,
+       "accept_chitchat": 0.0101,
+       "accept_out_of_catalog": 0.13,
+       "accept_adversarial_near_miss": 0.16
+      },
+      {
+       "tau": 0.06,
+       "coverage": 0.2639,
+       "selective_risk": 0.0789,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.08,
+       "accept_adversarial_near_miss": 0.12
+      },
+      {
+       "tau": 0.07,
+       "coverage": 0.1667,
+       "selective_risk": 0.0417,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.04,
+       "accept_adversarial_near_miss": 0.1
+      },
+      {
+       "tau": 0.08,
+       "coverage": 0.125,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.04,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.09,
+       "coverage": 0.0694,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.02,
+       "accept_adversarial_near_miss": 0.06
+      },
+      {
+       "tau": 0.1,
+       "coverage": 0.0486,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.11,
+       "coverage": 0.0347,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.04
+      },
+      {
+       "tau": 0.12,
+       "coverage": 0.0208,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.13,
+       "coverage": 0.0069,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.14,
+       "coverage": 0.0069,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.15,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.16,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.01,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.17,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.18,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.19,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.2,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.21,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.22,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.23,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.24,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.25,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.26,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.27,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.28,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.29,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.3,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.31,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.32,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.33,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.34,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.35,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.36,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.37,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.38,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.39,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.4,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.41,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.42,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.43,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.44,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.45,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.46,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.47,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.48,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.49,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.5,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.51,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.52,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.53,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.54,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.55,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.56,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.57,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.58,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.59,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.6,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.61,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.62,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.63,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.64,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.65,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.66,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.67,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.68,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.69,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.7,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.71,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.72,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.73,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.74,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.75,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.76,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.77,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.78,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.79,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.8,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.81,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.82,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.83,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.84,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.85,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.86,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.87,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.88,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.89,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.9,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.91,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.92,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.93,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.94,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.95,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.96,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.97,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.98,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 0.99,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      },
+      {
+       "tau": 1.0,
+       "coverage": 0.0,
+       "selective_risk": 0.0,
+       "accept_chitchat": 0.0,
+       "accept_out_of_catalog": 0.0,
+       "accept_adversarial_near_miss": 0.0
+      }
+     ],
+     "id_score_mean": 0.0371,
+     "ood_score_mean": 0.0191
+    }
+   }
+  }
+ }
+}
