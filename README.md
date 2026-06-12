@@ -44,6 +44,15 @@ results = router.route_top_k("Write a summary to output.txt", k=2)
 llm_tools = to_openai_tools(results)   # bindable function-calling schemas
 ```
 
+> **Performance note — default vs evaluated-best.** Out of the box the router
+> loads a *zero-shot* sentence-transformer checkpoint. The benchmark's headline
+> numbers come from **fine-tuned** weights, which are intentionally not
+> committed (see `experiments/results/artifact_manifest.json` for their
+> hashes). Zero-shot dense retrieval is measurably weaker — on this benchmark
+> frozen MiniLM scores *below BM25*. To match the reported quality, regenerate
+> the artifacts (`python experiments/run_all.py --from train`) and point the
+> router at one: `UniversalMCPRouter(model_name="experiments/artifacts/biencoder/minilm/seed42/final")`.
+
 Optional extras:
 
 ```bash

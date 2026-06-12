@@ -110,6 +110,33 @@ class TfidfRanker:
         return [self.corpus_tools[i] for i in order]
 
 
+class NearestTrainAnchorRanker:
+    """Leakage probe: ranks tools by similarity to *training queries*, never
+    reading a schema. High Recall@1 from this system means the split leaks
+    surface patterns from train to test; on a sound split it should sit well
+    below schema-based systems."""
+
+    def __init__(self, corpus_tools: list[str], train_anchors: list[str], train_labels: list[str]) -> None:
+        self.name = "1nn_train_anchor"
+        self.corpus_tools = list(corpus_tools)
+        self.train_labels = list(train_labels)
+        self.vectorizer = TfidfVectorizer(
+            analyzer="char_wb", ngram_range=(3, 5), lowercase=True, preprocessor=lexicalize
+        )
+        self.train_matrix = self.vectorizer.fit_transform(train_anchors)
+
+    def rank(self, query: str) -> list[str]:
+        similarities = np.asarray(
+            (self.vectorizer.transform([query]) @ self.train_matrix.T).todense()
+        ).ravel()
+        per_tool: dict[str, float] = {tool: 0.0 for tool in self.corpus_tools}
+        for similarity, label in zip(similarities, self.train_labels):
+            if similarity > per_tool.get(label, 0.0):
+                per_tool[label] = float(similarity)
+        order = sorted(self.corpus_tools, key=lambda tool: -per_tool[tool])
+        return order
+
+
 class EncoderRanker:
     """Dense ranker over normalized sentence-transformer embeddings.
 

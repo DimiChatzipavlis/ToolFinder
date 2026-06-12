@@ -208,6 +208,8 @@ def build() -> str:
     poisoning = load("poisoning.json")
     calibration = load("calibration.json")
     llm_incontext = load("llm_incontext.json")
+    template_disjoint = load("template_disjoint_eval.json")
+    significance = load("significance.json")
 
     sections: list[str] = []
 

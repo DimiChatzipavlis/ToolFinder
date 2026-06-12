@@ -89,3 +89,23 @@ def test_corpus_contains_all_30_tools_as_distractors() -> None:
             f"{regime} must rank against the full merged corpus, "
             "otherwise unseen-tool evaluation is artificially easy"
         )
+
+
+def test_regime1b_is_template_and_scenario_disjoint() -> None:
+    """The template-disjoint control: no surface template and no scenario of a
+    test row may appear in training. Without this, a model can score perfectly
+    by memorizing template->tool mappings (the regime-1 saturation signature)."""
+    df = load_queries().set_index("query_id")
+    split = load_split("regime1b_template_disjoint")
+
+    for column in ("template_id", "scenario_id"):
+        train_values = {df.loc[qid, column] for qid in split["train"]}
+        val_values = {df.loc[qid, column] for qid in split["val"]}
+        test_values = {df.loc[qid, column] for qid in split["test"]}
+        assert not (train_values & test_values), f"{column} crosses train/test"
+        assert not (train_values & val_values), f"{column} crosses train/val"
+        assert not (val_values & test_values), f"{column} crosses val/test"
+
+    buckets = [set(split["train"]), set(split["val"]), set(split["test"])]
+    assert not (buckets[0] & buckets[1]) and not (buckets[0] & buckets[2]) and not (buckets[1] & buckets[2])
+    assert all(df.loc[qid, "dataset"] == "v1" for bucket in buckets for qid in bucket)

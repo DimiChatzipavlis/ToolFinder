@@ -1,0 +1,93 @@
+{
+ "baseline": "bm25",
+ "n_resamples": 10000,
+ "regimes": {
+  "regime1_unseen_queries": {
+   "ft_minilm_seed13": {
+    "delta_r1": 0.4167,
+    "ci95": [
+     0.3403,
+     0.5
+    ],
+    "p_value": 0.0001,
+    "n_queries": 144
+   },
+   "ft_minilm_seed1337": {
+    "delta_r1": 0.4167,
+    "ci95": [
+     0.3403,
+     0.5
+    ],
+    "p_value": 0.0001,
+    "n_queries": 144
+   },
+   "ft_minilm_seed42": {
+    "delta_r1": 0.4236,
+    "ci95": [
+     0.3472,
+     0.5069
+    ],
+    "p_value": 0.0001,
+    "n_queries": 144
+   }
+  },
+  "regime2_unseen_tools": {
+   "ft_minilm_seed13": {
+    "delta_r1": 0.1507,
+    "ci95": [
+     0.1173,
+     0.1853
+    ],
+    "p_value": 0.0001,
+    "n_queries": 750
+   },
+   "ft_minilm_seed1337": {
+    "delta_r1": 0.1547,
+    "ci95": [
+     0.1213,
+     0.1893
+    ],
+    "p_value": 0.0001,
+    "n_queries": 750
+   },
+   "ft_minilm_seed42": {
+    "delta_r1": 0.1467,
+    "ci95": [
+     0.1133,
+     0.1813
+    ],
+    "p_value": 0.0001,
+    "n_queries": 750
+   }
+  },
+  "regime3_unseen_servers": {
+   "ft_minilm_seed13": {
+    "delta_r1": 0.1897,
+    "ci95": [
+     0.1128,
+     0.2667
+    ],
+    "p_value": 0.0001,
+    "n_queries": 195
+   },
+   "ft_minilm_seed1337": {
+    "delta_r1": 0.1692,
+    "ci95": [
+     0.0923,
+     0.2462
+    ],
+    "p_value": 0.0001,
+    "n_queries": 195
+   },
+   "ft_minilm_seed42": {
+    "delta_r1": 0.1795,
+    "ci95": [
+     0.1026,
+     0.2564
+    ],
+    "p_value": 0.0001,
+    "n_queries": 195
+   }
+  }
+ }
+}

@@ -31,6 +31,14 @@ addressed as below.
 | Path traversal enforcement not invariant across configs | Path arguments resolve against `workspace_root` (never process cwd) with `realpath` before containment checks in `Enterprise/runtime/policy.py` |
 | `_send_message` could block indefinitely on stdio backpressure | Bounded `drain()` with `request_timeout_s` in `toolfinder/mcp_adapter.py` |
 
+## Known mismatch: shipped default vs evaluated best
+
+`UniversalMCPRouter` defaults to a zero-shot checkpoint; the benchmark's best
+numbers come from fine-tuned artifacts that are regenerable but not committed.
+Zero-shot dense retrieval underperforms BM25 on this benchmark. This is
+disclosed in the README ("Performance note"), the router docstring, and the
+report's limitations; loading a fine-tuned artifact is a one-line change.
+
 ## Runtime changes worth knowing
 
 - `UniversalMCPRouter` defaults to exact `IndexFlatIP`; HNSW is opt-in

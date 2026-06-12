@@ -103,7 +103,49 @@ def main() -> None:
         "test": sorted(df[df["dataset"] == "v2"]["query_id"].tolist()),
     }
 
-    for spec in (regime1, regime2):
+    # Regime 1b: the template-disjoint control. The generation grammar is
+    # template x scenario; regime 1 holds out scenarios but every surface
+    # template still appears on both sides, so a model can ace it by learning
+    # template->tool mappings. Here test rows use templates AND scenarios never
+    # seen in training (rows in mixed blocks are discarded), which is the
+    # controlled measurement of in-grammar generalization.
+    bucket1b: dict[str, list[str]] = {bucket: [] for bucket in BUCKETS}
+    discarded = 0
+    rng1b = random.Random(SEED + 1)
+    for _, tool_group in v1.groupby("tool", sort=True):
+        templates = sorted(tool_group["template_id"].unique())
+        scenarios = sorted(tool_group["scenario_id"].unique())
+        if len(templates) <= 12 and len(scenarios) <= 8:
+            rng1b.shuffle(templates)
+            rng1b.shuffle(scenarios)
+            template_bucket = {t: ("train" if i < 6 else "val" if i < 8 else "test") for i, t in enumerate(templates)}
+            scenario_bucket = {s: ("train" if i < 3 else "val" if i < 4 else "test") for i, s in enumerate(scenarios)}
+            for _, row in tool_group.iterrows():
+                tb = template_bucket[row["template_id"]]
+                sb = scenario_bucket[row["scenario_id"]]
+                if tb == sb:
+                    bucket1b[tb].append(row["query_id"])
+                else:
+                    discarded += 1
+        else:
+            # One-off tools: every row is its own template, so a scenario-grouped
+            # split is template-disjoint by construction.
+            sizes = tool_group.groupby("scenario_id").size().to_dict()
+            assignment = split_tool_scenarios(sizes, rng1b)
+            for _, row in tool_group.iterrows():
+                bucket1b[assignment[row["scenario_id"]]].append(row["query_id"])
+
+    regime1b = {
+        "regime": "regime1b_template_disjoint",
+        "seed": SEED,
+        "corpus_tools": corpus_tools,
+        "discarded_mixed_block_rows": discarded,
+        "train": sorted(bucket1b["train"]),
+        "val": sorted(bucket1b["val"]),
+        "test": sorted(bucket1b["test"]),
+    }
+
+    for spec in (regime1, regime2, regime1b):
         out_path = paths.SPLITS_DIR / f"{spec['regime']}.json"
         out_path.write_text(json.dumps(spec, indent=1), encoding="utf-8")
         sizes = {bucket: len(spec[bucket]) for bucket in BUCKETS}

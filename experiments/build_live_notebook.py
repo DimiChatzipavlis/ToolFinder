@@ -78,7 +78,7 @@ except ImportError:
 
 REPO_ROOT = Path.cwd()
 sys.path.insert(0, str(REPO_ROOT))
-print("repo root:", REPO_ROOT)""",
+print("repo root folder:", REPO_ROOT.name)  # name only: keep absolute user paths out of committed outputs""",
     ),
     (
         "markdown",

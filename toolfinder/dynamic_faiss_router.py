@@ -131,6 +131,12 @@ class UniversalMCPRouter:
     index (exact `IndexFlatIP` by default; see `RouterHyperparameters.index_type`).
     Routing methods always return `RouteResult` objects; use `to_openai_tools()`
     to convert candidates into bindable function-calling schemas.
+
+    Quality note: `model_name` defaults to a zero-shot checkpoint. The
+    benchmark's best results come from fine-tuned weights; pass a local
+    artifact path (e.g. `experiments/artifacts/biencoder/minilm/seed42/final`)
+    to load them. Zero-shot dense retrieval can underperform lexical search on
+    in-domain catalogs (see `reports/report.md`).
     """
 
     def __init__(

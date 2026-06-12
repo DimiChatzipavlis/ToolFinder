@@ -66,6 +66,42 @@ def cluster_scenarios(anchors: list[str]) -> list[int]:
     return [tail_to_label[tail] for tail in tails]
 
 
+def recover_templates(anchors: list[str], scenario_labels: list[int]) -> list[int]:
+    """Recover the surface-template id of each anchor.
+
+    The generation grammar is `<template prefix> + <scenario clause>` with the
+    clause kept verbatim. Within a scenario cluster, the clause is therefore
+    the longest common word-suffix of the cluster's anchors; stripping it
+    leaves the template prefix, which is shared *across* scenarios of the same
+    tool. Tools without the grammar (one-off anchors) get one template per row.
+    """
+    normalized = [normalize(anchor).split() for anchor in anchors]
+
+    clause_lengths: dict[int, int] = {}
+    by_label: dict[int, list[list[str]]] = {}
+    for words, label in zip(normalized, scenario_labels):
+        by_label.setdefault(label, []).append(words)
+    for label, members in by_label.items():
+        if len(members) == 1:
+            clause_lengths[label] = len(members[0])
+            continue
+        shortest = min(len(words) for words in members)
+        common = 0
+        while common < shortest and len({tuple(words[len(words) - common - 1 :]) for words in members}) == 1:
+            common += 1
+        clause_lengths[label] = common
+
+    template_keys: list[str] = []
+    for index, (words, label) in enumerate(zip(normalized, scenario_labels)):
+        clause_length = clause_lengths[label]
+        prefix = " ".join(words[: len(words) - clause_length]).strip()
+        # One-off rows (clause == whole anchor) are their own template.
+        template_keys.append(prefix if prefix else f"__row_{index}")
+
+    key_to_id = {key: i for i, key in enumerate(sorted(set(template_keys)))}
+    return [key_to_id[key] for key in template_keys]
+
+
 def load_raw() -> pd.DataFrame:
     frames = []
     for dataset_name, csv_path in (("v1", paths.RAW_V1_CSV), ("v2", paths.RAW_V2_CSV)):
@@ -84,9 +120,12 @@ def main() -> None:
     df = load_raw()
 
     scenario_ids: list[str] = [""] * len(df)
+    template_ids: list[str] = [""] * len(df)
     summary_rows: list[dict] = []
     for (dataset_name, tool), group in df.groupby(["dataset", "tool"], sort=True):
-        labels = cluster_scenarios(group["anchor"].tolist())
+        anchors = group["anchor"].tolist()
+        labels = cluster_scenarios(anchors)
+        templates = recover_templates(anchors, labels)
         sizes: dict[int, int] = {}
         for label in labels:
             sizes[label] = sizes.get(label, 0) + 1
@@ -96,16 +135,21 @@ def main() -> None:
                 "tool": tool,
                 "n_rows": len(group),
                 "n_scenarios": len(sizes),
+                "n_templates": len(set(templates)),
                 "max_cluster": max(sizes.values()),
             }
         )
-        for df_index, label in zip(group.index, labels):
+        for df_index, label, template in zip(group.index, labels, templates):
             scenario_ids[df_index] = f"{dataset_name}:{tool}:s{label:02d}"
+            template_ids[df_index] = f"{dataset_name}:{tool}:t{template:02d}"
 
     df["scenario_id"] = scenario_ids
+    df["template_id"] = template_ids
     df["query_id"] = [f"{d}-{i:04d}" for i, d in enumerate(df["dataset"])]
 
-    out = df[["query_id", "dataset", "server", "tool", "scenario_id", "origin", "anchor", "positive_schema"]]
+    out = df[
+        ["query_id", "dataset", "server", "tool", "scenario_id", "template_id", "origin", "anchor", "positive_schema"]
+    ]
     out.to_csv(paths.QUERIES_CSV, index=False)
 
     corpus: dict[str, dict] = {}
