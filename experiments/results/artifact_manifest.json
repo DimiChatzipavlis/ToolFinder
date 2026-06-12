@@ -54,10 +54,12 @@
  },
  "results": {
   "experiments/results/ablation_representation.json": "16477b9732df27c5e35e548d9f56c70c8f66e9f3b07da5403deceb39ec4207b8",
+  "experiments/results/artifact_manifest.json": "afb3edc35196cd84f8b8ed303bf30fe3475aa2f5f7874a4c81c70f751819edf8",
   "experiments/results/biencoder_training.json": "20dcfa22b64543d867d51c0decc6b05c5c410d7f762e688ca840e856e5f22418",
   "experiments/results/calibration.json": "32d1e38a3692d1de29334976c13683213f51c4c58b2b93138de5117295765245",
   "experiments/results/crossencoder_training.json": "3c114a2fde03a4f0a0a82a79768dd7adb71d2dac4e4945c60bc33b964819e3e8",
-  "experiments/results/main_eval.json": "aa787dc3700f33b0d2c5b9496562136885bcb3e2200a55d33c5f89d52840f87d",
+  "experiments/results/diagnostics/main_eval_per_query.json": "9231611c81cb58b9ed1a7d4ee68a5535b8933edf6e256ed5ea90eaf316254cdc",
+  "experiments/results/main_eval.json": "c894614100e469ca264934600056d5ceaf4cf3038b3d26113826c661c25a6186",
   "experiments/results/ood_eval.json": "3f5ee1030173c69e0dde7dda6a149c924e7394cc16c0fde970f06ac91d4d9cad",
   "experiments/results/poisoning.json": "998e81ba3a534c44beec3707c129b43783091817c435614df0cf504f4fb3175b",
   "experiments/results/scaling_bench.json": "c4d4c4cddbe161280b52efdd92e8dd50e1edc9059d7c2e9e66b3b00f14e09f3c"
