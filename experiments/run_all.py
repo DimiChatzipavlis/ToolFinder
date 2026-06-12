@@ -40,7 +40,11 @@ STAGES: list[tuple[str, list[list[str]]]] = [
     ("scaling", [["experiments/benchmarks/scaling_bench.py"]]),
     ("attacks", [["experiments/attacks/poisoning.py"]]),
     ("calibration", [["experiments/evaluation/calibration.py"]]),
-    ("figures", [["experiments/figures.py"], ["experiments/build_eda_notebook.py"]]),
+    ("figures", [
+        ["experiments/figures.py"],
+        ["experiments/build_eda_notebook.py"],
+        ["experiments/build_live_notebook.py"],
+    ]),
     ("report", [["experiments/build_report.py"], ["experiments/build_manifest.py"]]),
 ]
 

@@ -115,21 +115,32 @@ print(json.dumps(to_openai_tools(results[:1])[0]["function"]["name"], indent=2))
     ),
     (
         "markdown",
-        """### Abstention on out-of-scope queries
+        """### Scores around the abstention threshold
 
-Below the similarity threshold the router refuses instead of force-routing —
-the operating point is chosen from the measured risk-coverage analysis
-(`experiments/results/ood_eval.json`), not guessed.""",
+The router abstains when the best similarity falls below `min_cosine_similarity`.
+The honest story (quantified in `experiments/results/ood_eval.json`) is that
+in-scope and out-of-scope queries occupy different score ranges but the
+separation is imperfect — chitchat sits far below in-distribution scores, while
+near-miss requests overlap them. The cell shows raw top-1 scores against the
+threshold so you can see the margin, not just the verdict.""",
     ),
     (
         "code",
-        """for query in ["what's the weather in Athens tomorrow?", "play my focus playlist"]:
-    try:
-        result = router.route(query)
-        print(f"{query!r} -> ROUTED to {result.tool_name} (score {result.score:.3f})")
-    except RouteNotFoundError:
-        top = router.route_top_k(query, k=1)
-        print(f"{query!r} -> ABSTAINED (no candidate above threshold)")""",
+        """probe_queries = [
+    ("in-scope ", "list the open issues mentioning memory leaks"),
+    ("in-scope ", "fork the analytics repository to my account"),
+    ("oo-scope ", "what's the weather in Athens tomorrow?"),
+    ("oo-scope ", "play my focus playlist"),
+]
+tau = router.config.min_cosine_similarity
+print(f"threshold tau = {tau}")
+for label, query in probe_queries:
+    top = router.route_top_k(query, k=1)
+    if top:
+        verdict = "route" if top[0].score >= tau else "abstain"
+        print(f"[{label}] {query!r:55s} top1={top[0].tool_name:24s} score={top[0].score:.3f} -> {verdict}")
+    else:
+        print(f"[{label}] {query!r:55s} -> abstain (below threshold)")""",
     ),
     (
         "markdown",

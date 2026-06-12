@@ -1,0 +1,170 @@
+[
+ {
+  "model_key": "crossencoder",
+  "base_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "seed": 13,
+  "device": "cuda",
+  "epochs": 3,
+  "batch_size": 32,
+  "learning_rate": 2e-05,
+  "max_length": 384,
+  "train_pairs": 2300,
+  "train_duration_s": 567.7,
+  "final_val_mrr_full_corpus": 0.9619,
+  "loss_history": [
+   {
+    "step": 20,
+    "loss": 0.9727770805358886
+   },
+   {
+    "step": 40,
+    "loss": 0.5036234378814697
+   },
+   {
+    "step": 60,
+    "loss": 0.39291555881500245
+   },
+   {
+    "step": 80,
+    "loss": 0.26845216751098633
+   },
+   {
+    "step": 100,
+    "loss": 0.23539412021636963
+   },
+   {
+    "step": 120,
+    "loss": 0.2066584587097168
+   },
+   {
+    "step": 140,
+    "loss": 0.19571882486343384
+   },
+   {
+    "step": 160,
+    "loss": 0.17767635583877564
+   },
+   {
+    "step": 180,
+    "loss": 0.14369317293167114
+   },
+   {
+    "step": 200,
+    "loss": 0.16486499309539795
+   }
+  ],
+  "artifact": "experiments\\artifacts\\crossencoder\\seed13\\final"
+ },
+ {
+  "model_key": "crossencoder",
+  "base_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "seed": 42,
+  "device": "cuda",
+  "epochs": 3,
+  "batch_size": 32,
+  "learning_rate": 2e-05,
+  "max_length": 384,
+  "train_pairs": 2300,
+  "train_duration_s": 516.9,
+  "final_val_mrr_full_corpus": 0.9603,
+  "loss_history": [
+   {
+    "step": 20,
+    "loss": 0.926856803894043
+   },
+   {
+    "step": 40,
+    "loss": 0.49602227210998534
+   },
+   {
+    "step": 60,
+    "loss": 0.30440073013305663
+   },
+   {
+    "step": 80,
+    "loss": 0.2918406009674072
+   },
+   {
+    "step": 100,
+    "loss": 0.20935745239257814
+   },
+   {
+    "step": 120,
+    "loss": 0.2037628173828125
+   },
+   {
+    "step": 140,
+    "loss": 0.22554683685302734
+   },
+   {
+    "step": 160,
+    "loss": 0.13764019012451173
+   },
+   {
+    "step": 180,
+    "loss": 0.16360368728637695
+   },
+   {
+    "step": 200,
+    "loss": 0.1364511489868164
+   }
+  ],
+  "artifact": "experiments\\artifacts\\crossencoder\\seed42\\final"
+ },
+ {
+  "model_key": "crossencoder",
+  "base_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+  "seed": 1337,
+  "device": "cuda",
+  "epochs": 3,
+  "batch_size": 32,
+  "learning_rate": 2e-05,
+  "max_length": 384,
+  "train_pairs": 2300,
+  "train_duration_s": 520.1,
+  "final_val_mrr_full_corpus": 0.955,
+  "loss_history": [
+   {
+    "step": 20,
+    "loss": 0.9712618827819824
+   },
+   {
+    "step": 40,
+    "loss": 0.4274683952331543
+   },
+   {
+    "step": 60,
+    "loss": 0.34533441066741943
+   },
+   {
+    "step": 80,
+    "loss": 0.2866696834564209
+   },
+   {
+    "step": 100,
+    "loss": 0.1957206606864929
+   },
+   {
+    "step": 120,
+    "loss": 0.20798041820526122
+   },
+   {
+    "step": 140,
+    "loss": 0.203191876411438
+   },
+   {
+    "step": 160,
+    "loss": 0.1816951274871826
+   },
+   {
+    "step": 180,
+    "loss": 0.14089738130569457
+   },
+   {
+    "step": 200,
+    "loss": 0.14398382902145385
+   }
+  ],
+  "artifact": "experiments\\artifacts\\crossencoder\\seed1337\\final"
+ }
+]

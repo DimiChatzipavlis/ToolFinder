@@ -156,46 +156,67 @@ def discover_crossencoders() -> dict[str, str]:
     return found
 
 
-def build_systems(corpus_tools: list[str], corpus_texts: list[str], skip_encoders: bool) -> list:
-    systems: list = [
-        RandomRanker(corpus_tools, seed=0),
-        Bm25Ranker(corpus_tools, corpus_texts),
-        TfidfRanker(corpus_tools, corpus_texts, analyzer="word", ngram_range=(1, 2)),
-        TfidfRanker(corpus_tools, corpus_texts, analyzer="char_wb", ngram_range=(3, 5)),
-    ]
-    if skip_encoders:
-        return systems
+def _release_memory() -> None:
+    """Free model memory between systems so one model is resident at a time.
+
+    The previous implementation kept all ~16 encoder systems alive
+    simultaneously, which exhausted RAM/VRAM on consumer hardware and killed
+    the process mid-evaluation without a traceback.
+    """
+    import gc
+
+    gc.collect()
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except ImportError:
+        pass
+
+
+def encoder_system_factories(
+    corpus_tools: list[str],
+    corpus_texts: list[str],
+    bm25: Bm25Ranker,
+) -> list[tuple[str, "callable"]]:
+    """(name, builder) pairs for every memory-heavy system, built lazily."""
+    factories: list[tuple[str, callable]] = []
 
     for name, model_path in FROZEN_MODELS.items():
-        print(f"  [load] {name}")
-        systems.append(EncoderRanker(name, model_path, corpus_tools, corpus_texts))
-
-    encoders_by_name: dict[str, EncoderRanker] = {}
-    for name, artifact in discover_finetuned().items():
-        print(f"  [load] {name}")
-        encoder = EncoderRanker(name, artifact, corpus_tools, corpus_texts)
-        encoders_by_name[name] = encoder
-        systems.append(encoder)
-
-    if "ft_minilm_seed42" in encoders_by_name:
-        bm25 = next(system for system in systems if system.name == "bm25")
-        systems.append(
-            HybridRrfRanker("hybrid_bm25+ft_minilm_seed42", bm25, encoders_by_name["ft_minilm_seed42"])
+        factories.append(
+            (name, lambda n=name, p=model_path: EncoderRanker(n, p, corpus_tools, corpus_texts))
         )
 
-    from experiments.models.reranker import CrossEncoderReranker
+    finetuned = discover_finetuned()
+    for name, artifact in finetuned.items():
+        factories.append(
+            (name, lambda n=name, p=artifact: EncoderRanker(n, p, corpus_tools, corpus_texts))
+        )
+
+    if "ft_minilm_seed42" in finetuned:
+        def build_hybrid(path=finetuned["ft_minilm_seed42"]):
+            dense = EncoderRanker("ft_minilm_seed42", path, corpus_tools, corpus_texts)
+            return HybridRrfRanker("hybrid_bm25+ft_minilm_seed42", bm25, dense)
+
+        factories.append(("hybrid_bm25+ft_minilm_seed42", build_hybrid))
 
     corpus_texts_by_tool = dict(zip(corpus_tools, corpus_texts))
     for seed_name, ce_artifact in discover_crossencoders().items():
         base_name = f"ft_minilm_{seed_name}"
-        if base_name not in encoders_by_name:
+        if base_name not in finetuned:
             continue
-        name = f"ft_minilm+ce_rerank_{seed_name}"
-        print(f"  [load] {name}")
-        systems.append(
-            CrossEncoderReranker(name, encoders_by_name[base_name], ce_artifact, corpus_texts_by_tool)
-        )
-    return systems
+
+        def build_reranker(base_path=finetuned[base_name], ce_path=ce_artifact, seed=seed_name):
+            from experiments.models.reranker import CrossEncoderReranker
+
+            base = EncoderRanker(f"ft_minilm_{seed}", base_path, corpus_tools, corpus_texts)
+            return CrossEncoderReranker(
+                f"ft_minilm+ce_rerank_{seed}", base, ce_path, corpus_texts_by_tool
+            )
+
+        factories.append((f"ft_minilm+ce_rerank_{seed_name}", build_reranker))
+    return factories
 
 
 def aggregate_seed_groups(results: dict[str, dict]) -> dict[str, dict]:
@@ -206,6 +227,7 @@ def aggregate_seed_groups(results: dict[str, dict]) -> dict[str, dict]:
 
     aggregated: dict[str, dict] = {}
     for base, members in groups.items():
+        members = [m for m in members if "recall@1" in results[m]]
         if len(members) < 2:
             continue
         block: dict = {"seeds": len(members), "members": sorted(members)}
@@ -240,16 +262,41 @@ def main() -> None:
         split, queries, corpus_tools, corpus_texts = load_regime(regime)
         test_ids = split["test"]
         print(f"\n=== {regime} ({len(test_ids)} test queries, corpus={len(corpus_tools)}) ===")
-        systems = build_systems(corpus_tools, corpus_texts, args.skip_encoders)
 
         regime_results: dict[str, dict] = {}
-        for system in systems:
+
+        def run_one(system) -> None:
             summary = evaluate_system(system, queries, test_ids)
             regime_results[system.name] = summary
             print(
                 f"  {system.name:36s} R@1={summary['recall@1']['mean']:.4f} "
                 f"R@3={summary['recall@3']['mean']:.4f} MRR={summary['mrr']['mean']:.4f}"
             )
+
+        bm25 = Bm25Ranker(corpus_tools, corpus_texts)
+        for system in (
+            RandomRanker(corpus_tools, seed=0),
+            bm25,
+            TfidfRanker(corpus_tools, corpus_texts, analyzer="word", ngram_range=(1, 2)),
+            TfidfRanker(corpus_tools, corpus_texts, analyzer="char_wb", ngram_range=(3, 5)),
+        ):
+            run_one(system)
+
+        if not args.skip_encoders:
+            # One model resident at a time: build, evaluate, free. A failure in
+            # one system is recorded and must not abort the remaining systems.
+            for name, build in encoder_system_factories(corpus_tools, corpus_texts, bm25):
+                print(f"  [load] {name}")
+                try:
+                    system = build()
+                    run_one(system)
+                except Exception as exc:  # noqa: BLE001 - isolate per-system failures
+                    print(f"  [error] {name}: {exc}")
+                    regime_results[name] = {"error": str(exc)}
+                finally:
+                    system = None
+                    _release_memory()
+
         regime_results.update(aggregate_seed_groups(regime_results))
         output["regimes"][regime] = regime_results
         output["corpus_size_" + regime] = len(corpus_tools)
