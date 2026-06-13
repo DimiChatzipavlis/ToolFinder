@@ -127,11 +127,14 @@ def fig_confusion() -> None:
         return
     diagnostics = json.loads(diagnostics_path.read_text(encoding="utf-8"))
     block = diagnostics["regimes"]["regime1_unseen_queries"]
+    # Render Model A (the headline MiniLM bi-encoder) so the figure matches the
+    # "Model A" caption and §4.3 table; fall back to any seed-42 fine-tune.
+    preferred = "ft_minilm_seed42"
     candidates = [name for name in block if name.startswith("ft_") and "_seed42" in name]
     if not candidates:
         print("[skip] no seed-42 fine-tuned system in diagnostics")
         return
-    system = sorted(candidates)[0]
+    system = preferred if preferred in candidates else sorted(candidates)[0]
 
     queries = pd.read_csv(paths.QUERIES_CSV).set_index("query_id")
     top1 = block[system]["top1"]
