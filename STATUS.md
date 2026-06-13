@@ -18,9 +18,11 @@ addressed as below.
 - Results are generated artifacts: `experiments/results/*.json`,
   `experiments/results/figures/`, `reports/report.md`,
   `notebooks/01_eda.ipynb` (executed, outputs committed).
-- Known environment limitation: the LLM-in-context baseline
-  (`experiments/evaluation/llm_incontext.py`) requires a local Ollama service
-  and has not been run on the authoring machine.
+- The LLM-in-context (monolithic) baseline has now been run against a local
+  `llama3.2` (`experiments/evaluation/llm_incontext.py`,
+  `results/llm_incontext.json`): accuracy falls 0.41→0.30→0.17 as the prompt
+  grows from 5→15→30 tools while latency rises ~1→4.5 s/query — far below the
+  retrieval router (0.99 R@1 at ~0.5 ms). Reported in report.md §4.9.
 
 ## Audit findings closed since the April reports
 
