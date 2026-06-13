@@ -213,9 +213,17 @@ The outcome inverts the expected story. BM25 is catastrophically hijackable (83%
 
 Model B's sigmoid score on its top candidate gates auto-execution. On regime-1 test: raw ECE 0.131; after temperature scaling fitted on validation (T = 0.95) ECE 0.128 (top-1 accuracy 0.944). Reliability diagram: `figures/fig_calibration.png`.
 
-### 4.9 LLM-in-context selection (monolithic arm)
+### 4.9 LLM-in-context selection (the monolithic arm)
 
-Not run in this environment: the experiment requires a local LLM service (Ollama), unavailable on the authoring machine. The ready-to-run script is `experiments/evaluation/llm_incontext.py`; the smoke-scale A/B harness (3 filesystem tasks, llama3.2, README table) remains the only end-to-end evidence and is labeled as such.
+The comparison the introduction promises: instead of retrieving, stuff K tool schemas into the prompt and let `llama3.2` pick by number. Run on the same 144 regime-1 test queries; accuracy is top-1 selection (directly comparable to Recall@1):
+
+| Catalog size (tools in prompt) | LLM accuracy | Mean latency (s/query) | Unparseable |
+| --- | --- | --- | --- |
+| 5 | 0.410 | 1.03 | 0 |
+| 15 | 0.299 | 2.45 | 0 |
+| 30 | 0.174 | 4.55 | 0 |
+
+In-context selection is both **less accurate and orders of magnitude slower** than retrieval: accuracy drops from 0.410 at 5 tools to 0.174 at 30 tools as the prompt grows, at 1.0–4.5 s per query on CPU. On the identical 30-tool regime-1 test set the fine-tuned bi-encoder scores **0.988** Recall@1 at ~0.5 ms/query and even BM25 scores 0.569 — both far above the in-context LLM, and ~10,000× cheaper per query. The small model also confuses near-synonym tools (e.g. `create_pull_request` vs `create_pull_request_with_copilot`) that fine-tuning learns to separate — the concrete mechanism behind the routing-vs-monolith gap. This is the headline comparison the architecture is premised on, now measured rather than asserted.
 
 ## 5. Discussion & Limitations
 
@@ -223,9 +231,11 @@ Not run in this environment: the experiment requires a local LLM service (Ollama
 
 **Why the baselines matter.** BM25/TF-IDF solve a large share of this benchmark (tool-name echo in queries; quantified overlap medians 0.33/0.45). Reporting deep models without them would overstate the contribution — the honest claim is the measured delta, which is largest exactly where lexical overlap is weakest (unseen phrasings, unseen servers, confusable pairs).
 
+**The monolithic comparison, now measured.** §4.9 closes the comparison the whole project is premised on: handing the tool catalog to a small LLM in-context (`llama3.2`) and asking it to choose. It is both less accurate than the retrieval router and orders of magnitude slower per query, and it degrades as the catalog grows — while a retrieval router's cost is flat in catalog size. This is direct empirical support for *separating tool selection from execution* rather than letting the generator do both, and it explains the efficiency case from the introduction with numbers instead of assertion. The small model's specific failure — confusing near-synonym tools that fine-tuning learns to separate — is the same confusability the EDA flagged, seen from the generator's side.
+
 **Difficulties encountered.** (1) The most consequential finding was a *data* problem, not a model problem: the original random split was answerable at ~96% Recall@1 without any model; recovering the scenario grammar and rebuilding the splits invalidated and replaced all earlier numbers. (2) MNRL's in-batch negatives are silently wrong at small catalog sizes (duplicate positives become negatives) — fixed with a no-duplicates sampler. (3) Training on a 4GB consumer GPU required fp16, sequence truncation to 256, and one recovery from a mid-run crash; CPU/GPU contention between concurrent jobs distorted early latency measurements until benchmarks were serialized. (4) The local-LLM baseline was blocked by environment (no Ollama); we ship the script and report the gap rather than fabricate it.
 
-**Limitations.** All queries are synthetic with a *known generation grammar* (author-templated or LLM-written; no production traffic, no human-written test set): regime-1 numbers are in-grammar upper bounds because surface templates cross the split — quantified and controlled by regime 1b, but the grammar itself remains the data's ceiling, and lexical echo inflates all lexical numbers. The library's **shipped default is the zero-shot encoder, not the evaluated best**: the fine-tuned weights that produce the headline numbers are regenerable from pinned seeds but not committed, and zero-shot dense retrieval loses to BM25 here (disclosed in README, router docstring, and STATUS.md). The LLM-in-context arm is environment-blocked (script ships, unrun). Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation. Latency numbers are single-hardware, English-only queries throughout.
+**Limitations.** All queries are synthetic with a *known generation grammar* (author-templated or LLM-written; no production traffic, no human-written test set): regime-1 numbers are in-grammar upper bounds because surface templates cross the split — quantified and controlled by regime 1b, but the grammar itself remains the data's ceiling, and lexical echo inflates all lexical numbers. The library's **shipped default is the zero-shot encoder, not the evaluated best**: the fine-tuned weights that produce the headline numbers are regenerable from pinned seeds but not committed, and zero-shot dense retrieval loses to BM25 here (disclosed in README, router docstring, and STATUS.md). Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation. Latency numbers are single-hardware, English-only queries throughout.
 
 ## 6. Future Work: From a Course Study to a Benchmark Contribution
 
@@ -245,9 +255,9 @@ These are completed, reproducible assets the future plan builds on — not aspir
 
 Each phase states the action, the checkpoint it extends, the effort, and what it unlocks. The ordering maximizes credibility gained per unit of work: the cheapest steps that most directly answer a reviewer come first.
 
-**Phase A — Close the two known gaps (≈ 1 week).**
-1. *Run the LLM-in-context arm.* The script ships (`experiments/evaluation/llm_incontext.py`); it needs only a local Ollama service. Extends C3; removes the single most-cited missing baseline and lets the report state the router-vs-monolith comparison its introduction promises.
-2. *Train on the multi-server corpus, not just GitHub.* Re-use the C3 harness with the C5 corpus as training data; report unseen-server generalization with the source domain actually held out. Unlocks the first claim that generalization is not GitHub-specific.
+**Phase A — Close the remaining gap (≈ 1 week).**
+1. *~~Run the LLM-in-context arm.~~* **Done (§4.9):** the monolithic baseline now runs against a local `llama3.2`, confirming retrieval beats in-context selection on both accuracy and latency. The most-cited missing baseline is closed.
+2. *Train on the multi-server corpus, not just GitHub.* Re-use the C3 harness with the C5 corpus as training data; report unseen-server generalization with the source domain actually held out. Unlocks the first claim that generalization is not GitHub-specific. This is now the single highest-value next step.
 
 **Phase B — Break the synthetic-grammar ceiling (≈ 2–3 weeks).**
 3. *Collect a human-written test set.* 200–400 queries written by people who see only tool documentation, never the training anchors (classmates, or a small annotation task). Extends C1/C2: report the score drop from synthetic to human queries — the honest measure of real generalization, and the experiment that most strengthens external validity.
@@ -260,7 +270,7 @@ Each phase states the action, the checkpoint it extends, the effort, and what it
 
 ### 6.3 Decision gates (go / no-go)
 
-- **Gate 1 (after Phase A):** does the fine-tuned model still beat the LLM-in-context arm on accuracy *and* latency? If no, the framing pivots from "retrieval wins" to "retrieval as a cheap pre-filter," and the paper claim narrows.
+- **Gate 1 (after Phase A):** does the fine-tuned model beat the LLM-in-context arm on accuracy *and* latency? **Passed (§4.9):** retrieval wins decisively on both, so the "retrieval wins" framing holds.
 - **Gate 2 (after Phase B):** does the synthetic→human score drop stay modest (say, < 15 points R@1)? If it collapses, the contribution is explicitly the *benchmark and the leakage finding*, not the model — which is still publishable as a resource, but the narrative must change before any submission.
 - **Gate 3 (after Phase C):** is the leakage-controlled protocol adopted/citable (even one external run)? That is the signal that the benchmark, not the system, is the contribution.
 

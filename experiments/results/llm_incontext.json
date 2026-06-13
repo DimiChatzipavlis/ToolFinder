@@ -1,0 +1,21 @@
+{
+ "model": "llama3.2",
+ "n_queries": 144,
+ "catalog_sizes": {
+  "5": {
+   "accuracy": 0.4097,
+   "unparseable": 0,
+   "latency_s_mean": 1.03
+  },
+  "15": {
+   "accuracy": 0.2986,
+   "unparseable": 0,
+   "latency_s_mean": 2.45
+  },
+  "30": {
+   "accuracy": 0.1736,
+   "unparseable": 0,
+   "latency_s_mean": 4.55
+  }
+ }
+}

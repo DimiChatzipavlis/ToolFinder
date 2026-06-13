@@ -455,7 +455,7 @@ The outcome inverts the expected story. BM25 is catastrophically hijackable (83%
         if ft_v is not None and bm_v is not None:
             ref_line = (
                 f" On the identical 30-tool regime-1 test set the fine-tuned bi-encoder scores **{ft_v:.3f}** Recall@1 at ~0.5 ms/query and even "
-                f"BM25 scores {bm_v:.3f} — both far above the in-context LLM, at a tiny fraction of the per-query cost ({min(lats):.1f}–{max(lats):.1f} s)."
+                f"BM25 scores {bm_v:.3f} — both far above the in-context LLM, and ~10,000× cheaper per query."
             )
         sections.append(
             f"\nIn-context selection is both **less accurate and orders of magnitude slower** than retrieval: {trend}, at "
