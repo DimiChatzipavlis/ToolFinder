@@ -31,3 +31,6 @@ eval_toolfinder_output*.txt
 deck_build/node_modules/
 reports/qa_slides/
 reports/*.pdf
+
+# Presentation speaker guide (local only, never commit)
+*.docx

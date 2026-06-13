@@ -240,8 +240,21 @@ negs.forEach(([h, d]) => {
   s.addText(d, { x: 0.85, y: ny + 0.42, w: 5.3, h: 0.5, fontFace: BODY, fontSize: 10.5, color: INK, margin: 0 });
   ny += 1.05;
 });
-fitImage(s, fig("fig_confusion_regime1.png"), 1049, 959, 6.5, 1.7, 3.1, 3.0, { frame: true });
-s.addText("Residual errors: confusable pairs", { x: 6.5, y: 4.62, w: 3.1, h: 0.3, fontFace: BODY, fontSize: 9.5, italic: true, color: MUTED, align: "center", margin: 0 });
+// Native bar chart: Model A vs Model B R@1 by regime — shows reranking degrades A.
+s.addShape(pres.shapes.RECTANGLE, { x: 6.4, y: 1.7, w: 3.15, h: 2.95, fill: { color: WHITE }, line: { color: CARDLINE, width: 1 }, shadow: shadow() });
+s.addChart(pres.charts.BAR, [
+  { name: "Model A (bi-encoder)", labels: ["Regime 1", "Regime 2", "Regime 3"], values: [0.988, 0.909, 0.667] },
+  { name: "Model B (+ rerank)", labels: ["Regime 1", "Regime 2", "Regime 3"], values: [0.944, 0.867, 0.632] },
+], {
+  x: 6.5, y: 1.78, w: 2.95, h: 2.78, barDir: "col",
+  chartColors: [BLUE, ORANGE],
+  showTitle: false, showValue: true, dataLabelFormatCode: "0.00", dataLabelFontSize: 7, dataLabelColor: INK,
+  valAxisMinVal: 0, valAxisMaxVal: 1, valAxisMajorUnit: 0.25, valAxisHidden: true,
+  catAxisLabelColor: MUTED, catAxisLabelFontSize: 8,
+  valGridLine: { style: "none" }, catGridLine: { style: "none" },
+  showLegend: true, legendPos: "b", legendFontSize: 8, legendColor: INK,
+});
+s.addText("Reranking (B) sits below the bi-encoder (A) in every regime.", { x: 6.4, y: 4.68, w: 3.15, h: 0.34, fontFace: BODY, fontSize: 9.5, italic: true, color: MUTED, align: "center", margin: 0 });
 footer(s, 10);
 
 // ===================================================== SLIDE 11 — CONCLUSION
