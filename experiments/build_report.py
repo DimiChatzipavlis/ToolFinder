@@ -450,8 +450,57 @@ Not run in this environment: the experiment requires a local LLM service (Ollama
 **Limitations.** All queries are synthetic with a *known generation grammar* (author-templated or LLM-written; no production traffic, no human-written test set): regime-1 numbers are in-grammar upper bounds because surface templates cross the split — quantified and controlled by regime 1b, but the grammar itself remains the data's ceiling, and lexical echo inflates all lexical numbers. The library's **shipped default is the zero-shot encoder, not the evaluated best**: the fine-tuned weights that produce the headline numbers are regenerable from pinned seeds but not committed, and zero-shot dense retrieval loses to BM25 here (disclosed in README, router docstring, and STATUS.md). The LLM-in-context arm is environment-blocked (script ships, unrun). Regime 3 queries cover 65 of 574 corpus tools; multi-server *training* is untested. The scaling corpus above 30 tools is schema-like synthetic text (≤10k) and random vectors (100k) — it bounds latency, not retrieval quality at scale. The poisoning attack is one decoy with one bait construction; adaptive attacks are future work. The representation ablation is inference-only for the fine-tuned model. A global threshold cannot fully separate adversarial near-misses; destructive tools need per-tool margins and confirmation. Latency numbers are single-hardware, English-only queries throughout.
 """)
 
+    # ------------------------------------------------------------- future work
+    sections.append("""## 6. Future Work: From a Course Study to a Benchmark Contribution
+
+The defensible contribution of this project is not the architecture — dense-retrieval routing is established practice — but the **leakage-controlled evaluation methodology** and the public artifacts that operationalize it. This section lays out, honestly and concretely, how that methodology could be matured into a citable benchmark, what each step costs, and what realistic outcome it unlocks.
+
+### 6.1 What is already banked (checkpoints reached)
+
+These are completed, reproducible assets the future plan builds on — not aspirations:
+
+- **C1 — A measurable leakage probe.** The 1-NN-over-training-queries baseline quantifies surface leakage on any split (0.96 on the naive split, 0.87 on scenario-grouping, 0.65 on the template-disjoint control). This is the project's most original instrument.
+- **C2 — A doubly-disjoint control (regime 1b).** Template- *and* scenario-disjoint splitting, CI-enforced, demonstrating that the headline result survives (0.958) rather than collapsing — the evidence that the win is not memorization.
+- **C3 — A multi-regime protocol with statistics.** Three generalization regimes, three seeds, bootstrap CIs, and paired significance tests (p ≤ 0.0001) — a complete, re-runnable evaluation harness (`experiments/run_all.py`).
+- **C4 — A breadth of analyses already implemented.** Open-set rejection (ROC-AUC), an adversarial description-poisoning attack with mitigations, reranker calibration, and a Flat-vs-HNSW scaling study — each a script that generalizes to a new corpus unchanged.
+- **C5 — A 574-tool multi-server corpus** (GitHub MCP + 23 OpenAPI providers) already converted and indexed, used today only for unseen-server *evaluation*.
+
+### 6.2 The pathway (optimal, phased plan)
+
+Each phase states the action, the checkpoint it extends, the effort, and what it unlocks. The ordering maximizes credibility gained per unit of work: the cheapest steps that most directly answer a reviewer come first.
+
+**Phase A — Close the two known gaps (≈ 1 week).**
+1. *Run the LLM-in-context arm.* The script ships (`experiments/evaluation/llm_incontext.py`); it needs only a local Ollama service. Extends C3; removes the single most-cited missing baseline and lets the report state the router-vs-monolith comparison its introduction promises.
+2. *Train on the multi-server corpus, not just GitHub.* Re-use the C3 harness with the C5 corpus as training data; report unseen-server generalization with the source domain actually held out. Unlocks the first claim that generalization is not GitHub-specific.
+
+**Phase B — Break the synthetic-grammar ceiling (≈ 2–3 weeks).**
+3. *Collect a human-written test set.* 200–400 queries written by people who see only tool documentation, never the training anchors (classmates, or a small annotation task). Extends C1/C2: report the score drop from synthetic to human queries — the honest measure of real generalization, and the experiment that most strengthens external validity.
+4. *Cross-generator queries.* Regenerate a slice with a different LLM family under anti-echo instructions; measure whether quality is grammar-specific. Cheap robustness evidence.
+
+**Phase C — Package as a released benchmark (≈ 3–4 weeks).**
+5. *Freeze a versioned benchmark:* held-out test split never distributed with labels, a leaderboard submission protocol, a license, and a dataset datasheet extending the current `DATASET_CARD.md`. Extends C3/C5.
+6. *Adaptive poisoning track.* Promote the C4 attack from one decoy/one construction to an adaptive attacker that optimizes bait against the fine-tuned space — the difference between "we tested robustness" and "we benchmarked robustness."
+7. *Power and seed-variance analysis* on the chosen headline metric, so future submissions to the benchmark report statistically comparable numbers.
+
+### 6.3 Decision gates (go / no-go)
+
+- **Gate 1 (after Phase A):** does the fine-tuned model still beat the LLM-in-context arm on accuracy *and* latency? If no, the framing pivots from "retrieval wins" to "retrieval as a cheap pre-filter," and the paper claim narrows.
+- **Gate 2 (after Phase B):** does the synthetic→human score drop stay modest (say, < 15 points R@1)? If it collapses, the contribution is explicitly the *benchmark and the leakage finding*, not the model — which is still publishable as a resource, but the narrative must change before any submission.
+- **Gate 3 (after Phase C):** is the leakage-controlled protocol adopted/citable (even one external run)? That is the signal that the benchmark, not the system, is the contribution.
+
+### 6.4 Realistic potentiality
+
+Stated without inflation. The architecture is not novel and single-domain synthetic data caps ambition, so a main-track conference paper is not the target. The credible outcomes, conditioned on the gates:
+
+- **Most likely (Phase A+B done):** a **workshop or dataset/resource-track paper** whose contribution is the leakage-controlled MCP-routing benchmark plus the 1-NN leakage-audit methodology and the reranking/HNSW negative results. The negative results and the leakage instrument are the genuinely transferable ideas.
+- **Possible (Phase C done, Gate 3 passed):** a **citable community benchmark** — more valuable long-term than a one-off paper, because other tool-routing work would evaluate against it.
+- **Out of scope:** a methods/architecture contribution at a top venue — correctly, since the system reuses standard components by design.
+
+The honest one-line verdict: this is not a paper *today*, but it is a **benchmark-shaped contribution one focused month away**, and every step above extends an asset that already exists rather than starting from zero.
+""")
+
     # ------------------------------------------------------------- conclusion
-    sections.append("""## 6. Conclusions
+    sections.append("""## 7. Conclusions
 
 Framed as open-set dense retrieval and evaluated under leakage-controlled protocols, MCP tool selection is solved to high accuracy by a small contrastively fine-tuned bi-encoder — which also proves to be the strongest measured defense against description poisoning and the better open-set rejector. The trained cross-encoder comparison yields a deliberate negative result: at this supervision scale, reranking a stronger retriever with a weaker reranker degrades quality while multiplying cost, so the deployed system uses the bi-encoder alone. On indexing, exact flat search is the correct *default*: it is faster and exact below ~10^3 tools, and although HNSW searches faster beyond that, routing latency stays encoder-dominated to 10^5 vectors while HNSW pays up to 23% recall at default settings — approximation buys nothing until catalogs far exceed today's MCP registries. Equally important is what the study removes: an evaluation whose random split answered itself, and claims ("logarithmic scaling", "deterministic", "10,000+ tools") that the system no longer needs to make rhetorically because the benchmark now tests them empirically — or retires them. All datasets, splits, trained-model manifests, results, and figures regenerate from `experiments/run_all.py` with pinned seeds, and the split-hygiene constraints that make the numbers meaningful are enforced as failing tests in CI.
 

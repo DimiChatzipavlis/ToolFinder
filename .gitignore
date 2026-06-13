@@ -27,8 +27,10 @@ examples/langgraph_integration/sandbox/*
 *.log
 eval_toolfinder_output*.txt
 
-# Presentation build (regenerate: node deck_build/build_deck.js)
-deck_build/node_modules/
+# Presentation build — local tooling, not part of the codebase or report.
+# The deck (.pptx) and guide (.docx) it produces live in reports/ and are the
+# only deliverables; the build scripts themselves stay out of the repo.
+deck_build/
 reports/qa_slides/
 reports/*.pdf
 
