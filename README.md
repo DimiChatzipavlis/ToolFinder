@@ -65,11 +65,19 @@ python -m pip install -e ".[experiments]"  # research pipeline (pandas, sklearn,
 
 `ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and a downstream MCP server** (filesystem, git, memory, …). Rather than exposing the downstream catalog to the agent — which grows the prompt with every tool — the bridge exposes a few routing tools and selects the relevant ones with the dense retriever. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
 
-```bash
-TOOLFINDER_FS_ROOT=./sandbox python ToolFinder_mcp_server.py     # bridge to a filesystem server
+Run standalone, or register it in an MCP host. **Use absolute paths to your Python interpreter and the script** — MCP hosts (Claude Desktop, Claude Code, Cursor) don't inherit your shell `PATH`, so a bare `"python"` won't launch:
+
+```jsonc
+"mcpServers": {
+  "toolfinder": {
+    "command": "C:\\Users\\you\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "args": ["C:\\path\\to\\ToolFinder\\ToolFinder_mcp_server.py"],
+    "env": { "TOOLFINDER_FS_ROOT": "C:\\path\\to\\sandbox" }
+  }
+}
 ```
 
-Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`.
+(Find your interpreter with `python -c "import sys; print(sys.executable)"`.) Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`.
 
 **Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models.
 
