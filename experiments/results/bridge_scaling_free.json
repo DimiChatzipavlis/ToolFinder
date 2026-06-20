@@ -1,0 +1,53 @@
+{
+ "probes": 8,
+ "points": [
+  {
+   "n_tools": 14,
+   "baseline_schema_tokens": 2092,
+   "findcall_schema_tokens": 137,
+   "single_schema_tokens": 75,
+   "router_recall@1": 1.0,
+   "router_recall@3": 1.0
+  },
+  {
+   "n_tools": 30,
+   "baseline_schema_tokens": 4353,
+   "findcall_schema_tokens": 137,
+   "single_schema_tokens": 75,
+   "router_recall@1": 1.0,
+   "router_recall@3": 1.0
+  },
+  {
+   "n_tools": 60,
+   "baseline_schema_tokens": 8538,
+   "findcall_schema_tokens": 137,
+   "single_schema_tokens": 75,
+   "router_recall@1": 1.0,
+   "router_recall@3": 1.0
+  },
+  {
+   "n_tools": 120,
+   "baseline_schema_tokens": 18097,
+   "findcall_schema_tokens": 137,
+   "single_schema_tokens": 75,
+   "router_recall@1": 1.0,
+   "router_recall@3": 1.0
+  },
+  {
+   "n_tools": 250,
+   "baseline_schema_tokens": 37697,
+   "findcall_schema_tokens": 137,
+   "single_schema_tokens": 75,
+   "router_recall@1": 1.0,
+   "router_recall@3": 1.0
+  },
+  {
+   "n_tools": 400,
+   "baseline_schema_tokens": 61384,
+   "findcall_schema_tokens": 137,
+   "single_schema_tokens": 75,
+   "router_recall@1": 1.0,
+   "router_recall@3": 1.0
+  }
+ ]
+}

@@ -61,6 +61,20 @@ python -m pip install -e ".[langgraph]"    # LangChain/LangGraph integration
 python -m pip install -e ".[experiments]"  # research pipeline (pandas, sklearn, matplotlib)
 ```
 
+## ToolFinder as an MCP Server (routing bridge)
+
+`ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and a downstream MCP server** (filesystem, git, memory, …). Rather than exposing the downstream catalog to the agent — which grows the prompt with every tool — the bridge exposes a few routing tools and selects the relevant ones with the dense retriever. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
+
+```bash
+TOOLFINDER_FS_ROOT=./sandbox python ToolFinder_mcp_server.py     # bridge to a filesystem server
+```
+
+Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`.
+
+**Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models.
+
+Full cookbook (install, host registration, tool API, config, results, security): [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
+
 ## Empirical Results
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DimiChatzipavlis/ToolFinder/blob/main/notebooks/02_toolfinder_live.ipynb) — runnable evidence notebook: clones this repo, routes live on the real corpus, reproduces baseline rows, renders the committed results, and (on GPU) fine-tunes live.
@@ -106,7 +120,8 @@ Regenerate with `python examples/eval_toolfinder.py --update-readme` (preserve t
 Every folder has its own README with details.
 
 - [`toolfinder/`](toolfinder/README.md) — core library: router, MCP stdio client, autonomous ReAct agent, recovery parsing.
-- [`experiments/`](experiments/README.md) — the research pipeline: datasets, leakage-controlled splits, training (bi- and cross-encoders), baselines, three evaluation regimes, OOD/threshold analysis, Flat-vs-HNSW scaling benchmark, poisoning attack, calibration, figures, report generation. Generated evidence lives in [`experiments/results/`](experiments/results/README.md).
+- [`ToolFinder_mcp_server.py`](ToolFinder_mcp_server.py) — the MCP routing-bridge server (FastMCP); cookbook in [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md).
+- [`experiments/`](experiments/README.md) — the research pipeline: datasets, leakage-controlled splits, training (bi- and cross-encoders), baselines, three evaluation regimes, OOD/threshold analysis, Flat-vs-HNSW scaling benchmark, the MCP-bridge scaling study, poisoning attack, calibration, figures, report generation. Generated evidence lives in [`experiments/results/`](experiments/results/README.md).
 - [`examples/`](examples/README.md) — runnable demos: A/B harness, multi-server agent demo, LangGraph integration (require local Ollama + Node).
 - [`Enterprise/`](Enterprise/README.md) — optional hybrid runtime (HTTP API, policy engine, executor, telemetry). Out of scope for the research evaluation.
 - [`tests/`](tests/README.md) — unit tests incl. CI-enforced split-hygiene guards (run `pytest`).

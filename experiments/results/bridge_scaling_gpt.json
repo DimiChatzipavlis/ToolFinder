@@ -1,0 +1,120 @@
+{
+ "backend": "openai",
+ "model": "gpt-5.4",
+ "sizes": {
+  "14": {
+   "baseline": {
+    "schema_tokens": 2092,
+    "n_bound_tools": 14,
+    "prompt_tokens": 6285,
+    "completion_tokens": 145,
+    "total_tokens": 6430,
+    "first_call_prompt_tokens": 1399,
+    "model_turns": 4,
+    "tool_calls": 3,
+    "task_success": true,
+    "arm": "baseline"
+   },
+   "find_call": {
+    "schema_tokens": 135,
+    "n_bound_tools": 2,
+    "prompt_tokens": 11475,
+    "completion_tokens": 278,
+    "total_tokens": 11753,
+    "first_call_prompt_tokens": 364,
+    "model_turns": 7,
+    "tool_calls": 6,
+    "task_success": true,
+    "arm": "find_call"
+   },
+   "single": {
+    "schema_tokens": 73,
+    "n_bound_tools": 1,
+    "prompt_tokens": 3950,
+    "completion_tokens": 311,
+    "total_tokens": 4261,
+    "first_call_prompt_tokens": 332,
+    "model_turns": 6,
+    "tool_calls": 5,
+    "task_success": true,
+    "arm": "single"
+   }
+  },
+  "60": {
+   "baseline": {
+    "schema_tokens": 8538,
+    "n_bound_tools": 60,
+    "prompt_tokens": 22364,
+    "completion_tokens": 148,
+    "total_tokens": 22512,
+    "first_call_prompt_tokens": 5415,
+    "model_turns": 4,
+    "tool_calls": 3,
+    "task_success": true,
+    "arm": "baseline"
+   },
+   "find_call": {
+    "schema_tokens": 135,
+    "n_bound_tools": 2,
+    "prompt_tokens": 11500,
+    "completion_tokens": 279,
+    "total_tokens": 11779,
+    "first_call_prompt_tokens": 366,
+    "model_turns": 7,
+    "tool_calls": 6,
+    "task_success": true,
+    "arm": "find_call"
+   },
+   "single": {
+    "schema_tokens": 73,
+    "n_bound_tools": 1,
+    "prompt_tokens": 4340,
+    "completion_tokens": 334,
+    "total_tokens": 4674,
+    "first_call_prompt_tokens": 334,
+    "model_turns": 6,
+    "tool_calls": 5,
+    "task_success": true,
+    "arm": "single"
+   }
+  },
+  "120": {
+   "baseline": {
+    "schema_tokens": 18097,
+    "n_bound_tools": 120,
+    "prompt_tokens": 47724,
+    "completion_tokens": 148,
+    "total_tokens": 47872,
+    "first_call_prompt_tokens": 11755,
+    "model_turns": 4,
+    "tool_calls": 3,
+    "task_success": true,
+    "arm": "baseline"
+   },
+   "find_call": {
+    "schema_tokens": 135,
+    "n_bound_tools": 2,
+    "prompt_tokens": 11500,
+    "completion_tokens": 279,
+    "total_tokens": 11779,
+    "first_call_prompt_tokens": 366,
+    "model_turns": 7,
+    "tool_calls": 6,
+    "task_success": true,
+    "arm": "find_call"
+   },
+   "single": {
+    "schema_tokens": 73,
+    "n_bound_tools": 1,
+    "prompt_tokens": 2941,
+    "completion_tokens": 259,
+    "total_tokens": 3200,
+    "first_call_prompt_tokens": 334,
+    "model_turns": 5,
+    "tool_calls": 4,
+    "task_success": true,
+    "arm": "single"
+   }
+  }
+ }
+}

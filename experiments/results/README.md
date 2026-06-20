@@ -21,6 +21,9 @@ files by hand.
 | `scaling_bench.json` | ~10 KB | Flat-vs-HNSW latency/recall/build/size per tier + encoder latency | `build_report.py`, `figures.py` |
 | `poisoning.json` | ~3 KB | Hijack rates per attack strength × system × mitigation | `build_report.py` |
 | `calibration.json` | ~3 KB | ECE + reliability bins, raw vs temperature-scaled | `build_report.py` |
+| `bridge_scaling_free.json` | ~2 KB | MCP-bridge study, free axis: per-turn schema-token weight + router recall@1/@3 vs catalog size N (14→400) | `bridge_figures.py`, cookbook |
+| `bridge_scaling_gpt.json` | ~3 KB | MCP-bridge study, API axis: total tokens + task success for baseline / find+call / route_and_call at N∈{14,60,120} (GPT-5.4) | `bridge_figures.py`, cookbook |
+| `bridge_ab.json` | ~1 KB | single-N baseline-vs-bridge A/B (superseded by the scaling study) | reference |
 | `artifact_manifest.json` | ~7 KB | SHA256 of datasets, results, and (uncommitted) model artifacts | release verification |
 | `figures/*.png` | — | Every figure referenced by the report | report, notebooks |
 

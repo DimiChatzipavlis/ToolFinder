@@ -32,6 +32,8 @@ Stages (each runnable standalone):
 | Description poisoning | `attacks/poisoning.py` | `results/poisoning.json` |
 | CE calibration | `evaluation/calibration.py` | `results/calibration.json`, `figures/fig_calibration.png` |
 | LLM-in-context baseline | `evaluation/llm_incontext.py` | `results/llm_incontext.json` (requires a local Ollama service; not run in the authoring environment) |
+| MCP-bridge scaling study | `bridge_scaling.py` (`--free-only` = no API) | `results/bridge_scaling_{free,gpt}.json` |
+| MCP-bridge figures | `bridge_figures.py` | `results/figures/fig_bridge_scaling_{free,api}.png` |
 | Figures | `figures.py` | `results/figures/*.png` |
 | EDA notebook | `build_eda_notebook.py` | `notebooks/01_eda.ipynb` (executed, outputs committed) |
 | Report + manifest | `build_report.py`, `build_manifest.py` | `reports/report.md`, `results/artifact_manifest.json` |
