@@ -66,7 +66,9 @@ def main() -> None:
     bm25 = Bm25Ranker(corpus_tools, corpus_texts)
     record("bm25", [bm25.rank(a) for a in anchors])
     for name, path in SYSTEMS:
-        if not (Path(path).exists() or "/" not in path):
+        # Skip only a missing LOCAL artifact; HF model ids (frozen) always load.
+        is_local_artifact = "artifacts" in path or "\\" in path
+        if is_local_artifact and not Path(path).exists():
             print(f"  [skip] {name}: artifact missing ({path})")
             continue
         record(name, EncoderRanker(name, path, corpus_tools, corpus_texts).rank_batch(anchors))

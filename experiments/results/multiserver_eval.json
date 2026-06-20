@@ -1,0 +1,39 @@
+{
+ "test_servers": [
+  "box",
+  "docusign",
+  "netlify",
+  "sendgrid",
+  "spotify",
+  "squareup",
+  "zoom"
+ ],
+ "n_test_queries": 60,
+ "corpus_size": 574,
+ "systems": {
+  "bm25": {
+   "recall@1": 0.4167,
+   "recall@3": 0.6,
+   "recall@5": 0.6833,
+   "mrr": 0.5412
+  },
+  "frozen_minilm": {
+   "recall@1": 0.3333,
+   "recall@3": 0.55,
+   "recall@5": 0.65,
+   "mrr": 0.4764
+  },
+  "ft_github_only": {
+   "recall@1": 0.5333,
+   "recall@3": 0.8167,
+   "recall@5": 0.9,
+   "mrr": 0.683
+  },
+  "ft_multiserver": {
+   "recall@1": 0.5667,
+   "recall@3": 0.85,
+   "recall@5": 0.9167,
+   "mrr": 0.7149
+  }
+ }
+}
