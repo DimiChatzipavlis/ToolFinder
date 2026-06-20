@@ -54,8 +54,24 @@ pip install -e ".[experiments]"   # pulls fastmcp, sentence-transformers, faiss
 ## Run (stdio transport)
 
 ```bash
-# bridge to a filesystem server rooted at ./sandbox
+# multi-server (recommended): front several downstream servers from one config
+TOOLFINDER_CONFIG=mcp_servers.json python ToolFinder_mcp_server.py
+
+# or zero-config: a single filesystem server rooted at ./sandbox
 TOOLFINDER_FS_ROOT=./sandbox python ToolFinder_mcp_server.py
+```
+
+A config (`mcp_servers.json`, see `mcp_servers.example.json`) lists the servers to
+bridge — the agent then sees the routing tools over their **combined** catalog:
+
+```json
+{
+  "servers": [
+    {"name": "filesystem", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "./sandbox"]},
+    {"name": "memory",     "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"]},
+    {"name": "git",        "command": "npx", "args": ["-y", "@modelcontextprotocol/server-git", "--repository", "."]}
+  ]
+}
 ```
 
 ## Register in an MCP host (Claude Desktop, Cursor, …)
@@ -68,7 +84,7 @@ TOOLFINDER_FS_ROOT=./sandbox python ToolFinder_mcp_server.py
     "toolfinder": {
       "command": "C:\\Users\\you\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
       "args": ["C:\\path\\to\\ToolFinder\\ToolFinder_mcp_server.py"],
-      "env": { "TOOLFINDER_FS_ROOT": "C:\\path\\to\\sandbox" }
+      "env": { "TOOLFINDER_CONFIG": "C:\\path\\to\\mcp_servers.json" }
     }
   }
 }
@@ -88,7 +104,13 @@ catalog. No host code changes — that interoperability is the point.
 | `find_tools` | `find_tools(query: str, k: int = 3)` | top‑k downstream tool schemas | discovery — agent then calls `call_tool` |
 | `call_tool` | `call_tool(tool_name: str, arguments: dict)` | downstream result | execute a chosen tool |
 | `route_and_call` | `route_and_call(intent: str, arguments: dict)` | downstream result | **one‑hop**: route by intent and execute (most token‑efficient) |
-| `catalog_size` | `catalog_size()` | `{"downstream_tools": N}` | diagnostic |
+| `catalog_size` | `catalog_size()` | `{"total_tools": N, "by_server": {…}}` | diagnostic |
+
+`find_tools` and `route_and_call` route across the **union** of all configured
+servers; `call_tool` and `route_and_call` dispatch execution to the server that
+owns the chosen tool. (If two servers expose the same tool name, the first wins
+for `call_tool`; `route_and_call` is always unambiguous because it dispatches by
+the routed server.)
 
 ### Two usage patterns
 
@@ -105,18 +127,15 @@ catalog. No host code changes — that interoperability is the point.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TOOLFINDER_FS_ROOT` | cwd | directory the downstream filesystem server may access |
-| `TOOLFINDER_DOWNSTREAM_CMD` | `npx` | command to launch the downstream MCP server |
-| `TOOLFINDER_DOWNSTREAM_ARGS` | filesystem server on `FS_ROOT` | JSON list of args (override to bridge a different server) |
+| `TOOLFINDER_CONFIG` | — | path to a multi-server JSON config (see `mcp_servers.example.json`); overrides the single-server vars below |
+| `TOOLFINDER_FS_ROOT` | cwd | directory the default single filesystem server may access |
+| `TOOLFINDER_DOWNSTREAM_CMD` | `npx` | command for the default single server |
+| `TOOLFINDER_DOWNSTREAM_ARGS` | filesystem server on `FS_ROOT` | JSON args for the default single server |
 | `TOOLFINDER_MODEL` | `all-MiniLM-L6-v2` | embedding model for routing |
 | `TOOLFINDER_TOPK` | `3` | default shortlist size for `find_tools` |
 
-Bridge a different downstream server, e.g. git:
-
-```bash
-TOOLFINDER_DOWNSTREAM_ARGS='["-y","@modelcontextprotocol/server-git","--repository","."]' \
-  python ToolFinder_mcp_server.py
-```
+For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
+servers) rather than the single-server env vars — see the Run section above.
 
 ---
 
@@ -149,9 +168,11 @@ key in `experiments/.env` as `API_KEY` + `AGENT_MODEL`), then
 
 ## Roadmap (server)
 
-Today the bridge fronts **one** downstream server with a static catalog. The path to production:
+The bridge now fronts **multiple** downstream servers from one config (E1, done).
+The path to production from here:
 
-1. **Multi-server** — front several downstream MCP servers at once via a config file; route across their union. This is the real use case (one bridge for your whole MCP fleet) and where the token savings compound.
+1. ~~**Multi-server**~~ — **done**: front several downstream MCP servers via
+   `TOOLFINDER_CONFIG` and route across their union.
 2. **Live tool changes & resilience** — handle `tools/list_changed` (re-index incrementally) and reconnect a downstream server that crashes or times out.
 3. **Package** — a PyPI/`uvx` entry point so users add `toolfinder` to any host without cloning.
 4. **Tests & observability** — in-memory FastMCP client tests in CI; log each routing decision for traceability.

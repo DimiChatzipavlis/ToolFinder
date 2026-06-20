@@ -63,16 +63,16 @@ python -m pip install -e ".[experiments]"  # research pipeline (pandas, sklearn,
 
 ## ToolFinder as an MCP Server (routing bridge)
 
-`ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and a downstream MCP server** (filesystem, git, memory, …). Rather than exposing the downstream catalog to the agent — which grows the prompt with every tool — the bridge exposes a few routing tools and selects the relevant ones with the dense retriever. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
+`ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and one or more downstream MCP servers** (filesystem, git, memory, …). Rather than exposing every downstream catalog to the agent — which grows the prompt with every tool — the bridge embeds the **union** of all downstream tools once and exposes a few routing tools, dispatching execution to whichever server owns the chosen tool. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
 
-Run standalone, or register it in an MCP host. **Use absolute paths to your Python interpreter and the script** — MCP hosts (Claude Desktop, Claude Code, Cursor) don't inherit your shell `PATH`, so a bare `"python"` won't launch:
+Register it in an MCP host with a config listing the servers to bridge (`mcp_servers.example.json`). **Use absolute paths to your Python interpreter and the script** — MCP hosts don't inherit your shell `PATH`, so a bare `"python"` won't launch:
 
 ```jsonc
 "mcpServers": {
   "toolfinder": {
     "command": "C:\\Users\\you\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
     "args": ["C:\\path\\to\\ToolFinder\\ToolFinder_mcp_server.py"],
-    "env": { "TOOLFINDER_FS_ROOT": "C:\\path\\to\\sandbox" }
+    "env": { "TOOLFINDER_CONFIG": "C:\\path\\to\\mcp_servers.json" }
   }
 }
 ```
@@ -140,19 +140,19 @@ Every folder has its own README with details.
 
 ## Roadmap
 
-Two parallel tracks. **Start here:** commit & publish the repo, then **E1** (multi-server bridge) and **R1** (multi-server training) — those unlock the most value.
+Two parallel tracks. **E1** (multi-server bridge) and **R1** (multi-server training) are **done** — details below; next up are **R2/R3** (real queries, live multi-server study) and **E2/E3** (resilience, packaging).
 
 **Research** (extends the leakage-controlled study; full plan in [`reports/report.md`](reports/report.md) §6):
-- **R1 — Train on multiple servers, not just GitHub.** Re-train the bi-encoder on the 574-tool / 24-provider corpus and report unseen-*server* generalization with the source domain held out. *Highest research value; turns "GitHub-only" into "generalizes."*
+- **R1 — Train on multiple servers, not just GitHub.** ✅ **Done.** A server-disjoint split (12 train / 7 held-out test servers, 574-tool corpus) shows multi-server training **beats GitHub-only on unseen servers: R@1 0.567 vs 0.533** (and 0.42 BM25 / 0.33 frozen) — diversity helps generalization, modestly at this data scale. Run: `experiments/dataset/make_multiserver_splits.py` → `models/biencoder.py --split-name regime4_multiserver` → `evaluation/eval_multiserver.py`.
 - **R2 — Human-written query set.** 200–400 queries written from tool docs only; measure the synthetic→human accuracy drop (real external validity, breaks the grammar ceiling).
 - **R3 — Live multi-server bridge study.** Replace schema-padded distractors with 3–4 *real* downstream servers and real tasks; add repeats/error bars and a small-local-model arm to map the cost crossover surface.
 - **R4 — Release the benchmark.** Held-out test split, datasheet, leaderboard protocol — the citable artifact.
 
 **Engineering** (make the MCP bridge production-worthy):
-- **E1 — Multi-server bridge.** One ToolFinder in front of *several* downstream MCP servers (config file listing servers), routing across the union. *This is where the bridge's value actually lives.*
+- **E1 — Multi-server bridge.** ✅ **Done.** One ToolFinder fronts several downstream MCP servers via `TOOLFINDER_CONFIG`, routing across the union and dispatching to the owning server (`tests/test_mcp_server.py`).
 - **E2 — Live tool-change + resilience.** Subscribe to `tools/list_changed` and re-index incrementally; reconnect downstream servers on crash/timeout.
 - **E3 — Package & publish.** PyPI entry point / `uvx`-style launch so anyone adds the bridge in one line.
-- **E4 — Server tests + observability.** In-memory FastMCP client tests in CI; log routing decisions ("why this tool") for traceability.
+- **E4 — Server tests + observability.** In-memory FastMCP client tests in CI (started); log routing decisions ("why this tool") for traceability.
 - **E5 — (optional) Ship the fine-tuned encoder by default**, closing the shipped-default-vs-evaluated-best gap.
 
 ## Scope Notes

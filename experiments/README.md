@@ -34,6 +34,9 @@ Stages (each runnable standalone):
 | LLM-in-context baseline | `evaluation/llm_incontext.py` | `results/llm_incontext.json` (requires a local Ollama service; not run in the authoring environment) |
 | MCP-bridge scaling study | `bridge_scaling.py` (`--free-only` = no API) | `results/bridge_scaling_{free,gpt}.json` |
 | MCP-bridge figures | `bridge_figures.py` | `results/figures/fig_bridge_scaling_{free,api}.png` |
+| Multi-server split (R1) | `dataset/make_multiserver_splits.py` | `data/splits/regime4_multiserver.json` (server-disjoint) |
+| Multi-server training (R1) | `models/biencoder.py --split-name regime4_multiserver --artifact-root biencoder_multiserver` | `results/biencoder_multiserver_training.json` |
+| Unseen-server eval (R1) | `evaluation/eval_multiserver.py` | `results/multiserver_eval.json` |
 | Figures | `figures.py` | `results/figures/*.png` |
 | EDA notebook | `build_eda_notebook.py` | `notebooks/01_eda.ipynb` (executed, outputs committed) |
 | Report + manifest | `build_report.py`, `build_manifest.py` | `reports/report.md`, `results/artifact_manifest.json` |
