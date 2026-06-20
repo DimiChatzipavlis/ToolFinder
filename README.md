@@ -138,6 +138,23 @@ Every folder has its own README with details.
 - [`academic_research/`](academic_research/README.md) — raw source datasets only (provenance anchor).
 - [STATUS.md](STATUS.md) — current state, closed audit findings. [SECURITY.md](SECURITY.md) — threat model and mitigations.
 
+## Roadmap
+
+Two parallel tracks. **Start here:** commit & publish the repo, then **E1** (multi-server bridge) and **R1** (multi-server training) — those unlock the most value.
+
+**Research** (extends the leakage-controlled study; full plan in [`reports/report.md`](reports/report.md) §6):
+- **R1 — Train on multiple servers, not just GitHub.** Re-train the bi-encoder on the 574-tool / 24-provider corpus and report unseen-*server* generalization with the source domain held out. *Highest research value; turns "GitHub-only" into "generalizes."*
+- **R2 — Human-written query set.** 200–400 queries written from tool docs only; measure the synthetic→human accuracy drop (real external validity, breaks the grammar ceiling).
+- **R3 — Live multi-server bridge study.** Replace schema-padded distractors with 3–4 *real* downstream servers and real tasks; add repeats/error bars and a small-local-model arm to map the cost crossover surface.
+- **R4 — Release the benchmark.** Held-out test split, datasheet, leaderboard protocol — the citable artifact.
+
+**Engineering** (make the MCP bridge production-worthy):
+- **E1 — Multi-server bridge.** One ToolFinder in front of *several* downstream MCP servers (config file listing servers), routing across the union. *This is where the bridge's value actually lives.*
+- **E2 — Live tool-change + resilience.** Subscribe to `tools/list_changed` and re-index incrementally; reconnect downstream servers on crash/timeout.
+- **E3 — Package & publish.** PyPI entry point / `uvx`-style launch so anyone adds the bridge in one line.
+- **E4 — Server tests + observability.** In-memory FastMCP client tests in CI; log routing decisions ("why this tool") for traceability.
+- **E5 — (optional) Ship the fine-tuned encoder by default**, closing the shipped-default-vs-evaluated-best gap.
+
 ## Scope Notes
 
 This repository provides a runtime library, a research pipeline, and examples. It does not package a production multi-node deployment (service discovery, secrets, auth, load balancing are out of scope; see SECURITY.md for the full residual-risk list). Latency and quality numbers are measured on the configurations documented in `experiments/`; claims do not extend beyond the tested catalog sizes.

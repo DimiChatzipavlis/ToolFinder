@@ -147,6 +147,17 @@ key in `experiments/.env` as `API_KEY` + `AGENT_MODEL`), then
 - ToolFinder's broader threat model (description poisoning, OOD rejection) is in
   `SECURITY.md` and `reports/report.md`.
 
+## Roadmap (server)
+
+Today the bridge fronts **one** downstream server with a static catalog. The path to production:
+
+1. **Multi-server** — front several downstream MCP servers at once via a config file; route across their union. This is the real use case (one bridge for your whole MCP fleet) and where the token savings compound.
+2. **Live tool changes & resilience** — handle `tools/list_changed` (re-index incrementally) and reconnect a downstream server that crashes or times out.
+3. **Package** — a PyPI/`uvx` entry point so users add `toolfinder` to any host without cloning.
+4. **Tests & observability** — in-memory FastMCP client tests in CI; log each routing decision for traceability.
+
+See the repo README "Roadmap" for the matching research track (multi-server training, human queries, benchmark release).
+
 ## Limitations & scope
 
 - Results are for one downstream server (filesystem), one task family, and a
