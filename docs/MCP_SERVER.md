@@ -66,13 +66,15 @@ TOOLFINDER_FS_ROOT=./sandbox python ToolFinder_mcp_server.py
 {
   "mcpServers": {
     "toolfinder": {
-      "command": "python",
-      "args": ["ToolFinder_mcp_server.py"],
-      "env": { "TOOLFINDER_FS_ROOT": "C:/path/to/sandbox" }
+      "command": "C:\\Users\\you\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "args": ["C:\\path\\to\\ToolFinder\\ToolFinder_mcp_server.py"],
+      "env": { "TOOLFINDER_FS_ROOT": "C:\\path\\to\\sandbox" }
     }
   }
 }
 ```
+
+> Use the **absolute path to your Python interpreter** and to the script — MCP hosts (Claude Desktop, Claude Code, Cursor) don't inherit your shell `PATH`, so a bare `"python"` usually fails to launch. Find your interpreter with `python -c "import sys; print(sys.executable)"`. On macOS/Linux the same applies (e.g. `/usr/bin/python3` or your venv's `bin/python`).
 
 The host then sees **4 small tools** instead of the downstream server's full
 catalog. No host code changes — that interoperability is the point.
