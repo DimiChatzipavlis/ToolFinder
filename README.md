@@ -131,12 +131,11 @@ Every folder has its own README with details.
 - [`ToolFinder_mcp_server.py`](ToolFinder_mcp_server.py) — the MCP routing-bridge server (FastMCP); cookbook in [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md).
 - [`experiments/`](experiments/README.md) — the research pipeline: datasets, leakage-controlled splits, training (bi- and cross-encoders), baselines, three evaluation regimes, OOD/threshold analysis, Flat-vs-HNSW scaling benchmark, the MCP-bridge scaling study, poisoning attack, calibration, figures, report generation. Generated evidence lives in [`experiments/results/`](experiments/results/README.md).
 - [`examples/`](examples/README.md) — runnable demos: A/B harness, multi-server agent demo, LangGraph integration (require local Ollama + Node).
-- [`Enterprise/`](Enterprise/README.md) — optional hybrid runtime (HTTP API, policy engine, executor, telemetry). Out of scope for the research evaluation.
 - [`tests/`](tests/README.md) — unit tests incl. CI-enforced split-hygiene guards (run `pytest`).
 - [`notebooks/`](notebooks/README.md) — executed notebooks with committed outputs: EDA and the live local/Colab evidence notebook.
 - [`reports/`](reports/README.md) — the research report, auto-rendered from `experiments/results/`.
 - [`academic_research/`](academic_research/README.md) — raw source datasets only (provenance anchor).
-- [STATUS.md](STATUS.md) — current state, closed audit findings. [SECURITY.md](SECURITY.md) — threat model and mitigations.
+- [SECURITY.md](SECURITY.md) — threat model and mitigations.
 
 ## Roadmap
 
