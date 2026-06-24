@@ -2,6 +2,8 @@
 
 The deployable routing layer behind the MCP bridge. Three modules, no framework lock-in.
 
+> **Status:** part of the OSS **v0.1** tool. See the [repo README](../README.md) *Status* section for the v0.1-vs-production split (what's ready vs. what's still needed for a production release).
+
 ## Modules
 
 | Module | Responsibility |

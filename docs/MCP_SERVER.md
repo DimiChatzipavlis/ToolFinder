@@ -195,21 +195,25 @@ then `python legacy/experiments/bridge_figures.py`.
 - ToolFinder's broader threat model (description poisoning, OOD rejection) is in
   [`SECURITY.md`](../SECURITY.md).
 
-## Roadmap (server)
+## Roadmap & release readiness (server)
 
-Progress so far:
+**Shipped in v0.1:** multi-server union routing (`TOOLFINDER_CONFIG`); one-shot reconnect on a failed downstream call + on-demand `refresh()`; `pip install` + `toolfinder-mcp` entry point; `get_stats()` observability; opt-in server-aware hierarchical routing (`TOOLFINDER_HIERARCHICAL`); cost modeled **and** measured, plus top-k and selection-accuracy measured.
 
-1. ~~**Multi-server**~~ — **done**: fronts several downstream servers via `TOOLFINDER_CONFIG`, routing across their union.
-2. **Resilience** — *partial*: a failed downstream call triggers a one-shot reconnect+retry, and `refresh()` re-indexes on demand. Still TODO: push-based `tools/list_changed` subscription (auto re-index).
-3. ~~**Package**~~ — **done**: `pip install` exposes the `toolfinder-mcp` console command (and `python -m toolfinder.mcp_server`).
-4. **Observability** — *partial*: `get_stats()` exposes routing decisions and per-tool counts, and every route is logged. Still TODO: structured/exported metrics.
-5. **Publish** — push to PyPI so users add the bridge without cloning.
-6. ~~**Hierarchical, server-aware routing**~~ — **done (opt-in)**: `TOOLFINDER_HIERARCHICAL` routes to the top `TOOLFINDER_ROUTE_SERVERS` servers (by tool-embedding centroid), then the tool — precision + very-large-catalog scaling, not a latency win. See `route_top_k_hierarchical` in the router.
-7. **Cache-aware, quality-first measurement** — cost under prompt-cache pricing, top-k (k=5) end-task success, and a context-reduction→accuracy test.
+**Needed for a production release (not yet):**
 
-See the repo README "Roadmap" for the matching research track (multi-server training, human queries, benchmark release).
+- push-based `tools/list_changed` subscription, auto re-index (today: manual `refresh()`);
+- live multi-server validation at scale, with repeats/error bars (today: one task family, filesystem-only, n=1);
+- exported/structured metrics (today: logs + `get_stats()`);
+- stronger/fine-tuned default encoder (today: zero-shot MiniLM);
+- description-poisoning mitigations (studied in `legacy/`, not implemented);
+- PyPI publish.
+
+See the repo [README "Roadmap & release readiness"](../README.md#roadmap--release-readiness) for the full checklist and next immediate steps.
 
 ## Limitations & scope
+
+This is an **early-stage v0.1** tool — see the repo README's *Status* section for
+the full v0.1-vs-production split.
 
 - Results are for one downstream server (filesystem), one task family, and a
   schema‑padded catalog (distractor tools are real schemas but not executed).

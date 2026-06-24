@@ -8,6 +8,20 @@ ToolFinder is a retrieval-based routing layer for Model Context Protocol (MCP) t
 
 > This repository is the **MCP server tool**: the routing library and the bridge server. The original empirical study — datasets, training, leakage-controlled evaluation, the bridge scaling experiments, and the report generator — is archived under [`legacy/`](legacy/README.md) for provenance; it is not needed to run or develop the tool.
 
+## Status — OSS v0.1 (early-stage), not yet production-grade
+
+ToolFinder ships as an **early-stage, research-backed v0.1**: clean, unit-tested, packaged, and every performance claim has a reproducible script. It is **not** production-grade yet — validation is deliberately scoped (one task family, n=1, filesystem-only live execution) and some resilience/observability features are partial. Good fit **today**: large or multi-server tool catalogs and weak/local models. For production, bring your own validation and see the gaps below.
+
+| Area | ✅ Ready in v0.1 | 🔜 Needed for production |
+| --- | --- | --- |
+| Routing | exact FAISS flat (default), opt-in HNSW, opt-in server-aware hierarchical, threshold abstention | — |
+| Bridge | multi-server union + dispatch, one-shot reconnect, `get_stats` | push-based `tools/list_changed`; exported metrics |
+| Evidence | cost modeled **and** measured; top-5 + selection accuracy measured | live multi-server at scale; repeats/error bars |
+| Quality | any open encoder; honest defaults | stronger/fine-tuned default; poisoning mitigations |
+| Packaging | `pip install`, `toolfinder-mcp`, MIT, CI (lint+tests) | PyPI; CHANGELOG/CONTRIBUTING; integration tests |
+
+See [Roadmap & release readiness](#roadmap--release-readiness) for the full checklist and the next immediate steps.
+
 ## The Problem: Context Bloat
 
 Binding dozens of MCP tool schemas to a small local model (e.g. `llama3.2`) fills the prompt with irrelevant structure before reasoning begins. Similar APIs collide in-context, tool-selection errors rise, and smaller models emit malformed calls under long-prompt pressure — the "lost in the middle" failure mode applied to tool orchestration.
@@ -110,22 +124,29 @@ The protections below are what the tool actually enforces (full threat model and
 - [`legacy/`](legacy/README.md) — archived research pipeline, datasets, notebooks, and demos (not part of the tool).
 - [SECURITY.md](SECURITY.md) — threat model and mitigations.
 
-## Roadmap
+## Roadmap & release readiness
 
-Making the MCP bridge production-worthy:
+### Shipped in v0.1 (done)
 
-- **E1 — Multi-server bridge.** ✅ **Done.** One ToolFinder fronts several downstream MCP servers via `TOOLFINDER_CONFIG`, routing across the union and dispatching to the owning server.
-- **E2 — Resilience + live tool-change.** 🟡 **Partial.** Failed downstream calls trigger a one-shot reconnect+retry; `refresh()` re-indexes on demand. *TODO:* push-based `tools/list_changed` subscription.
-- **E3 — Package & publish.** 🟡 **Mostly done.** `pip install` exposes the `toolfinder-mcp` command and `python -m toolfinder.mcp_server`. *TODO:* push to PyPI.
-- **E4 — Observability.** 🟡 **Partial.** `get_stats()` + per-route logging. *TODO:* exported/structured metrics.
-- **E5 — (optional) Ship the fine-tuned encoder by default**, closing the shipped-default-vs-evaluated-best gap.
+- **E1 — Multi-server bridge.** ✅ One ToolFinder fronts several downstream MCP servers via `TOOLFINDER_CONFIG`, routing across the union and dispatching to the owning server.
+- **E3 — Package + entry point.** 🟡 Mostly done — `pip install` exposes `toolfinder-mcp` and `python -m toolfinder.mcp_server` (PyPI publish pending).
+- **H1 — Hierarchical, server-aware routing.** ✅ Opt-in. `UniversalMCPRouter.route_top_k_hierarchical` + `TOOLFINDER_HIERARCHICAL` / `TOOLFINDER_ROUTE_SERVERS`: stage 1 ranks servers by tool-embedding centroid, stage 2 picks within the top `n_servers`. A **precision/scale** win, not latency (encoding dominates; flat search is already <1 ms). Honest recall trade-off — `n_servers` is tunable (covered by tests). Learned semantic categories remain a later extension.
+- **M1 — Cache-aware + quality measurement.** ✅ Modeled *and* measured (gpt-5.4): live `cached_tokens` confirm the cache model within ~1–2% at N≥60 (cached share 18%→70%→73% for N=14→120); top-5 selection completes the task 100%; selection accuracy is router **100%** vs weak `gpt-4.1-mini` **62–75%** vs strong `gpt-5.4` **88–100%** (routing helps weak models; for strong models the value is cost). Scripts: [`bridge_cache_aware.py`](legacy/experiments/bridge_cache_aware.py), [`bridge_cache_measured.py`](legacy/experiments/bridge_cache_measured.py), [`bridge_selection_accuracy.py`](legacy/experiments/bridge_selection_accuracy.py).
 
-**Planned next (from review feedback):**
+### Required for a production release (not yet)
 
-- **H1 — Hierarchical, server-aware routing.** ✅ **Done (opt-in).** `UniversalMCPRouter.route_top_k_hierarchical` plus the bridge flags `TOOLFINDER_HIERARCHICAL` / `TOOLFINDER_ROUTE_SERVERS`: stage 1 ranks servers by tool-embedding centroid, stage 2 picks tools within the top `n_servers`. Sharpens precision on confusable catalogs and bounds the search at scale — a **precision/scale** win, not a latency one (query encoding dominates; flat search is already <1 ms). Honest recall trade-off: too tight a gate can hide the right tool, so `n_servers` is tunable (covered by tests). Learned semantic categories remain a later extension.
-- **M1 — Cache-aware, quality-first measurement.** ✅ **Done.** Modeled *and* measured (gpt-5.4): live `cached_tokens` confirm the cache model within ~1–2% at N≥60 (baseline cached share rises 18%→70%→73% for N=14→120); top-5 selection completes the task 100% ([`bridge_cache_aware.py`](legacy/experiments/bridge_cache_aware.py), [`bridge_cache_measured.py`](legacy/experiments/bridge_cache_measured.py)). **Context→accuracy** ([`bridge_selection_accuracy.py`](legacy/experiments/bridge_selection_accuracy.py)): on 8 forced single-tool probes the router selects correctly at **100%** at every catalog size, while weak `gpt-4.1-mini` manages only **62–75%** and strong `gpt-5.4` **88–100%** — so routing a weak model to the correct shortlist materially helps, while strong models barely need it (their bridge value is cost). A clean *monotonic* "larger catalog distracts" curve is **not** established at these sizes (n=1, 8 probes; the weak model is noisy and already misses with few tools) — the dominant factor is model strength, not N.
+- **E2 — Live tool-change.** Push-based `tools/list_changed` subscription with auto re-index (today: one-shot reconnect + manual `refresh()`).
+- **R3 — Live multi-server validation.** Real downstream servers + real tasks, with repeats and error bars (today: one task family, filesystem-only live execution, n=1, synthetic distractor catalogs). **The biggest credibility gap.**
+- **E4 — Exported metrics.** Structured/exported observability (today: `get_stats()` + logs).
+- **E5 — Stronger default encoder.** Ship or recommend a fine-tuned/stronger encoder (today: zero-shot MiniLM, modest on confusable catalogs).
+- **Poisoning mitigations.** Length cap / embedding-anomaly score / rerank were studied (in `legacy/`) but **not implemented** — needed before fronting untrusted downstream servers.
 
-The research track (human-written query set, live multi-server study, benchmark release) builds on the archived study in [`legacy/`](legacy/README.md).
+### Next immediate steps
+
+1. **Release hygiene (before any public push):** rotate the API key that has sat in your local `.env`, confirm `.env` is untracked in every branch, add `CHANGELOG.md` + `CONTRIBUTING.md`, tag `v0.1.0`, and decide GitHub-only vs PyPI.
+2. **R3 — live multi-server study** with repeats/error bars — the single highest-value step toward "trustworthy in production."
+3. **E2 — push-based tool-change** (auto re-index).
+4. *Optional / research:* **E5** stronger default, **E4** exported metrics, learned categories (H1 extension), and the broader study (human-written queries, benchmark release) in [`legacy/`](legacy/README.md).
 
 ## Scope Notes
 
