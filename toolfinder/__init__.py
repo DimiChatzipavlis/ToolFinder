@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .autonomous_agent import AutonomousMCPAgent
     from .dynamic_faiss_router import (
         RouteNotFoundError,
         RouteResult,
@@ -13,7 +12,6 @@ if TYPE_CHECKING:
     from .mcp_adapter import DynamicMCPClient
 
 __all__ = [
-    "AutonomousMCPAgent",
     "DynamicMCPClient",
     "RouteNotFoundError",
     "RouteResult",
@@ -23,10 +21,6 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    if name == "AutonomousMCPAgent":
-        from .autonomous_agent import AutonomousMCPAgent as _AutonomousMCPAgent
-
-        return _AutonomousMCPAgent
     if name == "DynamicMCPClient":
         from .mcp_adapter import DynamicMCPClient as _DynamicMCPClient
 

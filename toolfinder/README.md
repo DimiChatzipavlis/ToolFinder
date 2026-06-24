@@ -1,15 +1,14 @@
 # toolfinder/ — Core Library
 
-The deployable routing layer. Four modules, no framework lock-in.
+The deployable routing layer behind the MCP bridge. Three modules, no framework lock-in.
 
 ## Modules
 
 | Module | Responsibility |
 | --- | --- |
-| `dynamic_faiss_router.py` | `UniversalMCPRouter`: embeds tool schemas (sentence-transformers) and routes queries via FAISS. Exact `IndexFlatIP` by default — measured faster than HNSW at every catalog size up to 100k vectors (see `experiments/results/scaling_bench.json`); HNSW is opt-in via `RouterHyperparameters(index_type="hnsw" \| "auto")`. Threshold-based abstention (`min_cosine_similarity`) plus top1-top2 ambiguity-margin logging. |
+| `dynamic_faiss_router.py` | `UniversalMCPRouter`: embeds tool schemas (sentence-transformers) and routes queries via FAISS. Exact `IndexFlatIP` by default — query *encoding* dominates latency, so approximate search buys nothing at MCP catalog sizes; HNSW is opt-in via `RouterHyperparameters(index_type="hnsw" \| "auto")`. Threshold-based abstention (`min_cosine_similarity`) plus top1-top2 ambiguity-margin logging. |
 | `mcp_adapter.py` | `DynamicMCPClient`: real stdio MCP client — process spawn (no shell), initialize/tools-list handshake, request/response correlation with timeouts, bounded `stdin.drain()`, pending-request draining on shutdown. |
-| `autonomous_agent.py` | `AutonomousMCPAgent`: ReAct loop over routed candidates with JSON-Schema argument validation, canonicalized duplicate-action guard (sorted-key SHA256), bounded scratchpad, and Ollama-backed reasoning. |
-| `utils.py` | LLM-output recovery parsing: strict JSON first, then `ast.literal_eval` (literals only) with a nesting-depth guard. |
+| `mcp_server.py` | `FastMCP` bridge server (`toolfinder-mcp`): fronts one or more downstream MCP servers, exposes `find_tools` / `call_tool` / `route_and_call` / `catalog_size` / `get_stats` / `refresh`, dispatches to the owning server, reconnects on failure. See [docs/MCP_SERVER.md](../docs/MCP_SERVER.md). |
 
 ## API in 20 lines
 
@@ -36,10 +35,12 @@ llm_tools = to_openai_tools(results)            # OpenAI-style bindable schemas
 
 - **Exact search by default.** Query *encoding* (~tens of ms) dominates
   retrieval (<1 ms below 10⁵ vectors); approximate indexes buy nothing at MCP
-  catalog sizes and cost exactness. Evidence: `experiments/benchmarks/scaling_bench.py`.
+  catalog sizes and cost exactness. Benchmarked in the archived study under
+  `legacy/experiments/`.
 - **Type-stable routing API.** `route_top_k` always returns `RouteResult`;
   format conversion is an explicit function, not hidden state.
 - **Abstention over force-routing.** The threshold's operating points are
-  measured (risk-coverage / AUROC) in `experiments/evaluation/ood.py`, not
-  guessed. Schemas get `additionalProperties: false` injected at ingest.
+  measured (risk-coverage / AUROC) in the archived study under
+  `legacy/experiments/`, not guessed. Schemas get `additionalProperties: false`
+  injected at ingest.
 - **Security posture:** see [SECURITY.md](../SECURITY.md).

@@ -42,3 +42,9 @@ experiments/.env
 .env.*
 
 *.egg-info/
+
+# Legacy archive — heavy/derived/secret content was moved under legacy/, so the
+# root-anchored patterns above no longer match it. Re-exclude it here.
+legacy/**/artifacts/
+legacy/**/crossencoder_train_pairs.csv
+legacy/**/.env

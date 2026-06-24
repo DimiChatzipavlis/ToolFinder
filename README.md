@@ -5,7 +5,8 @@ ToolFinder is a retrieval-based routing layer for Model Context Protocol (MCP) t
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-compatible-black)](https://modelcontextprotocol.io/)
 [![FAISS](https://img.shields.io/badge/retrieval-FAISS-orange)](https://github.com/facebookresearch/faiss)
-[![LangGraph](https://img.shields.io/badge/integration-LangGraph-green)](https://github.com/langchain-ai/langgraph)
+
+> This repository is the **MCP server tool**: the routing library and the bridge server. The original empirical study — datasets, training, leakage-controlled evaluation, the bridge scaling experiments, and the report generator — is archived under [`legacy/`](legacy/README.md) for provenance; it is not needed to run or develop the tool.
 
 ## The Problem: Context Bloat
 
@@ -14,11 +15,9 @@ Binding dozens of MCP tool schemas to a small local model (e.g. `llama3.2`) fill
 ## The Approach
 
 - A sentence-transformer bi-encoder embeds queries and MCP schemas into the same vector space.
-- A FAISS index retrieves the top-k candidate tools for each query. The default index is **exact flat inner-product search** (`IndexFlatIP`): at realistic MCP catalog sizes, exact search is faster than approximate HNSW graph traversal and fully deterministic. HNSW remains available via `RouterHyperparameters(index_type="hnsw")` for very large catalogs (see the scaling benchmark in `experiments/`).
+- A FAISS index retrieves the top-k candidate tools for each query. The default index is **exact flat inner-product search** (`IndexFlatIP`): at realistic MCP catalog sizes, exact search is faster than approximate HNSW graph traversal and fully deterministic. HNSW remains available via `RouterHyperparameters(index_type="hnsw")` for very large catalogs.
 - A similarity threshold rejects queries that match no tool well enough, instead of force-routing them.
 - The model then reasons over a small, relevant tool surface instead of the entire ecosystem.
-
-The datasets, trained models, evaluation protocol, and benchmark results live in [experiments/](experiments/) (the maintained research pipeline; `academic_research/` contains earlier iterations kept for provenance).
 
 ## Quickstart
 
@@ -44,21 +43,19 @@ results = router.route_top_k("Write a summary to output.txt", k=2)
 llm_tools = to_openai_tools(results)   # bindable function-calling schemas
 ```
 
-> **Performance note — default vs evaluated-best.** Out of the box the router
-> loads a *zero-shot* sentence-transformer checkpoint. The benchmark's headline
-> numbers come from **fine-tuned** weights, which are intentionally not
-> committed (see `experiments/results/artifact_manifest.json` for their
-> hashes). Zero-shot dense retrieval is measurably weaker — on this benchmark
-> frozen MiniLM scores *below BM25*. To match the reported quality, regenerate
-> the artifacts (`python experiments/run_all.py --from train`) and point the
-> router at one: `UniversalMCPRouter(model_name="experiments/artifacts/biencoder/minilm/seed42/final")`.
+> **Shipped default vs evaluated-best.** Out of the box the router loads a
+> *zero-shot* sentence-transformer checkpoint (`all-MiniLM-L6-v2`, auto-downloaded).
+> The benchmark's headline retrieval numbers come from **fine-tuned** weights,
+> produced by the archived pipeline under `legacy/experiments/` and intentionally
+> not committed. Zero-shot dense retrieval is measurably weaker — on the
+> benchmark, frozen MiniLM scores *below BM25*. To match the reported quality,
+> fine-tune via `legacy/experiments/` and point the router at the result:
+> `UniversalMCPRouter(model_name="path/to/your/fine-tuned/encoder")`.
 
 Optional extras:
 
 ```bash
 python -m pip install -e ".[dev]"          # pytest
-python -m pip install -e ".[langgraph]"    # LangChain/LangGraph integration
-python -m pip install -e ".[experiments]"  # research pipeline (pandas, sklearn, matplotlib)
 ```
 
 ## ToolFinder as an MCP Server (routing bridge)
@@ -79,81 +76,39 @@ Register it in an MCP host with a config listing the servers to bridge (`mcp_ser
 
 (Find your interpreter with `python -c "import sys; print(sys.executable)"`.) After `pip install -e .` the server is also available as the `toolfinder-mcp` console command and `python -m toolfinder.mcp_server`. Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`, `get_stats()` (routing observability), `refresh()` (re-index after downstream tool changes).
 
-**Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models.
+**Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models. Full study and figures: [`legacy/experiments/`](legacy/README.md).
 
 Full cookbook (install, host registration, tool API, config, results, security): [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
 
-## Empirical Results
+## Routing Safety
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DimiChatzipavlis/ToolFinder/blob/main/lrgacy/examples/02_toolfinder_live.ipynb) — runnable evidence notebook: clones this repo, routes live on the real corpus, reproduces baseline rows, renders the committed results, and (on GPU) fine-tunes live.
+The protections below are what the tool actually enforces (full threat model and residual risks in [SECURITY.md](SECURITY.md)):
 
-Two kinds of evidence, with their scope stated plainly:
-
-**Retrieval quality** is evaluated in [experiments/](experiments/) under leakage-controlled splits (unseen queries and unseen tools), against lexical baselines (BM25, TF-IDF) and frozen-encoder baselines, with seed-averaged metrics and confidence intervals. See `experiments/results/` and `reports/report.md` for current numbers.
-
-**End-to-end system effect** is measured by a small A/B harness that runs identical filesystem tasks against a local model with (a) all tools bound vs (b) top-k routed tools. It is a smoke-scale benchmark (n=3 tasks), not a statistical claim:
-
-<!-- EVAL_TABLE_START -->
-_Last auto-updated: 2026-03-16 17:01:57_
-
-| Metric | Naive Baseline | ToolFinder Enabled |
-| --- | --- | --- |
-| Tasks Run | 3 | 3 |
-| Average Tools In Context | 14 | 2 |
-| Average Context Payload (Chars) | 9106 | 1450 |
-| Average Total Latency (s) | 57.51 | 14.47 |
-| Average Inference Latency (s) | 57.47 | 14.39 |
-| Successful Tool Calls | 3/3 | 3/3 |
-| Expected Tool Matches | 3/3 | 3/3 |
-| State Verified | 3/3 | 3/3 |
-
-Task outcomes:
-- T1_READ: naive=`read_text_file` verified=`True`, toolfinder=`read_text_file` verified=`True`
-- T2_WRITE: naive=`write_file` verified=`True`, toolfinder=`write_file` verified=`True`
-- T3_LIST: naive=`list_directory` verified=`True`, toolfinder=`list_directory` verified=`True`
-<!-- EVAL_TABLE_END -->
-
-Regenerate with `python examples/eval_toolfinder.py --update-readme` (preserve the markers).
-
-## Hardening Features
-
-- Strict schema enforcement injects `additionalProperties: false` into object schemas to reject speculative keys.
-- AST recovery parsing salvages Python-style dicts when strict JSON parsing of local-model output fails (literals only — no code execution).
-- ReAct execution loops let the agent observe failures and retry rather than crash on the first malformed response.
-- Idempotency guards and bounded scratchpads limit repeated actions and runaway context growth.
-- Threshold-based rejection abstains on out-of-scope queries rather than force-routing them. Routing is similarity-based and can still select a wrong tool for ambiguous queries; treat destructive tools accordingly (see `reports/report.md`, Limitations).
+- **Strict schema enforcement** injects `additionalProperties: false` into object schemas at ingest, so the agent can't pass speculative keys a downstream tool would reject.
+- **Threshold-based abstention** (`min_cosine_similarity`) rejects out-of-scope queries instead of force-routing them, with top1–top2 ambiguity-margin logging. Routing is similarity-based and can still pick a wrong tool for genuinely ambiguous queries; treat destructive downstream tools accordingly.
+- **Safe downstream spawning** — `DynamicMCPClient` spawns servers with argument lists (never `shell=True`), correlates requests with per-request timeouts, and drains pending requests on shutdown.
+- **No unsafe deserialization** — encoder weights load via safetensors; the FAISS index is built in-process, never loaded from disk.
 
 ## Repository Layout
 
-Every folder has its own README with details.
-
-- [`toolfinder/`](toolfinder/README.md) — core library: router, MCP stdio client, autonomous ReAct agent, recovery parsing.
-- [`ToolFinder_mcp_server.py`](ToolFinder_mcp_server.py) — the MCP routing-bridge server (FastMCP); cookbook in [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md).
-- [`experiments/`](experiments/README.md) — the research pipeline: datasets, leakage-controlled splits, training (bi- and cross-encoders), baselines, three evaluation regimes, OOD/threshold analysis, Flat-vs-HNSW scaling benchmark, the MCP-bridge scaling study, poisoning attack, calibration, figures, report generation. Generated evidence lives in [`experiments/results/`](experiments/results/README.md).
-- [`examples/`](examples/README.md) — runnable demos: A/B harness, multi-server agent demo, LangGraph integration (require local Ollama + Node).
-- [`tests/`](tests/README.md) — unit tests incl. CI-enforced split-hygiene guards (run `pytest`).
-- [`notebooks/`](notebooks/README.md) — executed notebooks with committed outputs: EDA and the live local/Colab evidence notebook.
-- [`reports/`](reports/README.md) — the research report, auto-rendered from `experiments/results/`.
-- [`academic_research/`](academic_research/README.md) — raw source datasets only (provenance anchor).
+- [`toolfinder/`](toolfinder/README.md) — core library: the FAISS router, the MCP stdio client, and the FastMCP bridge server.
+- [`ToolFinder_mcp_server.py`](ToolFinder_mcp_server.py) — entry-point shim for the MCP routing-bridge server; cookbook in [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md).
+- [`tests/`](tests/README.md) — unit tests for the router and the bridge (`pytest`).
+- [`legacy/`](legacy/README.md) — archived research pipeline, datasets, notebooks, and demos (not part of the tool).
 - [SECURITY.md](SECURITY.md) — threat model and mitigations.
 
 ## Roadmap
 
-Two parallel tracks. **E1, E3** and **R1** are **done**, **E2/E4** partially; next up are **R2/R3** (real queries, live multi-server study), finishing **E2** (push-based tool-change), and **E3-publish** (PyPI).
+Making the MCP bridge production-worthy:
 
-**Research** (extends the leakage-controlled study; full plan in [`reports/report.md`](reports/report.md) §6):
-- **R1 — Train on multiple servers, not just GitHub.** ✅ **Done.** A server-disjoint split (12 train / 7 held-out test servers, 574-tool corpus) shows multi-server training **beats GitHub-only on unseen servers: R@1 0.567 vs 0.533** (and 0.42 BM25 / 0.33 frozen) — diversity helps generalization, modestly at this data scale. Run: `experiments/dataset/make_multiserver_splits.py` → `models/biencoder.py --split-name regime4_multiserver` → `evaluation/eval_multiserver.py`.
-- **R2 — Human-written query set.** 200–400 queries written from tool docs only; measure the synthetic→human accuracy drop (real external validity, breaks the grammar ceiling).
-- **R3 — Live multi-server bridge study.** Replace schema-padded distractors with 3–4 *real* downstream servers and real tasks; add repeats/error bars and a small-local-model arm to map the cost crossover surface.
-- **R4 — Release the benchmark.** Held-out test split, datasheet, leaderboard protocol — the citable artifact.
-
-**Engineering** (make the MCP bridge production-worthy):
-- **E1 — Multi-server bridge.** ✅ **Done.** One ToolFinder fronts several downstream MCP servers via `TOOLFINDER_CONFIG`, routing across the union and dispatching to the owning server (`tests/test_mcp_server.py`).
+- **E1 — Multi-server bridge.** ✅ **Done.** One ToolFinder fronts several downstream MCP servers via `TOOLFINDER_CONFIG`, routing across the union and dispatching to the owning server.
 - **E2 — Resilience + live tool-change.** 🟡 **Partial.** Failed downstream calls trigger a one-shot reconnect+retry; `refresh()` re-indexes on demand. *TODO:* push-based `tools/list_changed` subscription.
 - **E3 — Package & publish.** 🟡 **Mostly done.** `pip install` exposes the `toolfinder-mcp` command and `python -m toolfinder.mcp_server`. *TODO:* push to PyPI.
-- **E4 — Observability + tests.** 🟡 **Partial.** `get_stats()` + per-route logging; in-memory FastMCP client tests in CI. *TODO:* exported/structured metrics.
+- **E4 — Observability.** 🟡 **Partial.** `get_stats()` + per-route logging. *TODO:* exported/structured metrics.
 - **E5 — (optional) Ship the fine-tuned encoder by default**, closing the shipped-default-vs-evaluated-best gap.
+
+The research track (human-written query set, live multi-server study, benchmark release) builds on the archived study in [`legacy/`](legacy/README.md).
 
 ## Scope Notes
 
-This repository provides a runtime library, a research pipeline, and examples. It does not package a production multi-node deployment (service discovery, secrets, auth, load balancing are out of scope; see SECURITY.md for the full residual-risk list). Latency and quality numbers are measured on the configurations documented in `experiments/`; claims do not extend beyond the tested catalog sizes.
+This repository provides the routing library and the MCP bridge server. It does not package a production multi-node deployment (service discovery, secrets, auth, load balancing are out of scope; see [SECURITY.md](SECURITY.md) for the full residual-risk list). Latency and quality numbers are measured on the configurations documented under `legacy/experiments/`; claims do not extend beyond the tested catalog sizes.

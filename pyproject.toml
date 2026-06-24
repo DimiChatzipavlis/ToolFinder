@@ -22,26 +22,12 @@ dependencies = [
 toolfinder-mcp = "toolfinder.mcp_server:main"
 
 [project.optional-dependencies]
-langgraph = ["langchain", "langgraph", "langchain-ollama"]
 dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0"]
-experiments = [
-    "pandas>=2.0.0",
-    "scikit-learn>=1.3.0",
-    "matplotlib>=3.8.0",
-    "datasets>=2.19.0",
-    "accelerate>=0.30.0",
-]
 
 [tool.setuptools.packages.find]
 include = ["toolfinder*"]
 
 [tool.ruff]
 line-length = 120
-# Executed notebooks are generated artifacts (see experiments/build_*_notebook.py);
-# lint the generators, not the generated cells.
-extend-exclude = ["notebooks", "examples/ToolFinder_StepByStep.ipynb"]
-
-[tool.ruff.lint.per-file-ignores]
-# Standalone scripts bootstrap sys.path before importing the local packages.
-"experiments/**" = ["E402"]
-"examples/**" = ["E402"]
+# legacy/ is archived research material, not maintained as part of the tool.
+extend-exclude = ["legacy"]

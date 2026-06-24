@@ -133,10 +133,10 @@ class UniversalMCPRouter:
     to convert candidates into bindable function-calling schemas.
 
     Quality note: `model_name` defaults to a zero-shot checkpoint. The
-    benchmark's best results come from fine-tuned weights; pass a local
-    artifact path (e.g. `experiments/artifacts/biencoder/minilm/seed42/final`)
-    to load them. Zero-shot dense retrieval can underperform lexical search on
-    in-domain catalogs (see `reports/report.md`).
+    benchmark's best results come from fine-tuned weights (produced by the
+    archived pipeline under `legacy/experiments/`); pass a local artifact path
+    to `model_name` to load them. Zero-shot dense retrieval can underperform
+    lexical search on in-domain catalogs.
     """
 
     def __init__(

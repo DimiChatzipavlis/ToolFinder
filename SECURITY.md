@@ -1,59 +1,45 @@
 # Security Posture
 
-Threat model, implemented mitigations, and residual risks. Verified by code
-sweep on 2026-06-12 (no `eval`/`exec`/`pickle`/`shell=True`/`os.system`/unsafe
-YAML/`verify=False` anywhere; no hardcoded credentials — API keys are read from
-environment variables only).
+ToolFinder is an MCP **routing bridge**: it embeds the tool catalogs of one or
+more downstream MCP servers and forwards the agent's chosen call to the server
+that owns the tool. It does **selection and dispatch only** — it does not execute
+code itself, and it holds no credentials (routing is a local embedding model).
 
-## Threat model
+## What the bridge actually protects
 
-**Selection layer (the router).** A hostile or compromised MCP server can
-publish tool descriptions crafted to attract unrelated queries
-(description poisoning), or rely on ambiguous queries being force-routed to
-destructive tools. Out-of-scope user requests must be rejected, not routed.
-
-**Execution layer (the agent/runtime).** A model can emit malformed or
-malicious arguments: path traversal, oversized payloads, repeated destructive
-actions, or non-JSON output crafted to break parsing.
-
-## Implemented mitigations
-
-| Risk | Mitigation | Where |
+| Property | How | Where |
 | --- | --- | --- |
-| Description poisoning | Measured attack + 3 mitigations (length cap, embedding-centroid anomaly score, cross-encoder rerank); see `experiments/results/poisoning.json` | `experiments/attacks/poisoning.py` |
-| Force-routing of out-of-scope queries | Similarity threshold with measured operating points (risk-coverage, AUROC) | `toolfinder/dynamic_faiss_router.py`, `experiments/evaluation/ood.py` |
-| Speculative/unknown arguments | `additionalProperties: false` injected into every object schema at ingest; arguments validated against the tool's JSON Schema before execution | router `_inject_additional_properties_false`, agent `jsonschema.validate` |
-| Path traversal | Path-like arguments resolve via `realpath` anchored at `workspace_root` (never process cwd), strict containment + parent-segment denial + allowed-roots check; null bytes rejected | `Enterprise/runtime/policy.py` |
-| Repeated/destructive duplicate actions | Canonicalized (sorted-key JSON) SHA256 action signatures in the ReAct loop; per-response dedup in the hybrid pipeline | `toolfinder/autonomous_agent.py`, `Enterprise/runtime/openclaw_hybrid_pipeline.py` |
-| Malicious model output parsing | Strict JSON first; recovery limited to `ast.literal_eval` (literals only, no calls/imports) with nesting-depth guard against parser DoS | `toolfinder/utils.py` |
-| Oversized payloads | Byte/string/collection limits on arguments | `Enterprise/runtime/policy.py` |
-| Stdio backpressure DoS | Bounded `stdin.drain()` with request timeout; pending-request map drained on timeout/shutdown | `toolfinder/mcp_adapter.py` |
-| Command injection at server spawn | `create_subprocess_exec` with argument lists everywhere; no `shell=True` in the codebase | `toolfinder/mcp_adapter.py`, `Enterprise/runtime/openclaw_backend.py` |
-| Unsafe deserialization | No `pickle`/`torch.load` of untrusted files; model weights load via safetensors through sentence-transformers; FAISS indexes are built in-process, never loaded from disk in the runtime | — |
-| Supply-chain drift of artifacts | SHA256 manifest of datasets, results, and model artifacts | `experiments/build_manifest.py` |
-| SSRF-ish hangs in outbound HTTP | Explicit timeouts on every `httpx` client/request | `Enterprise/runtime/openclaw_backend.py`, `experiments/*` |
+| No shell injection when spawning downstream servers | `create_subprocess_exec` with argument lists; never `shell=True` | `toolfinder/mcp_adapter.py` |
+| No hang on a stalled/garbage downstream | bounded `stdin.drain()`, per-request timeouts, pending-request draining on shutdown | `toolfinder/mcp_adapter.py` |
+| Speculative argument keys rejected | `additionalProperties: false` injected into every object schema at ingest | `toolfinder/dynamic_faiss_router.py` |
+| Refuses out-of-scope requests | similarity threshold (`min_cosine_similarity`) — abstains instead of force-routing | `toolfinder/dynamic_faiss_router.py` |
+| Survives a downstream crash | one-shot reconnect + retry on a failed call | `toolfinder/mcp_server.py` |
+| No unsafe deserialization | weights load via safetensors (sentence-transformers); FAISS index is built in-process, never loaded from disk | — |
 
-## Residual risks (known, accepted, documented)
+## What it relies on (not the bridge's job)
 
-1. **The HTTP API has no authentication.** `POST /execute`
-   (`Enterprise/runtime/api.py`) is a local validation runtime. Bind it to
-   `127.0.0.1` only; any network exposure requires an external auth/proxy
-   layer, which is explicitly out of scope here.
-2. **Error responses include exception text** (`execution failed: {exc}`),
-   which can disclose internal paths to a caller. Acceptable for a local
-   runtime; scrub before any exposure.
-3. **A global similarity threshold cannot fully separate adversarial
-   near-misses** (in-domain vocabulary, absent capability) from valid queries
-   — quantified in `experiments/results/ood_eval.json`. Destructive tools
-   should carry stricter per-tool margins and human confirmation.
-4. **Poisoning mitigations are partial individually** (measured in
-   `experiments/results/poisoning.json`); deploy the combination (length cap +
-   anomaly screen + rerank) and treat server allowlisting as the primary
-   control.
-5. **Resource exhaustion via very large literal payloads** remains possible
-   below the configured limits; limits are caps, not proofs.
+- **Downstream sandboxing.** Filesystem/git/etc. access limits are enforced by
+  the downstream servers themselves (e.g. the filesystem server's allowed-root).
+  The bridge does not add its own sandbox.
+- **Trusted configuration.** `TOOLFINDER_CONFIG` lists the servers to spawn; only
+  point it at servers you trust.
+
+## Known residual risks (honest)
+
+1. **No authentication on the bridge.** It is a local stdio MCP server; do not
+   expose it over a network without an external auth layer.
+2. **Tool-description poisoning.** A hostile downstream server could craft a tool
+   description to attract unrelated queries. Mitigations (length cap, embedding
+   anomaly score, reranking) were *studied* (archived under `legacy/experiments/`)
+   but are **not implemented in the server** — treat untrusted downstream servers
+   with caution.
+3. **Tool-name collisions.** If two downstream servers expose the same tool name,
+   `call_tool` resolves to the first; `route_and_call` is unambiguous (dispatches
+   by the routed server).
+4. **No persistence / single process.** The index is in-memory; there is no
+   horizontal scaling or audit log beyond `get_stats()` and process logging.
 
 ## Reporting
 
-This is a university research project, not a supported product. Open an issue
-for any finding; do not expect a formal SLA.
+Open a GitHub issue for any finding. This is an early-stage OSS tool, not a
+supported product.

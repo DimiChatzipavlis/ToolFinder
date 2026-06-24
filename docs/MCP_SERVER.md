@@ -17,7 +17,8 @@ It is a thin wrapper over two already-tested components: `UniversalMCPRouter`
 Measured on the filesystem server (create → edit → read a file), GPT‑5.4 as the
 agent, catalog padded with real distractor tools from a 574‑tool multi‑server
 pool. **Every configuration completed the task (100% success).** Numbers are
-total task tokens; figures in `experiments/results/figures/`.
+total task tokens. The full study (code, data, figures) is archived under
+`legacy/experiments/`.
 
 | Catalog size N | Baseline (all tools bound) | `find_tools`+`call_tool` | `route_and_call` (single) |
 |---|---|---|---|
@@ -145,15 +146,11 @@ servers) rather than the single-server env vars — see the Run section above.
 
 ## Figures
 
-- `experiments/results/figures/fig_bridge_scaling_free.png` — per‑turn schema
-  weight (flat bridge vs linear baseline) and router recall@1 vs catalog size.
-- `experiments/results/figures/fig_bridge_scaling_api.png` — end‑to‑end token
-  cost vs catalog size for the three configurations (the crossover).
-
-Reproduce: `python experiments/bridge_scaling.py --free-only` (no API), then
-`python experiments/bridge_scaling.py --api-sizes 14 60 120` (needs an OpenAI
-key in `experiments/.env` as `API_KEY` + `AGENT_MODEL`), then
-`python experiments/bridge_figures.py`.
+The full study (code, data, and figures) is archived under `legacy/experiments/`.
+Reproduce the bridge figures from there: `python legacy/experiments/bridge_scaling.py --free-only`
+(no API), then `python legacy/experiments/bridge_scaling.py --api-sizes 14 60 120`
+(needs an OpenAI key in `legacy/experiments/.env` as `API_KEY` + `AGENT_MODEL`),
+then `python legacy/experiments/bridge_figures.py`.
 
 ---
 
@@ -168,7 +165,7 @@ key in `experiments/.env` as `API_KEY` + `AGENT_MODEL`), then
   deduplicated `required`) before use, so a malformed downstream schema cannot
   break the agent's tool binding.
 - ToolFinder's broader threat model (description poisoning, OOD rejection) is in
-  `SECURITY.md` and `reports/report.md`.
+  [`SECURITY.md`](../SECURITY.md).
 
 ## Roadmap (server)
 
