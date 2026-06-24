@@ -162,13 +162,28 @@ def _record(query: str, chosen: str | None, server: str | None, score: float | N
     logger.info("route %r -> %s@%s (score=%s)", query[:80], chosen, server, score)
 
 
+def _route(query: str, k: int) -> list:
+    """Route a query to the top-k tools.
+
+    Flat search by default. When `TOOLFINDER_HIERARCHICAL` is set, use two-stage
+    server-aware routing — pick the top `TOOLFINDER_ROUTE_SERVERS` servers (by
+    centroid), then the best tools within them. Helps precision on confusable
+    multi-server catalogs and bounds the search at large scale; not a latency win.
+    """
+    router = _state["router"]
+    if os.getenv("TOOLFINDER_HIERARCHICAL", "").strip().lower() in {"1", "true", "yes", "on"}:
+        n_servers = max(1, int(os.getenv("TOOLFINDER_ROUTE_SERVERS", "2")))
+        return router.route_top_k_hierarchical(query, k=k, n_servers=n_servers)
+    return router.route_top_k(query, k=k)
+
+
 @mcp.tool
 async def find_tools(query: str, k: int | None = None) -> list[dict]:
     """Return the downstream tools most relevant to `query`, as bindable schemas
     (each tagged with its `server_name`). Call this first, then `call_tool`."""
     await _ensure_ready()
     top_k = k or int(os.getenv("TOOLFINDER_TOPK", "3"))
-    matches = _state["router"].route_top_k(query, k=top_k)
+    matches = _route(query, top_k)
     if matches:
         _record(query, matches[0].tool_name, matches[0].server_name, round(matches[0].score, 4))
     return to_openai_tools(matches)
@@ -191,7 +206,7 @@ async def route_and_call(intent: str, arguments: dict[str, Any]) -> Any:
     token-efficient pattern — the agent binds just this one tool regardless of
     how large the combined catalog is."""
     await _ensure_ready()
-    matches = _state["router"].route_top_k(intent, k=1)
+    matches = _route(intent, 1)
     if not matches:
         _record(intent, None, None, None)
         return {"error": f"no downstream tool matched intent: {intent!r}"}

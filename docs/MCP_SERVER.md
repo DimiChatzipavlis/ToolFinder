@@ -150,6 +150,8 @@ the routed server.)
 | `TOOLFINDER_DOWNSTREAM_ARGS` | filesystem server on `FS_ROOT` | JSON args for the default single server |
 | `TOOLFINDER_MODEL` | `all-MiniLM-L6-v2` | embedding model for routing |
 | `TOOLFINDER_TOPK` | `3` | default shortlist size for `find_tools` |
+| `TOOLFINDER_HIERARCHICAL` | off | set (`1`/`true`) to enable two-stage **server-aware** routing |
+| `TOOLFINDER_ROUTE_SERVERS` | `2` | servers kept in stage 1 when hierarchical routing is on (higher = more recall, less precision) |
 
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
 servers) rather than the single-server env vars — see the Run section above.
@@ -193,7 +195,7 @@ Progress so far:
 3. ~~**Package**~~ — **done**: `pip install` exposes the `toolfinder-mcp` console command (and `python -m toolfinder.mcp_server`).
 4. **Observability** — *partial*: `get_stats()` exposes routing decisions and per-tool counts, and every route is logged. Still TODO: structured/exported metrics.
 5. **Publish** — push to PyPI so users add the bridge without cloning.
-6. **Hierarchical, server-aware routing** — route to the owning server first, then the tool (precision + very-large-catalog scaling; not a latency win — encoding dominates).
+6. ~~**Hierarchical, server-aware routing**~~ — **done (opt-in)**: `TOOLFINDER_HIERARCHICAL` routes to the top `TOOLFINDER_ROUTE_SERVERS` servers (by tool-embedding centroid), then the tool — precision + very-large-catalog scaling, not a latency win. See `route_top_k_hierarchical` in the router.
 7. **Cache-aware, quality-first measurement** — cost under prompt-cache pricing, top-k (k=5) end-task success, and a context-reduction→accuracy test.
 
 See the repo README "Roadmap" for the matching research track (multi-server training, human queries, benchmark release).

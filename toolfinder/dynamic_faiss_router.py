@@ -165,6 +165,10 @@ class UniversalMCPRouter:
         self.faiss_index: faiss.Index = self._create_index()
         self.metadata: dict[int, tuple[str, str, ToolSchema]] = {}
         self._staged_tools: list[tuple[str, ToolSchema]] = []
+        # Server-aware (hierarchical) routing state, populated during ingest.
+        self._embeddings: np.ndarray = np.zeros((0, embedding_dim), dtype=np.float32)
+        self._server_to_ids: dict[str, list[int]] = {}
+        self._server_centroids: dict[str, np.ndarray] | None = None
 
     def _create_index(self, expected_size: int = 0) -> faiss.Index:
         """Allocate the FAISS index configured by `index_type`.
@@ -205,12 +209,19 @@ class UniversalMCPRouter:
         self.faiss_index = self._create_index()
         self.metadata.clear()
         self._staged_tools.clear()
+        self._reset_hierarchical_state()
 
         if self.model is not None:
             del self.model
             self.model = None
 
         _EmbeddingModelSingleton.release(self.model_name, self.device)
+
+    def _reset_hierarchical_state(self) -> None:
+        """Clear retained embeddings / per-server index ids / cached centroids."""
+        self._embeddings = np.zeros((0, self._embedding_dim), dtype=np.float32)
+        self._server_to_ids = {}
+        self._server_centroids = None
 
     @staticmethod
     def canonicalize_schema(schema: ToolSchema) -> str:
@@ -256,6 +267,7 @@ class UniversalMCPRouter:
 
         self.faiss_index = self._create_index(expected_size=len(self._staged_tools))
         self.metadata.clear()
+        self._reset_hierarchical_state()
 
         # Staged tools were normalized (and strict-schema injected) exactly once
         # by add_tool; here they are only grouped per server and ingested.
@@ -318,6 +330,14 @@ class UniversalMCPRouter:
         for offset, tool in enumerate(normalized_tools):
             index_id = start_index + offset
             self.metadata[index_id] = (server_name, tool["tool_name"], tool)
+
+        # Retain normalized embeddings + per-server index ids for hierarchical
+        # (server-aware) routing; invalidate any cached server centroids.
+        self._embeddings = np.vstack([self._embeddings, embeddings])
+        self._server_to_ids.setdefault(server_name, []).extend(
+            range(start_index, start_index + len(normalized_tools))
+        )
+        self._server_centroids = None
 
         return len(normalized_tools)
 
@@ -429,6 +449,116 @@ class UniversalMCPRouter:
                 "threshold or rephrasing the query"
             )
         return matches[0]
+
+    def route_top_k_hierarchical(
+        self,
+        query: str,
+        k: int | None = None,
+        n_servers: int = 2,
+    ) -> list[RouteResult]:
+        """Two-stage, server-aware routing.
+
+        Stage 1 ranks the configured MCP servers by similarity to a per-server
+        **centroid** (the mean of that server's tool embeddings) and keeps the
+        top `n_servers`. Stage 2 returns the top-k tools drawn only from those
+        servers. Narrowing to the most relevant server(s) before tool selection
+        improves precision when different servers expose confusable tools, and
+        bounds the candidate set for very large multi-server catalogs.
+
+        This is **not** a latency optimization — query encoding dominates and
+        flat search is already sub-millisecond at MCP catalog sizes. The win is
+        precision and scale.
+
+        Recall trade-off: gating to the top server(s) excludes the correct tool
+        if its server is mis-ranked in stage 1; raise `n_servers` to widen the
+        gate (more recall, less precision). With one configured server, or
+        `n_servers` >= the number of servers, results match `route_top_k`.
+
+        Returns an empty list if nothing clears `min_cosine_similarity`.
+        """
+        k = self.config.top_k_candidates if k is None else k
+        if k < 1:
+            raise ValueError("k must be at least 1")
+        if n_servers < 1:
+            raise ValueError("n_servers must be at least 1")
+        if self.faiss_index.ntotal == 0:
+            raise ValueError("router index is empty; ingest at least one server first")
+
+        model = self.model
+        if model is None:
+            raise RuntimeError("embedding model has been torn down")
+
+        with torch.inference_mode():
+            query_embedding = model.encode([query], convert_to_numpy=True)
+        query_embedding = np.asarray(query_embedding, dtype=np.float32)
+        faiss.normalize_L2(query_embedding)
+        query_vector = query_embedding[0]
+
+        candidate_ids = self._select_server_candidate_ids(query_vector, n_servers)
+        if not candidate_ids:
+            return []
+
+        candidate_scores = self._embeddings[candidate_ids] @ query_vector
+        order = np.argsort(-candidate_scores)[:k]
+
+        top_score = float(candidate_scores[order[0]])
+        if top_score < self.config.min_cosine_similarity:
+            logger.debug(
+                "Rejected query %r hierarchically (top_score=%.4f < min_cosine_similarity=%.2f)",
+                query,
+                top_score,
+                self.config.min_cosine_similarity,
+            )
+            return []
+
+        matches: list[RouteResult] = []
+        for pos in order:
+            score = float(candidate_scores[int(pos)])
+            if score < self.config.min_cosine_similarity:
+                continue
+            index_id = candidate_ids[int(pos)]
+            server_name, tool_name, schema = self.metadata[index_id]
+            logger.info(
+                "Matched tool %s/%s with score=%.4f (hierarchical, threshold=%.2f)",
+                server_name,
+                tool_name,
+                score,
+                self.config.min_cosine_similarity,
+            )
+            matches.append(
+                RouteResult(server_name=server_name, tool_name=tool_name, schema=schema, score=score)
+            )
+        return matches
+
+    def _select_server_candidate_ids(self, query_vector: np.ndarray, n_servers: int) -> list[int]:
+        """Stage 1: rank servers by centroid similarity, return the tool index
+        ids belonging to the top `n_servers`."""
+        centroids = self._server_centroids_cached()
+        if not centroids:
+            return []
+        ranked = sorted(centroids, key=lambda name: float(centroids[name] @ query_vector), reverse=True)
+        selected = ranked[: max(1, n_servers)]
+        logger.info("Hierarchical stage-1 selected %s of %d server(s)", selected, len(centroids))
+        candidate_ids: list[int] = []
+        for server_name in selected:
+            candidate_ids.extend(self._server_to_ids.get(server_name, []))
+        return candidate_ids
+
+    def _server_centroids_cached(self) -> dict[str, np.ndarray]:
+        """Compute (and cache) the L2-normalized centroid of each server's tool
+        embeddings. Invalidated whenever the index is rebuilt."""
+        if self._server_centroids is None:
+            centroids: dict[str, np.ndarray] = {}
+            for server_name, ids in self._server_to_ids.items():
+                if not ids:
+                    continue
+                centroid = self._embeddings[ids].mean(axis=0)
+                norm = float(np.linalg.norm(centroid))
+                if norm > 0.0:
+                    centroid = centroid / norm
+                centroids[server_name] = centroid.astype(np.float32)
+            self._server_centroids = centroids
+        return self._server_centroids
 
     def _inject_additional_properties_false(self, node: Any, depth: int = 0, max_depth: int = 100) -> Any:
         # ALGY-4 FIX: Prevent stack overflow on deeply nested / circular schemas

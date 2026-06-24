@@ -133,6 +133,100 @@ def test_set_catalog_accepts_raw_mcp_payloads(monkeypatch: pytest.MonkeyPatch) -
     assert result.schema["inputSchema"]["additionalProperties"] is False
 
 
+class MultiServerEmbedder:
+    """Two servers with a deliberately adversarial geometry for the query
+    "cross query": its nearest *tool* is in `beta` (b_one), but `beta`'s centroid
+    is pulled toward b_two, so `alpha`'s centroid is the nearer *server*.
+    """
+
+    def __init__(self, model_name: str, device: str | None = None) -> None:
+        self.model_name = model_name
+        self.device = device
+
+    def get_sentence_embedding_dimension(self) -> int:
+        return 4
+
+    def encode(self, texts, batch_size: int | None = None, convert_to_numpy: bool = True):
+        del batch_size, convert_to_numpy
+        out = []
+        for text in texts:
+            if '"tool_name":"a_one"' in text or '"tool_name":"a_two"' in text:
+                out.append([1.0, 0.0, 0.0, 0.0])
+            elif '"tool_name":"b_one"' in text:
+                out.append([0.0, 0.0, 1.0, 0.0])
+            elif '"tool_name":"b_two"' in text:
+                out.append([0.0, 1.0, 0.0, 0.0])
+            elif "alpha thing" in text:
+                out.append([1.0, 0.0, 0.0, 0.0])
+            elif "cross query" in text:
+                out.append([0.6, 0.0, 0.8, 0.0])
+            else:
+                out.append([0.0, 0.0, 0.0, 1.0])
+        return np.asarray(out, dtype=np.float32)
+
+
+def build_multi_server_router(monkeypatch: pytest.MonkeyPatch) -> router_module.UniversalMCPRouter:
+    monkeypatch.setattr(router_module, "SentenceTransformer", MultiServerEmbedder)
+    router = router_module.UniversalMCPRouter(model_name="dummy-multi")
+    schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+    router.ingest_server("alpha", [
+        {"tool_name": "a_one", "description": "alpha one", "inputSchema": schema},
+        {"tool_name": "a_two", "description": "alpha two", "inputSchema": schema},
+    ])
+    router.ingest_server("beta", [
+        {"tool_name": "b_one", "description": "beta one", "inputSchema": schema},
+        {"tool_name": "b_two", "description": "beta two", "inputSchema": schema},
+    ])
+    return router
+
+
+def test_hierarchical_gates_to_top_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+
+    results = router.route_top_k_hierarchical("alpha thing", k=3, n_servers=1)
+
+    assert results, "expected a match"
+    assert results[0].tool_name == "a_one"
+    # Only the selected server's tools are candidates.
+    assert {r.server_name for r in results} == {"alpha"}
+
+
+def test_hierarchical_recall_tradeoff_widens_with_n_servers(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+
+    # Flat search would pick beta/b_one (the globally nearest tool)...
+    assert router.route_top_k("cross query", k=1)[0].tool_name == "b_one"
+
+    # ...but gating to a single server picks the nearer *centroid* (alpha) and
+    # therefore MISSES b_one — the documented recall trade-off.
+    tight = router.route_top_k_hierarchical("cross query", k=1, n_servers=1)
+    assert tight[0].server_name == "alpha"
+    assert tight[0].tool_name != "b_one"
+
+    # Widening the gate recovers the flat result.
+    wide = router.route_top_k_hierarchical("cross query", k=1, n_servers=2)
+    assert wide[0].tool_name == "b_one"
+
+
+def test_hierarchical_equivalent_to_flat_when_all_servers_selected(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+
+    flat = router.route_top_k("cross query", k=4)
+    hier = router.route_top_k_hierarchical("cross query", k=4, n_servers=5)  # >= server count
+
+    # Same top result and same candidate set (tie order between equal-score tools
+    # is unspecified, so compare as sets rather than exact order).
+    assert hier[0].tool_name == flat[0].tool_name == "b_one"
+    assert {r.tool_name for r in hier} == {r.tool_name for r in flat}
+
+
+def test_hierarchical_rejects_invalid_n_servers(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+
+    with pytest.raises(ValueError):
+        router.route_top_k_hierarchical("alpha thing", k=1, n_servers=0)
+
+
 def test_singleton_release_is_reference_counted(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tearing down one router must not evict a model another live router shares."""
     monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)
