@@ -85,7 +85,7 @@ Full cookbook (install, host registration, tool API, config, results, security):
 
 ## Empirical Results
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DimiChatzipavlis/ToolFinder/blob/main/notebooks/02_toolfinder_live.ipynb) — runnable evidence notebook: clones this repo, routes live on the real corpus, reproduces baseline rows, renders the committed results, and (on GPU) fine-tunes live.
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/DimiChatzipavlis/ToolFinder/blob/main/lrgacy/examples/02_toolfinder_live.ipynb) — runnable evidence notebook: clones this repo, routes live on the real corpus, reproduces baseline rows, renders the committed results, and (on GPU) fine-tunes live.
 
 Two kinds of evidence, with their scope stated plainly:
 
