@@ -37,6 +37,13 @@ total task tokens. The full study (code, data, figures) is archived under
   cost**, and it **scales with catalog size**. The router itself stays at
   **recall@1 = 1.0 even with the correct tool buried among 386 distractors.**
 
+> **Cost caveat (honest).** The table is *uncached* token totals. In practice the
+> baseline's tool block sits at the start of the prompt and is largely served from
+> the **KV/prompt cache** on later turns (cached input is billed at a fraction of
+> normal input), so the real cost gap is narrower than the raw counts suggest —
+> though not zero, and it still grows with catalog size. A cache-aware
+> re-measurement and a top-k (k=5) end-task metric are on the roadmap.
+
 **Rule of thumb:** use the bridge when the agent faces **many** tools (dozens+)
 or **multiple** MCP servers, or runs a **small/local** model that struggles to
 select in‑context. For a handful of distinct tools and a strong model, bind them
@@ -142,6 +149,11 @@ the routed server.)
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
 servers) rather than the single-server env vars — see the Run section above.
 
+`TOOLFINDER_MODEL` accepts any open sentence-transformers bi-encoder (a HuggingFace
+id or a local path to fine-tuned weights). On small catalogs of distinct tools the
+choice barely moves routing quality; it matters on confusable/out-of-domain
+catalogs. See the README's "Choosing the embedding model" for the trade-offs.
+
 ---
 
 ## Figures
@@ -176,6 +188,8 @@ Progress so far:
 3. ~~**Package**~~ — **done**: `pip install` exposes the `toolfinder-mcp` console command (and `python -m toolfinder.mcp_server`).
 4. **Observability** — *partial*: `get_stats()` exposes routing decisions and per-tool counts, and every route is logged. Still TODO: structured/exported metrics.
 5. **Publish** — push to PyPI so users add the bridge without cloning.
+6. **Hierarchical, server-aware routing** — route to the owning server first, then the tool (precision + very-large-catalog scaling; not a latency win — encoding dominates).
+7. **Cache-aware, quality-first measurement** — cost under prompt-cache pricing, top-k (k=5) end-task success, and a context-reduction→accuracy test.
 
 See the repo README "Roadmap" for the matching research track (multi-server training, human queries, benchmark release).
 

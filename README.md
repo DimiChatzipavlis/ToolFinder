@@ -58,6 +58,19 @@ Optional extras:
 python -m pip install -e ".[dev]"          # pytest
 ```
 
+## Choosing the embedding model
+
+Routing uses **any open [sentence-transformers](https://www.sbert.net/) bi-encoder you choose** — nothing is hard-wired or trained into the tool. Override the default:
+
+- **Server:** set `TOOLFINDER_MODEL` (e.g. `TOOLFINDER_MODEL=BAAI/bge-small-en-v1.5`).
+- **Library:** `UniversalMCPRouter(model_name="...")` — a HuggingFace id or a local path to fine-tuned weights.
+
+What to expect (measured on the archived GitHub-MCP study — direction, not a guarantee):
+
+- **On small catalogs of distinct tools the model barely matters** — stock `all-MiniLM-L6-v2` already routes at recall@1 = 1.0, so a heavier encoder mostly buys latency.
+- **On confusable or out-of-domain catalogs it matters a lot** — there, *frozen* MiniLM scored *below* BM25, a fine-tuned encoder beat it, and bigger stock encoders (MPNet, BGE) helped modestly.
+- **Trade-off:** MiniLM (384-d) is fastest/smallest; MPNet/BGE are more accurate but slower to encode — and *encoding*, not search, is the latency bottleneck. Fine-tune only when your catalog has near-duplicate tools or you observe wrong routes.
+
 ## ToolFinder as an MCP Server (routing bridge)
 
 `ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and one or more downstream MCP servers** (filesystem, git, memory, …). Rather than exposing every downstream catalog to the agent — which grows the prompt with every tool — the bridge embeds the **union** of all downstream tools once and exposes a few routing tools, dispatching execution to whichever server owns the chosen tool. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
@@ -76,7 +89,7 @@ Register it in an MCP host with a config listing the servers to bridge (`mcp_ser
 
 (Find your interpreter with `python -c "import sys; print(sys.executable)"`.) After `pip install -e .` the server is also available as the `toolfinder-mcp` console command and `python -m toolfinder.mcp_server`. Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`, `get_stats()` (routing observability), `refresh()` (re-index after downstream tool changes).
 
-**Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models. Full study and figures: [`legacy/experiments/`](legacy/README.md).
+**Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models. (These are *uncached* token counts; with prompt caching a static tool block at the head of the prompt is largely a cache **read**, so the real cost gap is smaller — though not zero, and it still grows with N. A cache-aware re-measurement is on the roadmap.) Full study and figures: [`legacy/experiments/`](legacy/README.md).
 
 Full cookbook (install, host registration, tool API, config, results, security): [docs/MCP_SERVER.md](docs/MCP_SERVER.md).
 
@@ -106,6 +119,11 @@ Making the MCP bridge production-worthy:
 - **E3 — Package & publish.** 🟡 **Mostly done.** `pip install` exposes the `toolfinder-mcp` command and `python -m toolfinder.mcp_server`. *TODO:* push to PyPI.
 - **E4 — Observability.** 🟡 **Partial.** `get_stats()` + per-route logging. *TODO:* exported/structured metrics.
 - **E5 — (optional) Ship the fine-tuned encoder by default**, closing the shipped-default-vs-evaluated-best gap.
+
+**Planned next (from review feedback):**
+
+- **H1 — Hierarchical, server-aware routing.** Two-stage selection — first to the owning MCP server (a hierarchy the bridge already tracks), then to the tool — to sharpen precision on confusable catalogs and scale to very large tool sets. Honest caveat: this is a **precision/scale** win, not a latency one (query encoding dominates; flat search is already <1 ms). Learned semantic categories are a possible later extension.
+- **M1 — Cache-aware, quality-first measurement.** Report cost under **prompt-cache pricing** (not raw tokens), measure end-task success when the agent picks from the **top-k (k=5)** shortlist instead of exact top-1, and test whether the smaller operating context measurably **improves** LLM accuracy (harder task / weaker model).
 
 The research track (human-written query set, live multi-server study, benchmark release) builds on the archived study in [`legacy/`](legacy/README.md).
 
