@@ -77,7 +77,7 @@ Register it in an MCP host with a config listing the servers to bridge (`mcp_ser
 }
 ```
 
-(Find your interpreter with `python -c "import sys; print(sys.executable)"`.) Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`.
+(Find your interpreter with `python -c "import sys; print(sys.executable)"`.) After `pip install -e .` the server is also available as the `toolfinder-mcp` console command and `python -m toolfinder.mcp_server`. Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`, `get_stats()` (routing observability), `refresh()` (re-index after downstream tool changes).
 
 **Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models.
 
@@ -139,7 +139,7 @@ Every folder has its own README with details.
 
 ## Roadmap
 
-Two parallel tracks. **E1** (multi-server bridge) and **R1** (multi-server training) are **done** — details below; next up are **R2/R3** (real queries, live multi-server study) and **E2/E3** (resilience, packaging).
+Two parallel tracks. **E1, E3** and **R1** are **done**, **E2/E4** partially; next up are **R2/R3** (real queries, live multi-server study), finishing **E2** (push-based tool-change), and **E3-publish** (PyPI).
 
 **Research** (extends the leakage-controlled study; full plan in [`reports/report.md`](reports/report.md) §6):
 - **R1 — Train on multiple servers, not just GitHub.** ✅ **Done.** A server-disjoint split (12 train / 7 held-out test servers, 574-tool corpus) shows multi-server training **beats GitHub-only on unseen servers: R@1 0.567 vs 0.533** (and 0.42 BM25 / 0.33 frozen) — diversity helps generalization, modestly at this data scale. Run: `experiments/dataset/make_multiserver_splits.py` → `models/biencoder.py --split-name regime4_multiserver` → `evaluation/eval_multiserver.py`.
@@ -149,9 +149,9 @@ Two parallel tracks. **E1** (multi-server bridge) and **R1** (multi-server train
 
 **Engineering** (make the MCP bridge production-worthy):
 - **E1 — Multi-server bridge.** ✅ **Done.** One ToolFinder fronts several downstream MCP servers via `TOOLFINDER_CONFIG`, routing across the union and dispatching to the owning server (`tests/test_mcp_server.py`).
-- **E2 — Live tool-change + resilience.** Subscribe to `tools/list_changed` and re-index incrementally; reconnect downstream servers on crash/timeout.
-- **E3 — Package & publish.** PyPI entry point / `uvx`-style launch so anyone adds the bridge in one line.
-- **E4 — Server tests + observability.** In-memory FastMCP client tests in CI (started); log routing decisions ("why this tool") for traceability.
+- **E2 — Resilience + live tool-change.** 🟡 **Partial.** Failed downstream calls trigger a one-shot reconnect+retry; `refresh()` re-indexes on demand. *TODO:* push-based `tools/list_changed` subscription.
+- **E3 — Package & publish.** 🟡 **Mostly done.** `pip install` exposes the `toolfinder-mcp` command and `python -m toolfinder.mcp_server`. *TODO:* push to PyPI.
+- **E4 — Observability + tests.** 🟡 **Partial.** `get_stats()` + per-route logging; in-memory FastMCP client tests in CI. *TODO:* exported/structured metrics.
 - **E5 — (optional) Ship the fine-tuned encoder by default**, closing the shipped-default-vs-evaluated-best gap.
 
 ## Scope Notes

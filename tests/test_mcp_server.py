@@ -80,7 +80,7 @@ def server(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("TOOLFINDER_CONFIG", str(config))
 
-    srv = importlib.reload(importlib.import_module("ToolFinder_mcp_server"))
+    srv = importlib.reload(importlib.import_module("toolfinder.mcp_server"))
     monkeypatch.setattr(srv, "DynamicMCPClient", FakeClient)
     return srv
 
@@ -111,3 +111,12 @@ async def test_route_and_call_dispatches_to_correct_server(server):
 async def test_call_tool_unknown_name_is_handled(server):
     result = await server.call_tool.fn("does_not_exist", {})
     assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_stats_records_routes(server):
+    await server.route_and_call.fn("write a file", {"path": "x"})
+    stats = await server.get_stats.fn()
+    assert stats["total_routes"] >= 1
+    assert "write_file" in stats["top_tools"]
+    assert stats["recent"][-1]["tool"] == "write_file"

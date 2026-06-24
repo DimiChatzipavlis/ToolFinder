@@ -47,7 +47,7 @@ still saves tokens even there).
 ## Install
 
 ```bash
-pip install -e ".[experiments]"   # pulls fastmcp, sentence-transformers, faiss
+pip install -e .          # installs the bridge + the `toolfinder-mcp` command
 # Node is required to launch downstream npx-based MCP servers (e.g. filesystem)
 ```
 
@@ -55,10 +55,12 @@ pip install -e ".[experiments]"   # pulls fastmcp, sentence-transformers, faiss
 
 ```bash
 # multi-server (recommended): front several downstream servers from one config
-TOOLFINDER_CONFIG=mcp_servers.json python ToolFinder_mcp_server.py
+TOOLFINDER_CONFIG=mcp_servers.json toolfinder-mcp
 
 # or zero-config: a single filesystem server rooted at ./sandbox
-TOOLFINDER_FS_ROOT=./sandbox python ToolFinder_mcp_server.py
+TOOLFINDER_FS_ROOT=./sandbox toolfinder-mcp
+
+# equivalents: `python -m toolfinder.mcp_server`  |  `python ToolFinder_mcp_server.py` (repo shim)
 ```
 
 A config (`mcp_servers.json`, see `mcp_servers.example.json`) lists the servers to
@@ -105,6 +107,8 @@ catalog. No host code changes — that interoperability is the point.
 | `call_tool` | `call_tool(tool_name: str, arguments: dict)` | downstream result | execute a chosen tool |
 | `route_and_call` | `route_and_call(intent: str, arguments: dict)` | downstream result | **one‑hop**: route by intent and execute (most token‑efficient) |
 | `catalog_size` | `catalog_size()` | `{"total_tools": N, "by_server": {…}}` | diagnostic |
+| `get_stats` | `get_stats()` | recent routing decisions + per-tool counts | observability |
+| `refresh` | `refresh()` | re-spawns downstream servers and re-indexes | after a downstream's tools change |
 
 `find_tools` and `route_and_call` route across the **union** of all configured
 servers; `call_tool` and `route_and_call` dispatch execution to the server that
@@ -168,14 +172,13 @@ key in `experiments/.env` as `API_KEY` + `AGENT_MODEL`), then
 
 ## Roadmap (server)
 
-The bridge now fronts **multiple** downstream servers from one config (E1, done).
-The path to production from here:
+Progress so far:
 
-1. ~~**Multi-server**~~ — **done**: front several downstream MCP servers via
-   `TOOLFINDER_CONFIG` and route across their union.
-2. **Live tool changes & resilience** — handle `tools/list_changed` (re-index incrementally) and reconnect a downstream server that crashes or times out.
-3. **Package** — a PyPI/`uvx` entry point so users add `toolfinder` to any host without cloning.
-4. **Tests & observability** — in-memory FastMCP client tests in CI; log each routing decision for traceability.
+1. ~~**Multi-server**~~ — **done**: fronts several downstream servers via `TOOLFINDER_CONFIG`, routing across their union.
+2. **Resilience** — *partial*: a failed downstream call triggers a one-shot reconnect+retry, and `refresh()` re-indexes on demand. Still TODO: push-based `tools/list_changed` subscription (auto re-index).
+3. ~~**Package**~~ — **done**: `pip install` exposes the `toolfinder-mcp` console command (and `python -m toolfinder.mcp_server`).
+4. **Observability** — *partial*: `get_stats()` exposes routing decisions and per-tool counts, and every route is logged. Still TODO: structured/exported metrics.
+5. **Publish** — push to PyPI so users add the bridge without cloning.
 
 See the repo README "Roadmap" for the matching research track (multi-server training, human queries, benchmark release).
 

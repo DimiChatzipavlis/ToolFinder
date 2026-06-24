@@ -40,3 +40,5 @@ reports/*.pdf
 # Secrets — never publish (also covered by .env above; explicit for safety)
 experiments/.env
 .env.*
+
+*.egg-info/

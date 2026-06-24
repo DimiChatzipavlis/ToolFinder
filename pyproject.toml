@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "toolfinder-mcp"
 version = "0.1.0"
-description = "A Neural Semantic Router and Execution Middleware for the Model Context Protocol (MCP)."
+description = "A semantic routing bridge (MCP server) that fronts one or more downstream MCP servers and selects relevant tools by dense retrieval."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -15,9 +15,11 @@ dependencies = [
     "jsonschema>=4.0.0",
     "httpx>=0.25.0",
     "pydantic>=2.0.0",
-    "fastapi>=0.115.0",
-    "uvicorn>=0.30.0"
+    "fastmcp>=2.0.0"
 ]
+
+[project.scripts]
+toolfinder-mcp = "toolfinder.mcp_server:main"
 
 [project.optional-dependencies]
 langgraph = ["langchain", "langgraph", "langchain-ollama"]
@@ -31,7 +33,7 @@ experiments = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["toolfinder*", "Enterprise*"]
+include = ["toolfinder*"]
 
 [tool.ruff]
 line-length = 120

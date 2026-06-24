@@ -1,0 +1,242 @@
+"""ToolFinder as an MCP server — a routing bridge in front of one or more
+downstream MCP servers (filesystem, git, memory, …).
+
+Instead of exposing every downstream server's full catalog to the agent (which
+bloats the context window and grows with every tool), ToolFinder embeds the
+*union* of all downstream tools once and exposes a small, fixed set of routing
+tools, dispatching execution to whichever server owns the chosen tool:
+
+  find_tools(query)            -> the top-k relevant tools across all servers
+  call_tool(tool_name, args)   -> execute a tool (dispatched to its server)
+  route_and_call(intent, args) -> route + execute in one hop (most efficient)
+  catalog_size()               -> tool counts per downstream server
+  get_stats()                  -> recent routing decisions (observability)
+  refresh()                    -> re-spawn downstream servers and re-index
+
+Resilience: a failed downstream call triggers a one-shot reconnect+retry of that
+server, so a downstream crash doesn't permanently break the bridge.
+
+Run it (after `pip install -e .`):
+    toolfinder-mcp                       # console entry point
+    python -m toolfinder.mcp_server      # module form
+    python ToolFinder_mcp_server.py      # repo shim (back-compat)
+
+Configure downstream servers either with a multi-server JSON config
+(`TOOLFINDER_CONFIG`, see mcp_servers.example.json) or, zero-config, a single
+filesystem server (`TOOLFINDER_FS_ROOT`). See docs/MCP_SERVER.md.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+from collections import Counter, deque
+from pathlib import Path
+from typing import Any
+
+from fastmcp import FastMCP
+
+from toolfinder import UniversalMCPRouter, to_openai_tools
+from toolfinder.mcp_adapter import DynamicMCPClient
+
+logger = logging.getLogger("toolfinder.mcp_server")
+
+mcp = FastMCP("ToolFinder")
+
+_state: dict[str, Any] = {
+    "clients": {},          # server_name -> DynamicMCPClient
+    "specs": {},            # server_name -> {command, args, env}
+    "router": None,
+    "tool_to_server": {},   # tool_name -> server_name
+    "counts": {},           # server_name -> tool count
+    "routes": 0,            # total routing decisions
+    "by_tool": Counter(),   # chosen tool -> count
+    "recent": deque(maxlen=50),
+}
+_init_lock = asyncio.Lock()
+
+
+def _server_configs() -> list[dict]:
+    """Downstream server configs: [{name, command, args, env}]."""
+    config_path = os.getenv("TOOLFINDER_CONFIG")
+    if config_path and Path(config_path).exists():
+        data = json.loads(Path(config_path).read_text(encoding="utf-8"))
+        servers = data.get("servers", data if isinstance(data, list) else [])
+        if not servers:
+            raise ValueError(f"{config_path} contains no servers")
+        return servers
+    command = os.getenv("TOOLFINDER_DOWNSTREAM_CMD", "npx")
+    raw_args = os.getenv("TOOLFINDER_DOWNSTREAM_ARGS")
+    if raw_args:
+        args = list(json.loads(raw_args))
+    else:
+        fs_root = os.getenv("TOOLFINDER_FS_ROOT", os.getcwd())
+        args = ["-y", "@modelcontextprotocol/server-filesystem", fs_root]
+    return [{"name": "filesystem", "command": command, "args": args}]
+
+
+def _new_client(name: str, spec: dict) -> DynamicMCPClient:
+    return DynamicMCPClient(
+        server_name=name, command=str(spec["command"]),
+        args=[str(a) for a in spec.get("args", [])], env=spec.get("env"),
+        startup_timeout_s=90.0, request_timeout_s=45.0,
+    )
+
+
+async def _build() -> None:
+    """Spawn every downstream server and build the union router."""
+    router = UniversalMCPRouter(
+        model_name=os.getenv("TOOLFINDER_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    )
+    clients: dict[str, DynamicMCPClient] = {}
+    specs: dict[str, dict] = {}
+    tool_to_server: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    for cfg in _server_configs():
+        name = str(cfg["name"])
+        specs[name] = cfg
+        client = _new_client(name, cfg)
+        tools = await client.initialize_and_get_tools()
+        router.ingest_server(name, tools)
+        clients[name] = client
+        counts[name] = len(tools)
+        for tool in tools:
+            tool_to_server.setdefault(tool["tool_name"], name)
+    _state.update(clients=clients, specs=specs, router=router, tool_to_server=tool_to_server, counts=counts)
+    logger.info("ToolFinder bridge ready: %s servers, %s tools", len(clients), sum(counts.values()))
+
+
+async def _ensure_ready() -> None:
+    if _state["router"] is not None:
+        return
+    async with _init_lock:
+        if _state["router"] is None:
+            await _build()
+
+
+async def _reconnect(server: str) -> DynamicMCPClient | None:
+    """Re-spawn one downstream server after a failed call (E2 resilience)."""
+    spec = _state["specs"].get(server)
+    if spec is None:
+        return None
+    old = _state["clients"].get(server)
+    if old is not None:
+        try:
+            await old.close()
+        except Exception:  # noqa: BLE001
+            pass
+    try:
+        client = _new_client(server, spec)
+        await client.initialize_and_get_tools()
+        _state["clients"][server] = client
+        logger.warning("reconnected downstream server %r", server)
+        return client
+    except Exception as exc:  # noqa: BLE001
+        logger.error("failed to reconnect %r: %s", server, exc)
+        return None
+
+
+async def _dispatch(server: str, tool_name: str, arguments: dict[str, Any]) -> Any:
+    client = _state["clients"].get(server)
+    if client is None:
+        return {"error": f"no downstream server '{server}'"}
+    try:
+        return await client.call_tool(tool_name, arguments or {})
+    except Exception as exc:  # noqa: BLE001 - downstream may have died; try once more
+        retry = await _reconnect(server)
+        if retry is None:
+            return {"error": f"downstream '{server}' unavailable: {exc}"}
+        try:
+            return await retry.call_tool(tool_name, arguments or {})
+        except Exception as exc2:  # noqa: BLE001
+            return {"error": f"downstream '{server}' failed after reconnect: {exc2}"}
+
+
+def _record(query: str, chosen: str | None, server: str | None, score: float | None) -> None:
+    _state["routes"] += 1
+    if chosen:
+        _state["by_tool"][chosen] += 1
+    _state["recent"].append({"query": query[:120], "tool": chosen, "server": server, "score": score})
+    logger.info("route %r -> %s@%s (score=%s)", query[:80], chosen, server, score)
+
+
+@mcp.tool
+async def find_tools(query: str, k: int | None = None) -> list[dict]:
+    """Return the downstream tools most relevant to `query`, as bindable schemas
+    (each tagged with its `server_name`). Call this first, then `call_tool`."""
+    await _ensure_ready()
+    top_k = k or int(os.getenv("TOOLFINDER_TOPK", "3"))
+    matches = _state["router"].route_top_k(query, k=top_k)
+    if matches:
+        _record(query, matches[0].tool_name, matches[0].server_name, round(matches[0].score, 4))
+    return to_openai_tools(matches)
+
+
+@mcp.tool
+async def call_tool(tool_name: str, arguments: dict[str, Any]) -> Any:
+    """Execute one downstream tool by name, dispatched to the server that owns it."""
+    await _ensure_ready()
+    server = _state["tool_to_server"].get(tool_name)
+    if server is None:
+        return {"error": f"unknown tool '{tool_name}'. Use find_tools to discover available tools."}
+    return await _dispatch(server, tool_name, arguments)
+
+
+@mcp.tool
+async def route_and_call(intent: str, arguments: dict[str, Any]) -> Any:
+    """Single-step bridge: route `intent` to the best downstream tool across all
+    servers and execute it in one hop (no discovery round-trip). The most
+    token-efficient pattern — the agent binds just this one tool regardless of
+    how large the combined catalog is."""
+    await _ensure_ready()
+    matches = _state["router"].route_top_k(intent, k=1)
+    if not matches:
+        _record(intent, None, None, None)
+        return {"error": f"no downstream tool matched intent: {intent!r}"}
+    chosen = matches[0]
+    _record(intent, chosen.tool_name, chosen.server_name, round(chosen.score, 4))
+    return await _dispatch(chosen.server_name, chosen.tool_name, arguments or {})
+
+
+@mcp.tool
+async def catalog_size() -> dict[str, Any]:
+    """Report the downstream catalog behind the bridge (diagnostic)."""
+    await _ensure_ready()
+    return {"total_tools": sum(_state["counts"].values()), "by_server": dict(_state["counts"])}
+
+
+@mcp.tool
+async def get_stats() -> dict[str, Any]:
+    """Routing observability: total routes, most-selected tools, recent decisions."""
+    await _ensure_ready()
+    return {
+        "total_routes": _state["routes"],
+        "top_tools": dict(_state["by_tool"].most_common(10)),
+        "recent": list(_state["recent"])[-10:],
+    }
+
+
+@mcp.tool
+async def refresh() -> dict[str, Any]:
+    """Re-spawn all downstream servers and rebuild the index — call after a
+    downstream server's tool list changes."""
+    for client in _state["clients"].values():
+        try:
+            await client.close()
+        except Exception:  # noqa: BLE001
+            pass
+    _state["router"] = None
+    await _ensure_ready()
+    return {"refreshed": True, "total_tools": sum(_state["counts"].values())}
+
+
+def main() -> None:
+    """Console entry point (`toolfinder-mcp`) — run the bridge over stdio."""
+    logging.basicConfig(level=os.getenv("TOOLFINDER_LOG", "INFO"))
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()
