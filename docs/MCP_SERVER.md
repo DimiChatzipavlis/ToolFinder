@@ -37,7 +37,7 @@ total task tokens. The full study (code, data, figures) is archived under
   cost**, and it **scales with catalog size**. The router itself stays at
   **recall@1 = 1.0 even with the correct tool buried among 386 distractors.**
 
-> **Cost caveat (honest, now modeled).** The table is *uncached* token totals.
+> **Cost caveat (honest — modeled + measured).** The table is *uncached* token totals.
 > A cache-aware re-scoring (`legacy/experiments/bridge_cache_aware.py` →
 > `results/bridge_cache_aware.json`) models prompt caching from the per-turn
 > structure: the baseline's tool block is a cached **read** on later turns, but
@@ -45,9 +45,11 @@ total task tokens. The full study (code, data, figures) is archived under
 > gets no discount. Net at N=120, `route_and_call` goes from ~16× cheaper
 > (uncached) to **~6–10× cheaper** (cached, depending on rate); at N≤14 the
 > multi-call `find_tools`+`call_tool` arm can actually cost **more** than the
-> cached baseline. The bridge's cost win is real but emerges **at scale**. A
-> *measured* version (API `cached_tokens`) and a top-k (k=5) end-task metric
-> remain on the roadmap.
+> cached baseline. The bridge's cost win is real but emerges **at scale**. A live
+> measurement (`bridge_cache_measured.py`, gpt-5.4) now confirms the model within
+> ~1–2% at N≥60 — the baseline's API-cached input share rises 18%→70%→73% for
+> N=14→120 — and **top-5 selection works**: GPT-5.4 completed the task 100% from a
+> 5-tool shortlist. See `results/bridge_cache_measured.json`.
 
 **Rule of thumb:** use the bridge when the agent faces **many** tools (dozens+)
 or **multiple** MCP servers, or runs a **small/local** model that struggles to

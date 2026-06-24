@@ -1,0 +1,225 @@
+{
+ "model": "gpt-5.4-2026-03-05",
+ "task": "create->edit->read",
+ "cells": {
+  "baseline@14": {
+   "schema_tokens": null,
+   "n_bound_tools": 14,
+   "prompt_tokens": 6285,
+   "cached_prompt_tokens": 1152,
+   "completion_tokens": 145,
+   "total_tokens": 6430,
+   "first_call_prompt_tokens": 1399,
+   "model_turns": 4,
+   "tool_calls": 3,
+   "per_turn": [
+    {
+     "prompt": 1399,
+     "cached": 0
+    },
+    {
+     "prompt": 1481,
+     "cached": 1152
+    },
+    {
+     "prompt": 1675,
+     "cached": 0
+    },
+    {
+     "prompt": 1730,
+     "cached": 0
+    }
+   ],
+   "task_success": true,
+   "n_tools": 14,
+   "arm": "baseline",
+   "shortlist_k": null,
+   "cached_fraction": 0.1833,
+   "billable_input": {
+    "openai_0.50": 5709.0,
+    "openai_0.25": 5421.0,
+    "anthropic_0.10": 5248.2
+   }
+  },
+  "baseline@60": {
+   "schema_tokens": null,
+   "n_bound_tools": 60,
+   "prompt_tokens": 22341,
+   "cached_prompt_tokens": 15744,
+   "completion_tokens": 145,
+   "total_tokens": 22486,
+   "first_call_prompt_tokens": 5413,
+   "model_turns": 4,
+   "tool_calls": 3,
+   "per_turn": [
+    {
+     "prompt": 5413,
+     "cached": 0
+    },
+    {
+     "prompt": 5495,
+     "cached": 5248
+    },
+    {
+     "prompt": 5689,
+     "cached": 5248
+    },
+    {
+     "prompt": 5744,
+     "cached": 5248
+    }
+   ],
+   "task_success": true,
+   "n_tools": 60,
+   "arm": "baseline",
+   "shortlist_k": null,
+   "cached_fraction": 0.7047,
+   "billable_input": {
+    "openai_0.50": 14469.0,
+    "openai_0.25": 10533.0,
+    "anthropic_0.10": 8171.4
+   }
+  },
+  "baseline@120": {
+   "schema_tokens": null,
+   "n_bound_tools": 120,
+   "prompt_tokens": 47701,
+   "cached_prompt_tokens": 34688,
+   "completion_tokens": 145,
+   "total_tokens": 47846,
+   "first_call_prompt_tokens": 11753,
+   "model_turns": 4,
+   "tool_calls": 3,
+   "per_turn": [
+    {
+     "prompt": 11753,
+     "cached": 0
+    },
+    {
+     "prompt": 11835,
+     "cached": 11392
+    },
+    {
+     "prompt": 12029,
+     "cached": 11392
+    },
+    {
+     "prompt": 12084,
+     "cached": 11904
+    }
+   ],
+   "task_success": true,
+   "n_tools": 120,
+   "arm": "baseline",
+   "shortlist_k": null,
+   "cached_fraction": 0.7272,
+   "billable_input": {
+    "openai_0.50": 30357.0,
+    "openai_0.25": 21685.0,
+    "anthropic_0.10": 16481.8
+   }
+  },
+  "find5@60": {
+   "schema_tokens": null,
+   "n_bound_tools": 2,
+   "prompt_tokens": 13053,
+   "cached_prompt_tokens": 5504,
+   "completion_tokens": 277,
+   "total_tokens": 13330,
+   "first_call_prompt_tokens": 364,
+   "model_turns": 7,
+   "tool_calls": 6,
+   "per_turn": [
+    {
+     "prompt": 364,
+     "cached": 0
+    },
+    {
+     "prompt": 1162,
+     "cached": 0
+    },
+    {
+     "prompt": 1252,
+     "cached": 0
+    },
+    {
+     "prompt": 2041,
+     "cached": 1152
+    },
+    {
+     "prompt": 2244,
+     "cached": 1664
+    },
+    {
+     "prompt": 2964,
+     "cached": 0
+    },
+    {
+     "prompt": 3026,
+     "cached": 2688
+    }
+   ],
+   "task_success": true,
+   "n_tools": 60,
+   "arm": "find5",
+   "shortlist_k": 5,
+   "cached_fraction": 0.4217,
+   "billable_input": {
+    "openai_0.50": 10301.0,
+    "openai_0.25": 8925.0,
+    "anthropic_0.10": 8099.4
+   }
+  },
+  "find5@120": {
+   "schema_tokens": null,
+   "n_bound_tools": 2,
+   "prompt_tokens": 13015,
+   "cached_prompt_tokens": 7680,
+   "completion_tokens": 250,
+   "total_tokens": 13265,
+   "first_call_prompt_tokens": 364,
+   "model_turns": 7,
+   "tool_calls": 6,
+   "per_turn": [
+    {
+     "prompt": 364,
+     "cached": 0
+    },
+    {
+     "prompt": 1150,
+     "cached": 0
+    },
+    {
+     "prompt": 1240,
+     "cached": 0
+    },
+    {
+     "prompt": 2023,
+     "cached": 1152
+    },
+    {
+     "prompt": 2226,
+     "cached": 1664
+    },
+    {
+     "prompt": 2975,
+     "cached": 2176
+    },
+    {
+     "prompt": 3037,
+     "cached": 2688
+    }
+   ],
+   "task_success": true,
+   "n_tools": 120,
+   "arm": "find5",
+   "shortlist_k": 5,
+   "cached_fraction": 0.5901,
+   "billable_input": {
+    "openai_0.50": 9175.0,
+    "openai_0.25": 7255.0,
+    "anthropic_0.10": 6103.0
+   }
+  }
+ }
+}
