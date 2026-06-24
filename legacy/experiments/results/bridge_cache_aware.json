@@ -1,0 +1,153 @@
+{
+ "model": "gpt-5.4",
+ "source": "bridge_scaling_gpt.json",
+ "scenarios": [
+  "uncached (as published)",
+  "OpenAI-style (read 0.50x)",
+  "OpenAI-style (read 0.25x)",
+  "Anthropic-style (read 0.10x / write 1.25x)"
+ ],
+ "sizes": {
+  "14": {
+   "baseline": {
+    "model_turns": 4,
+    "prefix_tokens_P0": 1399,
+    "completion_tokens": 145,
+    "billable_input_tokens": {
+     "uncached (as published)": 6285.0,
+     "OpenAI-style (read 0.50x)": 4186.5,
+     "OpenAI-style (read 0.25x)": 3137.2,
+     "Anthropic-style (read 0.10x / write 1.25x)": 2857.4
+    }
+   },
+   "find_call": {
+    "model_turns": 7,
+    "prefix_tokens_P0": 364,
+    "completion_tokens": 278,
+    "billable_input_tokens": {
+     "uncached (as published)": 11475.0,
+     "OpenAI-style (read 0.50x)": 11475.0,
+     "OpenAI-style (read 0.25x)": 11475.0,
+     "Anthropic-style (read 0.10x / write 1.25x)": 11475.0
+    }
+   },
+   "single": {
+    "model_turns": 6,
+    "prefix_tokens_P0": 332,
+    "completion_tokens": 311,
+    "billable_input_tokens": {
+     "uncached (as published)": 3950.0,
+     "OpenAI-style (read 0.50x)": 3950.0,
+     "OpenAI-style (read 0.25x)": 3950.0,
+     "Anthropic-style (read 0.10x / write 1.25x)": 3950.0
+    }
+   },
+   "baseline_over_find_call": {
+    "uncached (as published)": 0.55,
+    "OpenAI-style (read 0.50x)": 0.36,
+    "OpenAI-style (read 0.25x)": 0.27,
+    "Anthropic-style (read 0.10x / write 1.25x)": 0.25
+   },
+   "baseline_over_single": {
+    "uncached (as published)": 1.59,
+    "OpenAI-style (read 0.50x)": 1.06,
+    "OpenAI-style (read 0.25x)": 0.79,
+    "Anthropic-style (read 0.10x / write 1.25x)": 0.72
+   }
+  },
+  "60": {
+   "baseline": {
+    "model_turns": 4,
+    "prefix_tokens_P0": 5415,
+    "completion_tokens": 148,
+    "billable_input_tokens": {
+     "uncached (as published)": 22364.0,
+     "OpenAI-style (read 0.50x)": 14241.5,
+     "OpenAI-style (read 0.25x)": 10180.2,
+     "Anthropic-style (read 0.10x / write 1.25x)": 9097.2
+    }
+   },
+   "find_call": {
+    "model_turns": 7,
+    "prefix_tokens_P0": 366,
+    "completion_tokens": 279,
+    "billable_input_tokens": {
+     "uncached (as published)": 11500.0,
+     "OpenAI-style (read 0.50x)": 11500.0,
+     "OpenAI-style (read 0.25x)": 11500.0,
+     "Anthropic-style (read 0.10x / write 1.25x)": 11500.0
+    }
+   },
+   "single": {
+    "model_turns": 6,
+    "prefix_tokens_P0": 334,
+    "completion_tokens": 334,
+    "billable_input_tokens": {
+     "uncached (as published)": 4340.0,
+     "OpenAI-style (read 0.50x)": 4340.0,
+     "OpenAI-style (read 0.25x)": 4340.0,
+     "Anthropic-style (read 0.10x / write 1.25x)": 4340.0
+    }
+   },
+   "baseline_over_find_call": {
+    "uncached (as published)": 1.94,
+    "OpenAI-style (read 0.50x)": 1.24,
+    "OpenAI-style (read 0.25x)": 0.89,
+    "Anthropic-style (read 0.10x / write 1.25x)": 0.79
+   },
+   "baseline_over_single": {
+    "uncached (as published)": 5.15,
+    "OpenAI-style (read 0.50x)": 3.28,
+    "OpenAI-style (read 0.25x)": 2.35,
+    "Anthropic-style (read 0.10x / write 1.25x)": 2.1
+   }
+  },
+  "120": {
+   "baseline": {
+    "model_turns": 4,
+    "prefix_tokens_P0": 11755,
+    "completion_tokens": 148,
+    "billable_input_tokens": {
+     "uncached (as published)": 47724.0,
+     "OpenAI-style (read 0.50x)": 30091.5,
+     "OpenAI-style (read 0.25x)": 21275.2,
+     "Anthropic-style (read 0.10x / write 1.25x)": 18924.2
+    }
+   },
+   "find_call": {
+    "model_turns": 7,
+    "prefix_tokens_P0": 366,
+    "completion_tokens": 279,
+    "billable_input_tokens": {
+     "uncached (as published)": 11500.0,
+     "OpenAI-style (read 0.50x)": 11500.0,
+     "OpenAI-style (read 0.25x)": 11500.0,
+     "Anthropic-style (read 0.10x / write 1.25x)": 11500.0
+    }
+   },
+   "single": {
+    "model_turns": 5,
+    "prefix_tokens_P0": 334,
+    "completion_tokens": 259,
+    "billable_input_tokens": {
+     "uncached (as published)": 2941.0,
+     "OpenAI-style (read 0.50x)": 2941.0,
+     "OpenAI-style (read 0.25x)": 2941.0,
+     "Anthropic-style (read 0.10x / write 1.25x)": 2941.0
+    }
+   },
+   "baseline_over_find_call": {
+    "uncached (as published)": 4.15,
+    "OpenAI-style (read 0.50x)": 2.62,
+    "OpenAI-style (read 0.25x)": 1.85,
+    "Anthropic-style (read 0.10x / write 1.25x)": 1.65
+   },
+   "baseline_over_single": {
+    "uncached (as published)": 16.23,
+    "OpenAI-style (read 0.50x)": 10.23,
+    "OpenAI-style (read 0.25x)": 7.23,
+    "Anthropic-style (read 0.10x / write 1.25x)": 6.43
+   }
+  }
+ }
+}

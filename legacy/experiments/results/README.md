@@ -23,6 +23,7 @@ files by hand.
 | `calibration.json` | ~3 KB | ECE + reliability bins, raw vs temperature-scaled | `build_report.py` |
 | `bridge_scaling_free.json` | ~2 KB | MCP-bridge study, free axis: per-turn schema-token weight + router recall@1/@3 vs catalog size N (14→400) | `bridge_figures.py`, cookbook |
 | `bridge_scaling_gpt.json` | ~3 KB | MCP-bridge study, API axis: total tokens + task success for baseline / find+call / route_and_call at N∈{14,60,120} (GPT-5.4) | `bridge_figures.py`, cookbook |
+| `bridge_cache_aware.json` | ~2 KB | Cache-aware re-scoring of `bridge_scaling_gpt.json`: billable input tokens + baseline/bridge ratios under prompt caching (uncached / 0.5× / 0.25× / 0.1×). Modeled from per-turn structure | `bridge_cache_aware.py` |
 | `bridge_ab.json` | ~1 KB | single-N baseline-vs-bridge A/B (superseded by the scaling study) | reference |
 | `multiserver_eval.json` | ~1 KB | R1 unseen-server comparison: BM25 / frozen / GitHub-trained / multi-server-trained on 7 held-out servers | README roadmap |
 | `biencoder_multiserver_training.json` | ~7 KB | training record for the multi-server bi-encoder (R1) | reference |
