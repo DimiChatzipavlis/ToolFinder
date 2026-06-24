@@ -1,0 +1,312 @@
+{
+ "models": {
+  "weak": "gpt-4.1-mini",
+  "strong": "gpt-5.4-2026-03-05"
+ },
+ "n_probes": 8,
+ "cells": {
+  "weak@14": {
+   "model": "gpt-4.1-mini",
+   "n_tools": 14,
+   "accuracy": 0.75,
+   "correct": 6,
+   "of": 8,
+   "probes": [
+    {
+     "intent": "create a new text file with some content",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "overwrite the entire contents of a file",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "make a small edit to an existing file",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "read the contents of a text file",
+     "chosen": "read_text_file",
+     "ok": true
+    },
+    {
+     "intent": "list the files in a directory",
+     "chosen": "list_directory",
+     "ok": true
+    },
+    {
+     "intent": "create a new folder",
+     "chosen": "create_directory",
+     "ok": true
+    },
+    {
+     "intent": "move or rename a file",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "search for files by name",
+     "chosen": "search_files",
+     "ok": true
+    }
+   ]
+  },
+  "weak@60": {
+   "model": "gpt-4.1-mini",
+   "n_tools": 60,
+   "accuracy": 0.625,
+   "correct": 5,
+   "of": 8,
+   "probes": [
+    {
+     "intent": "create a new text file with some content",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "overwrite the entire contents of a file",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "make a small edit to an existing file",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "read the contents of a text file",
+     "chosen": "read_text_file",
+     "ok": true
+    },
+    {
+     "intent": "list the files in a directory",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "create a new folder",
+     "chosen": "create_directory",
+     "ok": true
+    },
+    {
+     "intent": "move or rename a file",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "search for files by name",
+     "chosen": "search_files",
+     "ok": true
+    }
+   ]
+  },
+  "weak@120": {
+   "model": "gpt-4.1-mini",
+   "n_tools": 120,
+   "accuracy": 0.75,
+   "correct": 6,
+   "of": 8,
+   "probes": [
+    {
+     "intent": "create a new text file with some content",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "overwrite the entire contents of a file",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "make a small edit to an existing file",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "read the contents of a text file",
+     "chosen": "read_text_file",
+     "ok": true
+    },
+    {
+     "intent": "list the files in a directory",
+     "chosen": "list_directory",
+     "ok": true
+    },
+    {
+     "intent": "create a new folder",
+     "chosen": "create_directory",
+     "ok": true
+    },
+    {
+     "intent": "move or rename a file",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "search for files by name",
+     "chosen": "search_files",
+     "ok": true
+    }
+   ]
+  },
+  "strong@14": {
+   "model": "gpt-5.4-2026-03-05",
+   "n_tools": 14,
+   "accuracy": 1.0,
+   "correct": 8,
+   "of": 8,
+   "probes": [
+    {
+     "intent": "create a new text file with some content",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "overwrite the entire contents of a file",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "make a small edit to an existing file",
+     "chosen": "edit_file",
+     "ok": true
+    },
+    {
+     "intent": "read the contents of a text file",
+     "chosen": "read_text_file",
+     "ok": true
+    },
+    {
+     "intent": "list the files in a directory",
+     "chosen": "list_directory",
+     "ok": true
+    },
+    {
+     "intent": "create a new folder",
+     "chosen": "create_directory",
+     "ok": true
+    },
+    {
+     "intent": "move or rename a file",
+     "chosen": "move_file",
+     "ok": true
+    },
+    {
+     "intent": "search for files by name",
+     "chosen": "search_files",
+     "ok": true
+    }
+   ]
+  },
+  "strong@60": {
+   "model": "gpt-5.4-2026-03-05",
+   "n_tools": 60,
+   "accuracy": 1.0,
+   "correct": 8,
+   "of": 8,
+   "probes": [
+    {
+     "intent": "create a new text file with some content",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "overwrite the entire contents of a file",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "make a small edit to an existing file",
+     "chosen": "edit_file",
+     "ok": true
+    },
+    {
+     "intent": "read the contents of a text file",
+     "chosen": "read_text_file",
+     "ok": true
+    },
+    {
+     "intent": "list the files in a directory",
+     "chosen": "list_directory",
+     "ok": true
+    },
+    {
+     "intent": "create a new folder",
+     "chosen": "create_directory",
+     "ok": true
+    },
+    {
+     "intent": "move or rename a file",
+     "chosen": "move_file",
+     "ok": true
+    },
+    {
+     "intent": "search for files by name",
+     "chosen": "search_files",
+     "ok": true
+    }
+   ]
+  },
+  "strong@120": {
+   "model": "gpt-5.4-2026-03-05",
+   "n_tools": 120,
+   "accuracy": 0.875,
+   "correct": 7,
+   "of": 8,
+   "probes": [
+    {
+     "intent": "create a new text file with some content",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "overwrite the entire contents of a file",
+     "chosen": "write_file",
+     "ok": true
+    },
+    {
+     "intent": "make a small edit to an existing file",
+     "chosen": "edit_file",
+     "ok": true
+    },
+    {
+     "intent": "read the contents of a text file",
+     "chosen": "read_text_file",
+     "ok": true
+    },
+    {
+     "intent": "list the files in a directory",
+     "chosen": "list_allowed_directories",
+     "ok": false
+    },
+    {
+     "intent": "create a new folder",
+     "chosen": "create_directory",
+     "ok": true
+    },
+    {
+     "intent": "move or rename a file",
+     "chosen": "move_file",
+     "ok": true
+    },
+    {
+     "intent": "search for files by name",
+     "chosen": "search_files",
+     "ok": true
+    }
+   ]
+  }
+ },
+ "router_recall@1": {
+  "14": 1.0,
+  "60": 1.0,
+  "120": 1.0
+ },
+ "tokens": {
+  "prompt": 288988,
+  "completion": 949
+ }
+}

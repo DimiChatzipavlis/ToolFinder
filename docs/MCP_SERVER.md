@@ -57,6 +57,13 @@ select in‑context. For a handful of distinct tools and a strong model, bind th
 directly — the bridge adds overhead for no accuracy gain (though `route_and_call`
 still saves tokens even there).
 
+*Measured (`legacy/experiments/bridge_selection_accuracy.py`):* on 8 forced
+single-tool probes the router selects correctly at **100%** at every catalog
+size, while a weak model (`gpt-4.1-mini`) manages only **62–75%** and strong
+`gpt-5.4` **88–100%** — the accuracy benefit of routing is real for weak models
+and marginal for strong ones (whose bridge value is cost). A clean
+catalog-size-distraction curve is not established at these sizes (small sample).
+
 ---
 
 ## Install
