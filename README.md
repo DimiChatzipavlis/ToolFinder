@@ -15,7 +15,7 @@ ToolFinder ships as an **early-stage, research-backed v0.1**: clean, unit-tested
 | Area | ✅ Ready in v0.1 | 🔜 Needed for production |
 | --- | --- | --- |
 | Routing | exact FAISS flat (default), opt-in HNSW, opt-in server-aware hierarchical, threshold abstention | — |
-| Bridge | multi-server union + dispatch, one-shot reconnect, `get_stats` | push-based `tools/list_changed`; exported metrics |
+| Bridge | multi-server union + dispatch (**MCP and OpenAPI**), env-based downstream auth, one-shot reconnect, `get_stats` | push-based `tools/list_changed`; exported metrics |
 | Evidence | cost modeled **and** measured; top-5 + selection accuracy measured | live multi-server at scale; repeats/error bars |
 | Quality | any open encoder; honest defaults | stronger/fine-tuned default; poisoning mitigations |
 | Packaging | `pip install`, `toolfinder-mcp`, MIT, CI (lint+tests) | PyPI; CHANGELOG/CONTRIBUTING; integration tests |
@@ -87,7 +87,7 @@ What to expect (measured on the archived GitHub-MCP study — direction, not a g
 
 ## ToolFinder as an MCP Server (routing bridge)
 
-`ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and one or more downstream MCP servers** (filesystem, git, memory, …). Rather than exposing every downstream catalog to the agent — which grows the prompt with every tool — the bridge embeds the **union** of all downstream tools once and exposes a few routing tools, dispatching execution to whichever server owns the chosen tool. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
+`ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and one or more downstream MCP servers — or OpenAPI REST APIs** (filesystem, git, memory, a Swagger/OpenAPI service, …). Rather than exposing every downstream catalog to the agent — which grows the prompt with every tool — the bridge embeds the **union** of all downstream tools once and exposes a few routing tools, dispatching execution to whichever server owns the chosen tool. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
 
 Register it in an MCP host with a config listing the servers to bridge (`mcp_servers.example.json`). **Use absolute paths to your Python interpreter and the script** — MCP hosts don't inherit your shell `PATH`, so a bare `"python"` won't launch:
 
@@ -101,7 +101,11 @@ Register it in an MCP host with a config listing the servers to bridge (`mcp_ser
 }
 ```
 
-(Find your interpreter with `python -c "import sys; print(sys.executable)"`.) After `pip install -e .` the server is also available as the `toolfinder-mcp` console command and `python -m toolfinder.mcp_server`. Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop — most token‑efficient), `catalog_size()`, `get_stats()` (routing observability), `refresh()` (re-index after downstream tool changes).
+(Find your interpreter with `python -c "import sys; print(sys.executable)"`.) After `pip install -e .` the server is also available as the `toolfinder-mcp` console command and `python -m toolfinder.mcp_server`. Tools exposed: `find_tools(query)` (discover top‑k relevant tools), `call_tool(name, args)` (execute one), `route_and_call(intent, args)` (route + execute in one hop), `catalog_size()`, `get_stats()` (routing observability), `refresh()` (re-index after downstream tool changes).
+
+**Two patterns — prefer `find_tools`+`call_tool`:** the agent sees the *retrieved* tools' schemas (top‑k, not the whole catalog), so it fills arguments correctly while the prompt stays small. `route_and_call` is the lowest‑token option but is **argument‑blind** (the agent supplies `arguments` without seeing the tool's schema) — reliable only for simple‑argument tools.
+
+**Downstream entries** can be MCP servers (`command`/`args`) **or OpenAPI REST APIs** (`type: "openapi"` with `spec_url`/`spec_file`, optional `auth` resolved from environment variables — never inlined in config or logged). See `mcp_servers.example.json`.
 
 **Measured (GPT‑5.4, create→edit→read task, 100% success in every configuration):** as the catalog grows, the baseline that binds all tools scales ≈ linearly (6.4k → 47.9k total tokens for N = 14 → 120), while the bridge stays flat — `route_and_call` is **~15× cheaper at 120 tools** and wins at every size; `find_tools`+`call_tool` is constant (~11.8k) and wins beyond ~30 tools. The router keeps **recall@1 = 1.0 even with the target tool buried among 386 distractors.** The bridge's value is **cost/context that scales with catalog size**, not selection accuracy for already‑capable models. (These are *uncached* token counts. A modeled cache-aware re-scoring — [`legacy/experiments/bridge_cache_aware.py`](legacy/experiments/bridge_cache_aware.py) — shrinks the N=120 `route_and_call` advantage from ~16× to **~6–10×** depending on the cache rate: the baseline's large tool block becomes a cached **read**, while the bridge's ~330‑token prefix sits below the ~1024‑token cache floor and gets no discount. The bridge still wins at scale but can be **break‑even at small N**. A *measured* version logging the API's `cached_tokens` is the remaining step.) Full study and figures: [`legacy/experiments/`](legacy/README.md).
 
@@ -118,7 +122,7 @@ The protections below are what the tool actually enforces (full threat model and
 
 ## Repository Layout
 
-- [`toolfinder/`](toolfinder/README.md) — core library: the FAISS router, the MCP stdio client, and the FastMCP bridge server.
+- [`toolfinder/`](toolfinder/README.md) — core library: the FAISS router, the MCP stdio client, the OpenAPI adapter, and the FastMCP bridge server.
 - [`ToolFinder_mcp_server.py`](ToolFinder_mcp_server.py) — entry-point shim for the MCP routing-bridge server; cookbook in [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md).
 - [`tests/`](tests/README.md) — unit tests for the router and the bridge (`pytest`).
 - [`legacy/`](legacy/README.md) — archived research pipeline, datasets, notebooks, and demos (not part of the tool).
@@ -132,6 +136,7 @@ The protections below are what the tool actually enforces (full threat model and
 - **E3 — Package + entry point.** 🟡 Mostly done — `pip install` exposes `toolfinder-mcp` and `python -m toolfinder.mcp_server` (PyPI publish pending).
 - **H1 — Hierarchical, server-aware routing.** ✅ Opt-in. `UniversalMCPRouter.route_top_k_hierarchical` + `TOOLFINDER_HIERARCHICAL` / `TOOLFINDER_ROUTE_SERVERS`: stage 1 ranks servers by tool-embedding centroid, stage 2 picks within the top `n_servers`. A **precision/scale** win, not latency (encoding dominates; flat search is already <1 ms). Honest recall trade-off — `n_servers` is tunable (covered by tests). Learned semantic categories remain a later extension.
 - **M1 — Cache-aware + quality measurement.** ✅ Modeled *and* measured (gpt-5.4): live `cached_tokens` confirm the cache model within ~1–2% at N≥60 (cached share 18%→70%→73% for N=14→120); top-5 selection completes the task 100%; selection accuracy is router **100%** vs weak `gpt-4.1-mini` **62–75%** vs strong `gpt-5.4` **88–100%** (routing helps weak models; for strong models the value is cost). Scripts: [`bridge_cache_aware.py`](legacy/experiments/bridge_cache_aware.py), [`bridge_cache_measured.py`](legacy/experiments/bridge_cache_measured.py), [`bridge_selection_accuracy.py`](legacy/experiments/bridge_selection_accuracy.py).
+- **G1 — OpenAPI gateway + downstream auth.** ✅ Downstream entries can be REST APIs described by an OpenAPI 3.x spec (`type: "openapi"`), routed identically to MCP servers; auth (bearer / API-key header or query) is resolved from environment variables. [`toolfinder/openapi_adapter.py`](toolfinder/openapi_adapter.py).
 
 ### Required for a production release (not yet)
 

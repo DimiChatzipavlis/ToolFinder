@@ -1,14 +1,15 @@
 # ToolFinder MCP Server — Cookbook
 
 `ToolFinder_mcp_server.py` turns ToolFinder into a **Model Context Protocol (MCP)
-server that bridges an LLM agent to a downstream MCP server** (filesystem, git,
-memory, …). Instead of exposing the downstream server's whole tool catalog to the
-agent — which grows the prompt linearly and pressures the context window — the
-bridge exposes a tiny, fixed set of routing tools and selects the relevant
-downstream tool(s) with the dense retriever.
+server that bridges an LLM agent to one or more downstream MCP servers — or
+OpenAPI REST APIs** (filesystem, git, memory, a Swagger/OpenAPI service, …).
+Instead of exposing every downstream catalog to the agent — which grows the
+prompt linearly and pressures the context window — the bridge exposes a tiny,
+fixed set of routing tools and selects the relevant downstream tool(s) with the
+dense retriever.
 
-It is a thin wrapper over two already-tested components: `UniversalMCPRouter`
-(selection) and `DynamicMCPClient` (downstream execution).
+It is a thin wrapper over tested components: `UniversalMCPRouter` (selection),
+`DynamicMCPClient` (stdio MCP execution), and `OpenAPIClient` (REST execution).
 
 ---
 
@@ -127,7 +128,7 @@ catalog. No host code changes — that interoperability is the point.
 |---|---|---|---|
 | `find_tools` | `find_tools(query: str, k: int = 3)` | top‑k downstream tool schemas | discovery — agent then calls `call_tool` |
 | `call_tool` | `call_tool(tool_name: str, arguments: dict)` | downstream result | execute a chosen tool |
-| `route_and_call` | `route_and_call(intent: str, arguments: dict)` | downstream result | **one‑hop**: route by intent and execute (most token‑efficient) |
+| `route_and_call` | `route_and_call(intent: str, arguments: dict)` | downstream result | **one‑hop**: route by intent and execute (lowest token cost, but **argument‑blind** — no schema shown; simple‑argument tools only) |
 | `catalog_size` | `catalog_size()` | `{"total_tools": N, "by_server": {…}}` | diagnostic |
 | `get_stats` | `get_stats()` | recent routing decisions + per-tool counts | observability |
 | `refresh` | `refresh()` | re-spawns downstream servers and re-indexes | after a downstream's tools change |
@@ -140,14 +141,47 @@ the routed server.)
 
 ### Two usage patterns
 
+**Prefer pattern 1 whenever tools have non-trivial arguments** — it shows the
+agent the chosen tool's schema, so arguments are correct. Pattern 2 is cheaper
+but the agent fills `arguments` blind.
+
 1. **Agent‑controlled selection** — bind `find_tools` + `call_tool`. The agent
-   discovers candidates and chooses, keeping it "in the loop." Cost is constant
-   in catalog size; best when you want the agent to make the final call.
+   discovers candidates (and sees their schemas), then chooses. Cost is constant
+   in catalog size; the robust default.
 2. **Delegated selection** — bind only `route_and_call`. The agent describes the
-   action; the router picks and executes. Cheapest and flat in N; best for large
-   catalogs and cost‑sensitive deployments.
+   action; the router picks and executes. Cheapest and flat in N, but
+   **argument‑blind** (no schema shown) — best for large catalogs of
+   simple‑argument tools.
 
 ---
+
+## Downstream servers — MCP and OpenAPI
+
+A config entry's `type` selects the transport:
+
+- **`"mcp"` (default):** spawn a stdio MCP server (`command` + `args`, optional `env`).
+- **`"openapi"`:** front a REST API from an OpenAPI 3.x spec — every operation becomes a routable tool.
+
+```json
+{
+  "servers": [
+    {"name": "git", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-git", "--repository", "."]},
+    {
+      "name": "petstore",
+      "type": "openapi",
+      "spec_url": "https://petstore3.swagger.io/api/v3/openapi.json",
+      "base_url": "https://petstore3.swagger.io/api/v3",
+      "auth": { "type": "bearer", "token_env": "PETSTORE_TOKEN" }
+    }
+  ]
+}
+```
+
+**Auth is resolved from environment variables — never inlined in config or logged.** Supported `auth.type`: `bearer` (`token_env`), `header` (`name` + `value_env`), `query` (`name` + `value_env`). The OpenAPI adapter is **v0.1**: OpenAPI 3.x, JSON bodies, local `$ref` resolution; no OAuth flows or multipart. It makes **outbound HTTP calls** — point it only at specs/endpoints you trust.
+
+## How the token numbers were measured
+
+The cost figures are **API-reported**, not estimated. `legacy/experiments/bridge_scaling.py` runs the agent loop and sums `usage.prompt_tokens` / `completion_tokens` per turn for each arm (bind-all-N / `find_tools`+`call_tool` / `route_and_call`) at several catalog sizes N; the deterministic per-turn schema weight is counted with `tiktoken`. `bridge_cache_measured.py` then logs the API's `cached_tokens` to re-score under prompt caching (see the *Cost caveat* above). Honest scope: **n=1, one task family, filesystem-only live execution, synthetic distractor catalogs, GPT‑5.4** — the *shapes* are robust, the statistics are not yet publication-grade (repeats/error bars are the R3 step).
 
 ## Configuration (environment variables)
 

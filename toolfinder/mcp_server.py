@@ -77,7 +77,24 @@ def _server_configs() -> list[dict]:
     return [{"name": "filesystem", "command": command, "args": args}]
 
 
-def _new_client(name: str, spec: dict) -> DynamicMCPClient:
+def _new_client(name: str, spec: dict):
+    """Build the right downstream client for a config entry.
+
+    `type` selects the transport: "mcp" (default) spawns a stdio MCP server;
+    "openapi" fronts a REST API described by an OpenAPI spec. Both expose the
+    same `initialize_and_get_tools()` / `call_tool()` / `close()` interface, so
+    the rest of the bridge is transport-agnostic.
+    """
+    if str(spec.get("type", "mcp")).lower() == "openapi":
+        from toolfinder.openapi_adapter import OpenAPIClient
+
+        return OpenAPIClient(
+            server_name=name,
+            spec=spec.get("spec") or spec.get("spec_url") or spec.get("spec_file"),
+            base_url=spec.get("base_url"),
+            auth=spec.get("auth"),
+            request_timeout_s=45.0,
+        )
     return DynamicMCPClient(
         server_name=name, command=str(spec["command"]),
         args=[str(a) for a in spec.get("args", [])], env=spec.get("env"),
@@ -180,7 +197,10 @@ def _route(query: str, k: int) -> list:
 @mcp.tool
 async def find_tools(query: str, k: int | None = None) -> list[dict]:
     """Return the downstream tools most relevant to `query`, as bindable schemas
-    (each tagged with its `server_name`). Call this first, then `call_tool`."""
+    (each tagged with its `server_name`). **Recommended pattern:** call this
+    first, then `call_tool` — the agent sees the chosen tools' *schemas* (top-k,
+    not the whole catalog), so it fills arguments correctly while the prompt
+    stays small."""
     await _ensure_ready()
     top_k = k or int(os.getenv("TOOLFINDER_TOPK", "3"))
     matches = _route(query, top_k)
@@ -202,9 +222,13 @@ async def call_tool(tool_name: str, arguments: dict[str, Any]) -> Any:
 @mcp.tool
 async def route_and_call(intent: str, arguments: dict[str, Any]) -> Any:
     """Single-step bridge: route `intent` to the best downstream tool across all
-    servers and execute it in one hop (no discovery round-trip). The most
-    token-efficient pattern — the agent binds just this one tool regardless of
-    how large the combined catalog is."""
+    servers and execute it in one hop (no discovery round-trip). Lowest token
+    cost — the agent binds just this one tool regardless of catalog size.
+
+    Caveat: the agent never sees the chosen tool's schema, so it must supply
+    `arguments` **blind**. Reliable only for tools with simple/obvious arguments;
+    for schema-heavy tools prefer `find_tools` + `call_tool`, which surfaces the
+    schema before execution."""
     await _ensure_ready()
     matches = _route(intent, 1)
     if not matches:

@@ -14,6 +14,13 @@
       "name": "git",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-git", "--repository", "."]
+    },
+    {
+      "name": "petstore",
+      "type": "openapi",
+      "spec_url": "https://petstore3.swagger.io/api/v3/openapi.json",
+      "base_url": "https://petstore3.swagger.io/api/v3",
+      "auth": { "type": "bearer", "token_env": "PETSTORE_TOKEN" }
     }
   ]
 }
