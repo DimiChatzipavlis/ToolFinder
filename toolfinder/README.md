@@ -1,6 +1,6 @@
 # toolfinder/ — Core Library
 
-The deployable routing layer behind the MCP bridge. Four modules, no framework lock-in.
+The deployable routing layer behind the MCP bridge. Five modules, no framework lock-in.
 
 > **Status:** part of the OSS **v0.1** tool. See the [repo README](../README.md) *Status* section for the v0.1-vs-production split (what's ready vs. what's still needed for a production release).
 
@@ -12,6 +12,7 @@ The deployable routing layer behind the MCP bridge. Four modules, no framework l
 | `mcp_adapter.py` | `DynamicMCPClient`: real stdio MCP client — process spawn (no shell), initialize/tools-list handshake, request/response correlation with timeouts, bounded `stdin.drain()`, pending-request draining on shutdown. |
 | `mcp_server.py` | `FastMCP` bridge server (`toolfinder-mcp`): fronts one or more downstream MCP servers / OpenAPI APIs, exposes `find_tools` / `call_tool` / `route_and_call` / `catalog_size` / `get_stats` / `refresh`, dispatches to the owning server, reconnects on failure. See [docs/MCP_SERVER.md](../docs/MCP_SERVER.md). |
 | `openapi_adapter.py` | `OpenAPIClient`: fronts a REST API from an OpenAPI 3.x spec — each operation becomes a routable tool; maps a chosen tool + args back to an HTTP request with env-resolved auth. Same `initialize_and_get_tools()` / `call_tool()` interface as the MCP client, so the bridge is transport-agnostic. |
+| `reranker.py` | `CrossEncoderReranker` (opt-in): re-scores the bi-encoder's top-k shortlist with a cross-encoder (`(query, tool)` scored jointly). Lazy-loaded, zero-shot — sharpens selection on confusable catalogs without retraining. Enabled via `RouterHyperparameters(rerank=True)`. |
 
 ## API in 20 lines
 

@@ -227,6 +227,40 @@ def test_hierarchical_rejects_invalid_n_servers(monkeypatch: pytest.MonkeyPatch)
         router.route_top_k_hierarchical("alpha thing", k=1, n_servers=0)
 
 
+class FakeReranker:
+    """Reverses the bi-encoder order, to prove the router actually applies it."""
+
+    def rank(self, query, documents):
+        n = len(documents)
+        return [(i, float(n - pos)) for pos, i in enumerate(reversed(range(n)))]
+
+
+def test_rerank_reorders_the_shortlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+    base = [r.tool_name for r in router.route_top_k("cross query", k=4)]
+    assert len(base) >= 2, "need a multi-candidate shortlist to exercise reranking"
+
+    router._reranker = FakeReranker()
+    reranked = [r.tool_name for r in router.route_top_k("cross query", k=4)]
+
+    assert reranked == list(reversed(base))  # the reranker reordered the candidates
+
+
+def test_rerank_disabled_leaves_order_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+    assert router._reranker is None  # opt-in: off by default
+    first = [r.tool_name for r in router.route_top_k("cross query", k=4)]
+    second = [r.tool_name for r in router.route_top_k("cross query", k=4)]
+    assert first == second
+
+
+def test_rerank_config_constructs_reranker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)
+    config = router_module.RouterHyperparameters(rerank=True)
+    router = router_module.UniversalMCPRouter(model_name="dummy", config=config)
+    assert router._reranker is not None  # constructed, but the cross-encoder loads lazily
+
+
 def test_singleton_release_is_reference_counted(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tearing down one router must not evict a model another live router shares."""
     monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)

@@ -195,6 +195,8 @@ The cost figures are **API-reported**, not estimated. `legacy/experiments/bridge
 | `TOOLFINDER_TOPK` | `3` | default shortlist size for `find_tools` |
 | `TOOLFINDER_HIERARCHICAL` | off | set (`1`/`true`) to enable two-stage **server-aware** routing |
 | `TOOLFINDER_ROUTE_SERVERS` | `2` | servers kept in stage 1 when hierarchical routing is on (higher = more recall, less precision) |
+| `TOOLFINDER_RERANK` | off | set (`1`/`true`) to re-rank the bi-encoder shortlist with a cross-encoder — helps confusable catalogs, adds latency |
+| `TOOLFINDER_RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | CrossEncoder checkpoint used when reranking is on |
 
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
 servers) rather than the single-server env vars — see the Run section above.

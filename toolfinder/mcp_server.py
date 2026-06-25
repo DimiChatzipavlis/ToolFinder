@@ -39,6 +39,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from toolfinder import UniversalMCPRouter, to_openai_tools
+from toolfinder.dynamic_faiss_router import RouterHyperparameters
 from toolfinder.mcp_adapter import DynamicMCPClient
 
 logger = logging.getLogger("toolfinder.mcp_server")
@@ -104,8 +105,13 @@ def _new_client(name: str, spec: dict):
 
 async def _build() -> None:
     """Spawn every downstream server and build the union router."""
+    rerank = os.getenv("TOOLFINDER_RERANK", "").strip().lower() in {"1", "true", "yes", "on"}
     router = UniversalMCPRouter(
-        model_name=os.getenv("TOOLFINDER_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+        model_name=os.getenv("TOOLFINDER_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
+        config=RouterHyperparameters(
+            rerank=rerank,
+            rerank_model=os.getenv("TOOLFINDER_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+        ),
     )
     clients: dict[str, DynamicMCPClient] = {}
     specs: dict[str, dict] = {}

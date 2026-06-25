@@ -1,0 +1,29 @@
+{
+ "n": 144,
+ "grid": {
+  "stock | rerank OFF": {
+   "recall@1": 0.5625,
+   "recall@3": 0.8264,
+   "recall@5": 0.875,
+   "mrr": 0.7065
+  },
+  "stock | rerank ON ": {
+   "recall@1": 0.8542,
+   "recall@3": 0.9653,
+   "recall@5": 0.9722,
+   "mrr": 0.9135
+  },
+  "fine-tuned | rerank OFF": {
+   "recall@1": 0.9861,
+   "recall@3": 1.0,
+   "recall@5": 1.0,
+   "mrr": 0.9931
+  },
+  "fine-tuned | rerank ON ": {
+   "recall@1": 0.8542,
+   "recall@3": 0.9653,
+   "recall@5": 0.9722,
+   "mrr": 0.9135
+  }
+ }
+}

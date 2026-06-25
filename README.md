@@ -17,7 +17,7 @@ ToolFinder ships as an **early-stage, research-backed v0.1**: clean, unit-tested
 | Routing | exact FAISS flat (default), opt-in HNSW, opt-in server-aware hierarchical, threshold abstention | — |
 | Bridge | multi-server union + dispatch (**MCP and OpenAPI**), env-based downstream auth, one-shot reconnect, `get_stats` | push-based `tools/list_changed`; exported metrics |
 | Evidence | cost modeled **and** measured; top-5 + selection accuracy measured | live multi-server at scale; repeats/error bars |
-| Quality | any open encoder; honest defaults | stronger/fine-tuned default; poisoning mitigations |
+| Quality | any open encoder; **opt-in cross-encoder rerank**; honest defaults | stronger/fine-tuned default; poisoning mitigations |
 | Packaging | `pip install`, `toolfinder-mcp`, MIT, CI (lint+tests) | PyPI; CHANGELOG/CONTRIBUTING; integration tests |
 
 See [Roadmap & release readiness](#roadmap--release-readiness) for the full checklist and the next immediate steps.
@@ -85,6 +85,12 @@ What to expect (measured on the archived GitHub-MCP study — direction, not a g
 - **On confusable or out-of-domain catalogs it matters a lot** — there, *frozen* MiniLM scored *below* BM25, a fine-tuned encoder beat it, and bigger stock encoders (MPNet, BGE) helped modestly.
 - **Trade-off:** MiniLM (384-d) is fastest/smallest; MPNet/BGE are more accurate but slower to encode — and *encoding*, not search, is the latency bottleneck. Fine-tune only when your catalog has near-duplicate tools or you observe wrong routes.
 
+For confusable catalogs you have two ways to specialize selection, measured on the GitHub-MCP eval — they are **alternatives, not a stack**:
+- **Fine-tune the bi-encoder** — strongest (recall@1 0.56 → **0.99**), needs labels/GPU.
+- **Enable the opt-in cross-encoder reranker** `TOOLFINDER_RERANK` — no training (0.56 → **0.85**); the fallback when you can't fine-tune.
+
+Don't rerank a fine-tuned base with the stock cross-encoder — it drags 0.99 → 0.85 (the cross-encoder overrides the better base). See Roadmap **Q1**.
+
 ## ToolFinder as an MCP Server (routing bridge)
 
 `ToolFinder_mcp_server.py` runs ToolFinder as a **Model Context Protocol server that sits between an LLM agent and one or more downstream MCP servers — or OpenAPI REST APIs** (filesystem, git, memory, a Swagger/OpenAPI service, …). Rather than exposing every downstream catalog to the agent — which grows the prompt with every tool — the bridge embeds the **union** of all downstream tools once and exposes a few routing tools, dispatching execution to whichever server owns the chosen tool. It is drop‑in for any MCP host (Claude Desktop, Cursor, …) with no host code changes.
@@ -137,6 +143,7 @@ The protections below are what the tool actually enforces (full threat model and
 - **H1 — Hierarchical, server-aware routing.** ✅ Opt-in. `UniversalMCPRouter.route_top_k_hierarchical` + `TOOLFINDER_HIERARCHICAL` / `TOOLFINDER_ROUTE_SERVERS`: stage 1 ranks servers by tool-embedding centroid, stage 2 picks within the top `n_servers`. A **precision/scale** win, not latency (encoding dominates; flat search is already <1 ms). Honest recall trade-off — `n_servers` is tunable (covered by tests). Learned semantic categories remain a later extension.
 - **M1 — Cache-aware + quality measurement.** ✅ Modeled *and* measured (gpt-5.4): live `cached_tokens` confirm the cache model within ~1–2% at N≥60 (cached share 18%→70%→73% for N=14→120); top-5 selection completes the task 100%; selection accuracy is router **100%** vs weak `gpt-4.1-mini` **62–75%** vs strong `gpt-5.4` **88–100%** (routing helps weak models; for strong models the value is cost). Scripts: [`bridge_cache_aware.py`](legacy/experiments/bridge_cache_aware.py), [`bridge_cache_measured.py`](legacy/experiments/bridge_cache_measured.py), [`bridge_selection_accuracy.py`](legacy/experiments/bridge_selection_accuracy.py).
 - **G1 — OpenAPI gateway + downstream auth.** ✅ Downstream entries can be REST APIs described by an OpenAPI 3.x spec (`type: "openapi"`), routed identically to MCP servers; auth (bearer / API-key header or query) is resolved from environment variables. [`toolfinder/openapi_adapter.py`](toolfinder/openapi_adapter.py).
+- **Q1 — Cross-encoder reranker (opt-in).** ✅ The practical form of the review's "specialize selection" idea — **no per-change retraining**: a stock cross-encoder re-scores the bi-encoder's top-k shortlist jointly (`TOOLFINDER_RERANK`; `RouterHyperparameters.rerank`). **Measured (local, $0 API):** on the confusable GitHub-MCP catalog (144 unseen queries) it lifts router **recall@1 0.56 → 0.85** and MRR 0.71 → 0.91 (56 queries improved, 8 worse) — [`toolfinder/reranker.py`](toolfinder/reranker.py), eval [`legacy/experiments/eval_rerank.py`](legacy/experiments/eval_rerank.py). Opt-in: it adds latency and only helps the hard case (on distinct catalogs the bi-encoder is already ~1.0). **But fine-tuning the bi-encoder is stronger** (recall@1 **0.99** on the same eval — [`eval_rerank_finetuned.py`](legacy/experiments/eval_rerank_finetuned.py)), and reranking a *fine-tuned* base with the stock cross-encoder **hurts** (0.99 → 0.85 — the cross-encoder overrides the better base). So the two are **alternatives, not a stack**: fine-tune when you have labels/GPU; use the reranker as the **no-training fallback** for a weak/stock encoder. (The 0.99 is on `regime1`/shared-template queries — likely optimistic; the template-disjoint split would be lower.)
 
 ### Required for a production release (not yet)
 

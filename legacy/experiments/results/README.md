@@ -26,6 +26,8 @@ files by hand.
 | `bridge_cache_aware.json` | ~2 KB | Cache-aware re-scoring of `bridge_scaling_gpt.json`: billable input tokens + baseline/bridge ratios under prompt caching (uncached / 0.5× / 0.25× / 0.1×). Modeled from per-turn structure | `bridge_cache_aware.py` |
 | `bridge_cache_measured.json` | ~6 KB | **Measured** (gpt-5.4) prompt-cache behavior: per-turn `cached_tokens` + cached fraction for the baseline arm (N=14/60/120) and the top-5 `find5` arm (N=60/120), with end-task success. Validates `bridge_cache_aware.json` | `bridge_cache_measured.py` |
 | `bridge_selection_accuracy.json` | ~5 KB | Forced single-tool selection accuracy over 8 probes vs catalog size (N=14/60/120), weak (`gpt-4.1-mini`) vs strong (`gpt-5.4`) vs router recall@1 — the context→accuracy test | `bridge_selection_accuracy.py` |
+| `rerank_eval.json` | ~1 KB | **Local ($0 API)** retrieval eval of the cross-encoder reranker on the confusable GitHub-MCP catalog (144 unseen queries): recall@1/@3/@5 + MRR, rerank OFF vs ON (recall@1 0.56→0.85) | `eval_rerank.py` |
+| `rerank_finetuned_eval.json` | ~1 KB | 2×2 {stock, fine-tuned MiniLM} × rerank {off,on} on the same eval — fine-tune vs rerank vs both (recall@1: stock 0.56, +rerank 0.85, fine-tuned **0.99**; they're alternatives, stacking hurts) | `eval_rerank_finetuned.py` |
 | `bridge_ab.json` | ~1 KB | single-N baseline-vs-bridge A/B (superseded by the scaling study) | reference |
 | `multiserver_eval.json` | ~1 KB | R1 unseen-server comparison: BM25 / frozen / GitHub-trained / multi-server-trained on 7 held-out servers | README roadmap |
 | `biencoder_multiserver_training.json` | ~7 KB | training record for the multi-server bi-encoder (R1) | reference |

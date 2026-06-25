@@ -44,6 +44,21 @@ class RouterHyperparameters(BaseModel):
         description="Absolute fallback threshold for cosine similarity",
     )
     top_k_candidates: int = Field(default=3, description="Default number of route candidates to evaluate")
+    rerank: bool = Field(
+        default=False,
+        description=(
+            "Opt-in cross-encoder re-ranking of the bi-encoder shortlist. Helps confusable / "
+            "out-of-domain catalogs and weak agent models; adds latency, so it is off by default."
+        ),
+    )
+    rerank_model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        description="CrossEncoder checkpoint used when rerank=True (stock, zero-shot — no retraining).",
+    )
+    rerank_pool: int = Field(
+        default=20,
+        description="How many bi-encoder candidates to re-rank before truncating to k.",
+    )
 
 
 @dataclass(frozen=True)
@@ -169,6 +184,12 @@ class UniversalMCPRouter:
         self._embeddings: np.ndarray = np.zeros((0, embedding_dim), dtype=np.float32)
         self._server_to_ids: dict[str, list[int]] = {}
         self._server_centroids: dict[str, np.ndarray] | None = None
+        # Optional cross-encoder reranker (opt-in; its model loads lazily on first use).
+        self._reranker = None
+        if self.config.rerank:
+            from toolfinder.reranker import CrossEncoderReranker
+
+            self._reranker = CrossEncoderReranker(self.config.rerank_model, device=self.device)
 
     def _create_index(self, expected_size: int = 0) -> faiss.Index:
         """Allocate the FAISS index configured by `index_type`.
@@ -373,13 +394,15 @@ class UniversalMCPRouter:
         query_embedding = np.asarray(query_embedding, dtype=np.float32)
         faiss.normalize_L2(query_embedding)
 
+        # When reranking, retrieve a larger bi-encoder pool to re-score; otherwise just k.
+        pool = max(k, self.config.rerank_pool) if self._reranker is not None else k
         scores, indices = self.faiss_index.search(
             query_embedding,
-            k=min(k, int(self.faiss_index.ntotal)),
+            k=min(pool, int(self.faiss_index.ntotal)),
         )
 
         top_score = float(scores[0][0])
-        if k > 1 and scores.shape[1] >= 2 and float(indices[0][1]) >= 0:
+        if scores.shape[1] >= 2 and float(indices[0][1]) >= 0:
             margin = float(scores[0][0]) - float(scores[0][1])
             if margin < 0.02:
                 logger.warning(
@@ -399,36 +422,33 @@ class UniversalMCPRouter:
             )
             return []
 
-        matches: list[RouteResult] = []
+        scored: list[tuple[float, str, str, ToolSchema]] = []
         for score, index_id in zip(scores[0], indices[0], strict=True):
-            if index_id < 0:
+            if index_id < 0 or float(score) < self.config.min_cosine_similarity:
                 continue
             server_name, tool_name, schema = self.metadata[int(index_id)]
-            if float(score) < self.config.min_cosine_similarity:
-                logger.debug(
-                    "Filtered tool %s/%s (score=%.4f < min_cosine_similarity=%.2f)",
-                    server_name,
-                    tool_name,
-                    float(score),
-                    self.config.min_cosine_similarity,
-                )
-                continue
-            logger.info(
-                "Matched tool %s/%s with score=%.4f (threshold=%.2f)",
-                server_name,
-                tool_name,
-                float(score),
-                self.config.min_cosine_similarity,
-            )
-            matches.append(
-                RouteResult(
-                    server_name=server_name,
-                    tool_name=tool_name,
-                    schema=schema,
-                    score=float(score),
-                )
-            )
-        return matches
+            scored.append((float(score), server_name, tool_name, schema))
+        return self._finalize_candidates(query, scored, k)
+
+    def _finalize_candidates(
+        self, query: str, scored: list[tuple[float, str, str, ToolSchema]], k: int
+    ) -> list[RouteResult]:
+        """Optionally cross-encoder re-rank the threshold-filtered, bi-encoder-ordered
+        candidates, then truncate to k and build RouteResults. With no reranker
+        configured this is a plain truncation, so default behavior is unchanged."""
+        if self._reranker is not None and len(scored) > 1:
+            documents = [self._rerank_text(tool_name, schema) for _, _, tool_name, schema in scored]
+            ranked = self._reranker.rank(query, documents)
+            scored = [(ce_score, scored[i][1], scored[i][2], scored[i][3]) for i, ce_score in ranked]
+        return [
+            RouteResult(server_name=server_name, tool_name=tool_name, schema=schema, score=score)
+            for score, server_name, tool_name, schema in scored[:k]
+        ]
+
+    def _rerank_text(self, tool_name: str, schema: ToolSchema) -> str:
+        """Compact natural-language document for the cross-encoder."""
+        description = schema.get("description", "") if isinstance(schema, dict) else ""
+        return f"{tool_name}: {description}".strip()[:512]
 
     def route(self, query: str) -> RouteResult:
         """Return the single highest-ranked tool candidate for a query.
@@ -499,7 +519,8 @@ class UniversalMCPRouter:
             return []
 
         candidate_scores = self._embeddings[candidate_ids] @ query_vector
-        order = np.argsort(-candidate_scores)[:k]
+        pool = max(k, self.config.rerank_pool) if self._reranker is not None else k
+        order = np.argsort(-candidate_scores)[:pool]
 
         top_score = float(candidate_scores[order[0]])
         if top_score < self.config.min_cosine_similarity:
@@ -511,24 +532,14 @@ class UniversalMCPRouter:
             )
             return []
 
-        matches: list[RouteResult] = []
+        scored: list[tuple[float, str, str, ToolSchema]] = []
         for pos in order:
             score = float(candidate_scores[int(pos)])
             if score < self.config.min_cosine_similarity:
                 continue
-            index_id = candidate_ids[int(pos)]
-            server_name, tool_name, schema = self.metadata[index_id]
-            logger.info(
-                "Matched tool %s/%s with score=%.4f (hierarchical, threshold=%.2f)",
-                server_name,
-                tool_name,
-                score,
-                self.config.min_cosine_similarity,
-            )
-            matches.append(
-                RouteResult(server_name=server_name, tool_name=tool_name, schema=schema, score=score)
-            )
-        return matches
+            server_name, tool_name, schema = self.metadata[candidate_ids[int(pos)]]
+            scored.append((score, server_name, tool_name, schema))
+        return self._finalize_candidates(query, scored, k)
 
     def _select_server_candidate_ids(self, query_vector: np.ndarray, n_servers: int) -> list[int]:
         """Stage 1: rank servers by centroid similarity, return the tool index
