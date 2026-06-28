@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "toolfinder": {
+      "command": "/ABSOLUTE/PATH/TO/python",
+      "args": ["/ABSOLUTE/PATH/TO/ToolFinder/ToolFinder_mcp_server.py"],
+      "env": {
+        "TOOLFINDER_CONFIG": "/ABSOLUTE/PATH/TO/mcp_servers.json",
+        "TOOLFINDER_RERANK": "0"
+      }
+    }
+  }
+}

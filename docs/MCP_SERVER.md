@@ -11,6 +11,10 @@ dense retriever.
 It is a thin wrapper over tested components: `UniversalMCPRouter` (selection),
 `DynamicMCPClient` (stdio MCP execution), and `OpenAPIClient` (REST execution).
 
+> **Want the "ToolFinder is my only MCP server" setup** (memory + SQL + filesystem
+> + REST APIs all under one gateway, with copy-paste host configs)? See
+> **[USE_AS_GATEWAY.md](USE_AS_GATEWAY.md)**. This cookbook is the deeper reference.
+
 ---
 
 ## When it helps — and when it doesn't (measured, not asserted)
@@ -182,6 +186,8 @@ A config entry's `type` selects the transport:
 ## How the token numbers were measured
 
 The cost figures are **API-reported**, not estimated. `legacy/experiments/bridge_scaling.py` runs the agent loop and sums `usage.prompt_tokens` / `completion_tokens` per turn for each arm (bind-all-N / `find_tools`+`call_tool` / `route_and_call`) at several catalog sizes N; the deterministic per-turn schema weight is counted with `tiktoken`. `bridge_cache_measured.py` then logs the API's `cached_tokens` to re-score under prompt caching (see the *Cost caveat* above). Honest scope: **n=1, one task family, filesystem-only live execution, synthetic distractor catalogs, GPT‑5.4** — the *shapes* are robust, the statistics are not yet publication-grade (repeats/error bars are the R3 step).
+
+The full set of evaluation scripts (cost, cache, selection accuracy, rerank, fine-tune, live gateway, and the at-scale feasibility test), what each does inside, the source code they exercise, and an honest production-grade-rigor assessment are in **[EVALUATION.md](EVALUATION.md)**.
 
 ## Configuration (environment variables)
 

@@ -47,11 +47,12 @@ logger = logging.getLogger("toolfinder.mcp_server")
 mcp = FastMCP("ToolFinder")
 
 _state: dict[str, Any] = {
-    "clients": {},          # server_name -> DynamicMCPClient
-    "specs": {},            # server_name -> {command, args, env}
+    "clients": {},          # server_name -> downstream client
+    "specs": {},            # server_name -> {command, args, env} | openapi spec
     "router": None,
     "tool_to_server": {},   # tool_name -> server_name
     "counts": {},           # server_name -> tool count
+    "failed": {},           # server_name -> startup error (skipped, gateway stays up)
     "routes": 0,            # total routing decisions
     "by_tool": Counter(),   # chosen tool -> count
     "recent": deque(maxlen=50),
@@ -113,22 +114,34 @@ async def _build() -> None:
             rerank_model=os.getenv("TOOLFINDER_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
         ),
     )
-    clients: dict[str, DynamicMCPClient] = {}
+    clients: dict[str, Any] = {}
     specs: dict[str, dict] = {}
     tool_to_server: dict[str, str] = {}
     counts: dict[str, int] = {}
+    failed: dict[str, str] = {}
     for cfg in _server_configs():
         name = str(cfg["name"])
         specs[name] = cfg
-        client = _new_client(name, cfg)
-        tools = await client.initialize_and_get_tools()
-        router.ingest_server(name, tools)
-        clients[name] = client
-        counts[name] = len(tools)
-        for tool in tools:
-            tool_to_server.setdefault(tool["tool_name"], name)
-    _state.update(clients=clients, specs=specs, router=router, tool_to_server=tool_to_server, counts=counts)
-    logger.info("ToolFinder bridge ready: %s servers, %s tools", len(clients), sum(counts.values()))
+        # Per-server fault isolation: a downstream that fails to start is logged
+        # and skipped so one bad config entry can't take down the whole gateway.
+        try:
+            client = _new_client(name, cfg)
+            tools = await client.initialize_and_get_tools()
+            router.ingest_server(name, tools)
+            clients[name] = client
+            counts[name] = len(tools)
+            for tool in tools:
+                tool_to_server.setdefault(tool["tool_name"], name)
+        except Exception as exc:  # noqa: BLE001 - isolate a bad downstream, keep the gateway up
+            failed[name] = str(exc)[:300]
+            logger.error("downstream server %r failed to start (skipped): %s", name, exc)
+    _state.update(clients=clients, specs=specs, router=router, tool_to_server=tool_to_server,
+                  counts=counts, failed=failed)
+    logger.info(
+        "ToolFinder bridge ready: %s/%s servers, %s tools%s",
+        len(clients), len(clients) + len(failed), sum(counts.values()),
+        f" (failed: {', '.join(failed)})" if failed else "",
+    )
 
 
 async def _ensure_ready() -> None:
@@ -249,7 +262,11 @@ async def route_and_call(intent: str, arguments: dict[str, Any]) -> Any:
 async def catalog_size() -> dict[str, Any]:
     """Report the downstream catalog behind the bridge (diagnostic)."""
     await _ensure_ready()
-    return {"total_tools": sum(_state["counts"].values()), "by_server": dict(_state["counts"])}
+    return {
+        "total_tools": sum(_state["counts"].values()),
+        "by_server": dict(_state["counts"]),
+        "failed_servers": dict(_state.get("failed", {})),
+    }
 
 
 @mcp.tool
@@ -260,6 +277,7 @@ async def get_stats() -> dict[str, Any]:
         "total_routes": _state["routes"],
         "top_tools": dict(_state["by_tool"].most_common(10)),
         "recent": list(_state["recent"])[-10:],
+        "failed_servers": dict(_state.get("failed", {})),
     }
 
 

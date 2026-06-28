@@ -41,6 +41,11 @@ reports/*.pdf
 experiments/.env
 .env.*
 
+# Local gateway configs created from the *.example.json templates — these may hold
+# connection strings / credentials. Keep the committed templates, ignore the real ones.
+mcp_servers.json
+mcp.host.json
+
 *.egg-info/
 
 # Legacy archive — heavy/derived/secret content was moved under legacy/, so the

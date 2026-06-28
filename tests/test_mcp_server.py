@@ -63,6 +63,15 @@ class FakeClient:
         pass
 
 
+class FailingClient(FakeClient):
+    """Like FakeClient, but the server named 'broken' fails to initialize."""
+
+    async def initialize_and_get_tools(self):
+        if self.server_name == "broken":
+            raise RuntimeError("boom: cannot start")
+        return [dict(t) for t in self.INVENTORY[self.server_name]]
+
+
 @pytest.fixture
 def server(monkeypatch, tmp_path):
     import toolfinder.dynamic_faiss_router as router_module
@@ -120,3 +129,31 @@ async def test_get_stats_records_routes(server):
     assert stats["total_routes"] >= 1
     assert "write_file" in stats["top_tools"]
     assert stats["recent"][-1]["tool"] == "write_file"
+
+
+@pytest.mark.asyncio
+async def test_failed_downstream_is_isolated(monkeypatch, tmp_path):
+    """One bad server in the config must not take down the whole gateway."""
+    import toolfinder.dynamic_faiss_router as router_module
+
+    monkeypatch.setattr(router_module, "SentenceTransformer", FakeEmbedder)
+    import toolfinder.mcp_adapter as adapter
+
+    monkeypatch.setattr(adapter, "DynamicMCPClient", FailingClient)
+    config = tmp_path / "servers.json"
+    config.write_text(
+        '{"servers":[{"name":"filesystem","command":"x","args":[]},'
+        '{"name":"broken","command":"x","args":[]}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("TOOLFINDER_CONFIG", str(config))
+
+    srv = importlib.reload(importlib.import_module("toolfinder.mcp_server"))
+    monkeypatch.setattr(srv, "DynamicMCPClient", FailingClient)
+
+    size = await srv.catalog_size.fn()
+    assert size["by_server"] == {"filesystem": 1}      # healthy server still loaded
+    assert "broken" in size["failed_servers"]          # bad server isolated + recorded
+    # gateway still routes/serves via the healthy server
+    fs = await srv.find_tools.fn("save some text to a file", k=1)
+    assert fs[0]["function"]["name"] == "write_file"

@@ -1,0 +1,27 @@
+{
+ "model": "gpt-4.1-mini",
+ "n_queries": 24,
+ "sizes": {
+  "60": {
+   "baseline_acc": 0.958,
+   "baseline_bind_errors": 0,
+   "gateway_acc": 0.75,
+   "router_recall@1": 0.875,
+   "router_recall@5": 0.958
+  },
+  "250": {
+   "baseline_acc": 0.0,
+   "baseline_bind_errors": 24,
+   "gateway_acc": 0.75,
+   "router_recall@1": 0.708,
+   "router_recall@5": 0.958
+  },
+  "574": {
+   "baseline_acc": 0.0,
+   "baseline_bind_errors": 24,
+   "gateway_acc": 0.708,
+   "router_recall@1": 0.458,
+   "router_recall@5": 0.875
+  }
+ }
+}

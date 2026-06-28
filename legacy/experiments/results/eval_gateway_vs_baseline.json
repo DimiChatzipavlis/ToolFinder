@@ -1,0 +1,57 @@
+{
+ "model": "gpt-4.1-mini",
+ "repeats": 3,
+ "sizes": {
+  "15": {
+   "baseline": {
+    "success": "3/3",
+    "mean_total_tokens": 6471,
+    "mean_turns": 4
+   },
+   "find_call": {
+    "success": "3/3",
+    "mean_total_tokens": 4829,
+    "mean_turns": 5
+   },
+   "single": {
+    "success": "3/3",
+    "mean_total_tokens": 5217,
+    "mean_turns": 7.3
+   }
+  },
+  "60": {
+   "baseline": {
+    "success": "3/3",
+    "mean_total_tokens": 22103,
+    "mean_turns": 4
+   },
+   "find_call": {
+    "success": "3/3",
+    "mean_total_tokens": 4340,
+    "mean_turns": 4.7
+   },
+   "single": {
+    "success": "3/3",
+    "mean_total_tokens": 2616,
+    "mean_turns": 5
+   }
+  },
+  "120": {
+   "baseline": {
+    "success": "3/3",
+    "mean_total_tokens": 47385,
+    "mean_turns": 4
+   },
+   "find_call": {
+    "success": "3/3",
+    "mean_total_tokens": 4829,
+    "mean_turns": 5
+   },
+   "single": {
+    "success": "3/3",
+    "mean_total_tokens": 4743,
+    "mean_turns": 7
+   }
+  }
+ }
+}
