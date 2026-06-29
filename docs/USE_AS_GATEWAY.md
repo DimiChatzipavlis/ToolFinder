@@ -103,6 +103,7 @@ through `find_tools` → `call_tool`, or the one-hop `route_and_call`.
 | `TOOLFINDER_MODEL` | swap the embedding model (any sentence-transformers bi-encoder, or a fine-tuned path) |
 | `TOOLFINDER_HIERARCHICAL=1` / `TOOLFINDER_ROUTE_SERVERS` | two-stage server-aware routing for very large multi-server setups |
 | `TOOLFINDER_TOPK` | shortlist size for `find_tools` |
+| `TOOLFINDER_INDEX` | vector index for very large catalogs: `flat` (default, exact) / `hnsw` / `auto` |
 
 ## 5. Resilience & diagnostics
 

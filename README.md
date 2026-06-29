@@ -135,7 +135,7 @@ The protections below are what the tool actually enforces (full threat model and
 - [`toolfinder/`](toolfinder/README.md) — core library: the FAISS router, the MCP stdio client, the OpenAPI adapter, and the FastMCP bridge server.
 - [`ToolFinder_mcp_server.py`](ToolFinder_mcp_server.py) — entry-point shim for the MCP routing-bridge server; cookbook in [`docs/MCP_SERVER.md`](docs/MCP_SERVER.md).
 - [`tests/`](tests/README.md) — unit tests for the router and the bridge (`pytest`).
-- [`docs/`](docs/) — the cookbook ([MCP_SERVER.md](docs/MCP_SERVER.md)), the single-gateway setup ([USE_AS_GATEWAY.md](docs/USE_AS_GATEWAY.md)), and the full **evaluation** ([EVALUATION.md](docs/EVALUATION.md)).
+- [`docs/`](docs/) — the cookbook ([MCP_SERVER.md](docs/MCP_SERVER.md)), the single-gateway setup ([USE_AS_GATEWAY.md](docs/USE_AS_GATEWAY.md)), the full **evaluation** ([EVALUATION.md](docs/EVALUATION.md)), and the **scalability status & plan** ([SCALABILITY.md](docs/SCALABILITY.md)).
 - [`legacy/`](legacy/README.md) — archived research pipeline, datasets, notebooks, and the evaluation scripts (`legacy/experiments/`).
 - [SECURITY.md](SECURITY.md) — threat model and mitigations.
 

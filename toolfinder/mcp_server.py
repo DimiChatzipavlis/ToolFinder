@@ -104,12 +104,28 @@ def _new_client(name: str, spec: dict):
     )
 
 
+async def _spawn_one(cfg: dict) -> tuple[str, dict, Any, list | None, str | None]:
+    """Construct + initialize one downstream client. Returns (name, cfg, client,
+    tools, error) — errors are captured, not raised, for per-server isolation."""
+    name = str(cfg["name"])
+    try:
+        client = _new_client(name, cfg)
+        tools = await client.initialize_and_get_tools()
+        return name, cfg, client, tools, None
+    except Exception as exc:  # noqa: BLE001 - isolate a bad downstream, keep the gateway up
+        return name, cfg, None, None, str(exc)[:300]
+
+
 async def _build() -> None:
-    """Spawn every downstream server and build the union router."""
+    """Spawn every downstream server (concurrently) and build the union router."""
     rerank = os.getenv("TOOLFINDER_RERANK", "").strip().lower() in {"1", "true", "yes", "on"}
+    index_type = os.getenv("TOOLFINDER_INDEX", "flat").strip().lower()
+    if index_type not in {"flat", "hnsw", "auto"}:
+        index_type = "flat"
     router = UniversalMCPRouter(
         model_name=os.getenv("TOOLFINDER_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
         config=RouterHyperparameters(
+            index_type=index_type,
             rerank=rerank,
             rerank_model=os.getenv("TOOLFINDER_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
         ),
@@ -119,22 +135,22 @@ async def _build() -> None:
     tool_to_server: dict[str, str] = {}
     counts: dict[str, int] = {}
     failed: dict[str, str] = {}
-    for cfg in _server_configs():
-        name = str(cfg["name"])
+
+    # Spawn + handshake all servers concurrently (the slow, IO-bound part); then
+    # ingest sequentially in config order (index build is not concurrency-safe,
+    # and order keeps tool-name collisions deterministic / first-wins).
+    spawned = await asyncio.gather(*[_spawn_one(cfg) for cfg in _server_configs()])
+    for name, cfg, client, tools, err in spawned:
         specs[name] = cfg
-        # Per-server fault isolation: a downstream that fails to start is logged
-        # and skipped so one bad config entry can't take down the whole gateway.
-        try:
-            client = _new_client(name, cfg)
-            tools = await client.initialize_and_get_tools()
-            router.ingest_server(name, tools)
-            clients[name] = client
-            counts[name] = len(tools)
-            for tool in tools:
-                tool_to_server.setdefault(tool["tool_name"], name)
-        except Exception as exc:  # noqa: BLE001 - isolate a bad downstream, keep the gateway up
-            failed[name] = str(exc)[:300]
-            logger.error("downstream server %r failed to start (skipped): %s", name, exc)
+        if err is not None:
+            failed[name] = err
+            logger.error("downstream server %r failed to start (skipped): %s", name, err)
+            continue
+        router.ingest_server(name, tools)
+        clients[name] = client
+        counts[name] = len(tools)
+        for tool in tools:
+            tool_to_server.setdefault(tool["tool_name"], name)
     _state.update(clients=clients, specs=specs, router=router, tool_to_server=tool_to_server,
                   counts=counts, failed=failed)
     logger.info(

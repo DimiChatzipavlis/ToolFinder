@@ -203,6 +203,7 @@ The full set of evaluation scripts (cost, cache, selection accuracy, rerank, fin
 | `TOOLFINDER_ROUTE_SERVERS` | `2` | servers kept in stage 1 when hierarchical routing is on (higher = more recall, less precision) |
 | `TOOLFINDER_RERANK` | off | set (`1`/`true`) to re-rank the bi-encoder shortlist with a cross-encoder — helps confusable catalogs, adds latency |
 | `TOOLFINDER_RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | CrossEncoder checkpoint used when reranking is on |
+| `TOOLFINDER_INDEX` | `flat` | vector index: `flat` (exact) / `hnsw` / `auto` (switches to HNSW above ~50k tools) — for very large catalogs |
 
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
 servers) rather than the single-server env vars — see the Run section above.

@@ -42,9 +42,11 @@ experiments/.env
 .env.*
 
 # Local gateway configs created from the *.example.json templates — these may hold
-# connection strings / credentials. Keep the committed templates, ignore the real ones.
+# connection strings / credentials, or machine-specific absolute paths. Keep the
+# committed templates, ignore the real ones.
 mcp_servers.json
 mcp.host.json
+.mcp.json
 
 *.egg-info/
 
