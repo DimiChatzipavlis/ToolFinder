@@ -15,6 +15,13 @@ import pytest
 pytest.importorskip("fastmcp")
 
 
+def _fn(tool):
+    """The underlying async function of an ``@mcp.tool``, robust across fastmcp
+    versions — some wrap it as a FunctionTool exposing ``.fn``, others return the
+    plain function itself."""
+    return getattr(tool, "fn", tool)
+
+
 class FakeEmbedder:
     """Deterministic 4-d embedder: routes by keyword so tests are stable."""
 
@@ -96,36 +103,36 @@ def server(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_catalog_unions_all_servers(server):
-    size = await server.catalog_size.fn()
+    size = await _fn(server.catalog_size)()
     assert size["total_tools"] == 2
     assert size["by_server"] == {"filesystem": 1, "memory": 1}
 
 
 @pytest.mark.asyncio
 async def test_find_tools_routes_across_servers(server):
-    fs = await server.find_tools.fn("save some text to a file", k=1)
+    fs = await _fn(server.find_tools)("save some text to a file", k=1)
     assert fs[0]["function"]["name"] == "write_file"
-    mem = await server.find_tools.fn("remember this entity", k=1)
+    mem = await _fn(server.find_tools)("remember this entity", k=1)
     assert mem[0]["function"]["name"] == "create_entity"
 
 
 @pytest.mark.asyncio
 async def test_route_and_call_dispatches_to_correct_server(server):
-    result = await server.route_and_call.fn("write a file", {"path": "x"})
+    result = await _fn(server.route_and_call)("write a file", {"path": "x"})
     text = result["content"][0]["text"]
     assert text.startswith("filesystem:write_file")
 
 
 @pytest.mark.asyncio
 async def test_call_tool_unknown_name_is_handled(server):
-    result = await server.call_tool.fn("does_not_exist", {})
+    result = await _fn(server.call_tool)("does_not_exist", {})
     assert "error" in result
 
 
 @pytest.mark.asyncio
 async def test_get_stats_records_routes(server):
-    await server.route_and_call.fn("write a file", {"path": "x"})
-    stats = await server.get_stats.fn()
+    await _fn(server.route_and_call)("write a file", {"path": "x"})
+    stats = await _fn(server.get_stats)()
     assert stats["total_routes"] >= 1
     assert "write_file" in stats["top_tools"]
     assert stats["recent"][-1]["tool"] == "write_file"
@@ -151,9 +158,8 @@ async def test_failed_downstream_is_isolated(monkeypatch, tmp_path):
     srv = importlib.reload(importlib.import_module("toolfinder.mcp_server"))
     monkeypatch.setattr(srv, "DynamicMCPClient", FailingClient)
 
-    size = await srv.catalog_size.fn()
+    size = await _fn(srv.catalog_size)()
     assert size["by_server"] == {"filesystem": 1}      # healthy server still loaded
     assert "broken" in size["failed_servers"]          # bad server isolated + recorded
-    # gateway still routes/serves via the healthy server
-    fs = await srv.find_tools.fn("save some text to a file", k=1)
+    fs = await _fn(srv.find_tools)("save some text to a file", k=1)
     assert fs[0]["function"]["name"] == "write_file"

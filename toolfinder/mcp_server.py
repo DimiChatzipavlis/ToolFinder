@@ -61,14 +61,27 @@ _init_lock = asyncio.Lock()
 
 
 def _server_configs() -> list[dict]:
-    """Downstream server configs: [{name, command, args, env}]."""
-    config_path = os.getenv("TOOLFINDER_CONFIG")
-    if config_path and Path(config_path).exists():
-        data = json.loads(Path(config_path).read_text(encoding="utf-8"))
-        servers = data.get("servers", data if isinstance(data, list) else [])
-        if not servers:
-            raise ValueError(f"{config_path} contains no servers")
-        return servers
+    """Downstream server configs: [{name, command, args, env}].
+
+    Resolved in order: (1) the `TOOLFINDER_CONFIG` env var, then (2) a
+    `mcp_servers.json` sitting next to the install (repo root) — so the gateway
+    finds its multi-server config even when the host registration forgets to pass
+    the env var. Only if neither exists does it fall back to a single filesystem
+    server (`TOOLFINDER_FS_ROOT`).
+    """
+    candidates: list[Path] = []
+    env_path = os.getenv("TOOLFINDER_CONFIG")
+    if env_path:
+        candidates.append(Path(env_path))
+    candidates.append(Path(__file__).resolve().parent.parent / "mcp_servers.json")
+    for path in candidates:
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            servers = data.get("servers", data if isinstance(data, list) else [])
+            if not servers:
+                raise ValueError(f"{path} contains no servers")
+            logger.info("ToolFinder downstream config: %s (%d servers)", path, len(servers))
+            return servers
     command = os.getenv("TOOLFINDER_DOWNSTREAM_CMD", "npx")
     raw_args = os.getenv("TOOLFINDER_DOWNSTREAM_ARGS")
     if raw_args:
