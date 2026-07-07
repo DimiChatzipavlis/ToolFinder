@@ -27,9 +27,11 @@ and the prioritized plan, with each item tied to evidence in
   encoder is better. (Evidence: `eval_selection_at_scale.py`.)
 
 **Track B — operational / performance:**
-- **Cold start re-embeds the entire catalog on every launch** (no persistence).
-- **`refresh()` rebuilds everything** — no incremental per-tool/per-server update,
-  and no push-based `tools/list_changed` subscription (E2).
+- ~~Cold start re-embeds the entire catalog on every launch~~ → **solved (opt-in)**
+  by the persistent embedding cache (`TOOLFINDER_CACHE_DIR`, see P1 below).
+- **`refresh()` still rebuilds the index structure** (though with the cache it no
+  longer re-*encodes* unchanged tools) — no push-based `tools/list_changed`
+  subscription (E2).
 - **Single process, per-query encode** — no batching / concurrency limits under
   high QPS; query encoding (tens of ms) dominates per-request latency.
 - **Memory** — the router retains the embedding matrix *and* the FAISS index
@@ -51,16 +53,21 @@ and the prioritized plan, with each item tied to evidence in
 - **Honest limit:** no tested config fully restores R@1 at 574 (best 0.583) —
   the remaining fix is **per-deployment fine-tuning on your own catalog**
   (measured 0.99 in-domain), so ship the fine-tune recipe. *Effort: M · Impact: high.*
-- *Revised by the data:* auto-enable at a size threshold should apply **rerank
-  only when the encoder is the stock default** (it degrades fine-tuned bases);
-  hierarchical remains opt-in (recall trade-off). *Effort: S.*
+- ✅ *Shipped (data-narrowed):* rerank now **auto-enables** above
+  `TOOLFINDER_SCALE_THRESHOLD` (default 100 tools) — **only** when the encoder is
+  the stock default (it degrades fine-tuned bases) and only if the user made no
+  explicit `TOOLFINDER_RERANK` choice; hierarchical remains opt-in (recall
+  trade-off). Covered by `tests/test_mcp_server.py`.
 
 **P1 — startup & persistence:**
-- **Persistent embedding cache**, keyed by `(model, schema-hash)` — only re-embed
-  *new/changed* tools across restarts and `refresh()`. Design: a cache dir
-  (`TOOLFINDER_CACHE_DIR`), an on-disk `hash → vector` store loaded at router init
-  and consulted in `ingest_server` before encoding. *Effort: M · Impact: big at 10⁴+ tools.*
-- **Batch-encode across all servers** (one encode pass) instead of per-server. *Effort: S.*
+- ✅ **Persistent embedding cache shipped** (opt-in `TOOLFINDER_CACHE_DIR` /
+  `RouterHyperparameters.cache_dir`): an on-disk `(model, schema-hash) → vector`
+  store (`.npz`, atomic replace) loaded at router init and consulted in
+  `ingest_server` — restarts and `refresh()` re-encode **only new/changed tools**
+  (a corrupt cache falls back to fresh, never blocks startup). Covered by
+  `tests/test_dynamic_faiss_router.py` (zero re-encodes warm, only-new-tools on
+  growth). *Remaining:* batch-encode across all servers in one pass (*Effort: S*),
+  and a cold-vs-warm startup benchmark at 10³/10⁴ tools.
 
 **P2 — live updates (E2):**
 - Subscribe to downstream `tools/list_changed`; **incrementally** add/remove tools

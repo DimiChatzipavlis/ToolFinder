@@ -149,6 +149,8 @@ total_tools: 23   by_server: { filesystem: 14, memory: 9 }   failed_servers: {}
 | `TOOLFINDER_HIERARCHICAL=1` / `TOOLFINDER_ROUTE_SERVERS` | two-stage server-aware routing for very large multi-server setups |
 | `TOOLFINDER_TOPK` | shortlist size for `find_tools` |
 | `TOOLFINDER_INDEX` | vector index for very large catalogs: `flat` (default, exact) / `hnsw` / `auto` |
+| `TOOLFINDER_CACHE_DIR` | persistent embedding cache — restarts and `refresh()` only re-encode new/changed tools |
+| `TOOLFINDER_SCALE_THRESHOLD` | catalog size at which rerank auto-enables on the stock encoder (default 100; `TOOLFINDER_RERANK=0` opts out) |
 
 ## 7. Resilience & diagnostics
 

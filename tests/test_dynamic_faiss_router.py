@@ -261,6 +261,61 @@ def test_rerank_config_constructs_reranker(monkeypatch: pytest.MonkeyPatch) -> N
     assert router._reranker is not None  # constructed, but the cross-encoder loads lazily
 
 
+class CountingEmbedder(DummySentenceTransformer):
+    """Counts how many TOOL texts (not queries) were actually encoded."""
+
+    tool_texts_encoded = 0
+
+    def encode(self, texts, batch_size=None, convert_to_numpy=True):
+        CountingEmbedder.tool_texts_encoded += sum('"tool_name"' in t for t in texts)
+        return super().encode(texts, batch_size, convert_to_numpy)
+
+
+def test_embedding_cache_persists_across_router_instances(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """P1: with cache_dir set, a second router (fresh process in real life) must
+    not re-encode unchanged tools — and must still route correctly from cache."""
+    monkeypatch.setattr(router_module, "SentenceTransformer", CountingEmbedder)
+    CountingEmbedder.tool_texts_encoded = 0
+    schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+    tools = [
+        {"tool_name": "alpha_tool", "description": "Tool for alpha query", "inputSchema": schema},
+        {"tool_name": "beta_tool", "description": "Tool for beta query", "inputSchema": schema},
+    ]
+
+    first = router_module.UniversalMCPRouter(
+        model_name="dummy-cache", config=router_module.RouterHyperparameters(cache_dir=str(tmp_path)))
+    first.ingest_server("test-server", tools)
+    assert CountingEmbedder.tool_texts_encoded == 2  # cold start encodes both
+    first.teardown()
+
+    second = router_module.UniversalMCPRouter(
+        model_name="dummy-cache", config=router_module.RouterHyperparameters(cache_dir=str(tmp_path)))
+    second.ingest_server("test-server", tools)
+    assert CountingEmbedder.tool_texts_encoded == 2  # warm start: zero re-encodes
+    assert second.route("alpha query").tool_name == "alpha_tool"  # cached vectors route correctly
+    second.teardown()
+
+
+def test_embedding_cache_encodes_only_new_tools(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.setattr(router_module, "SentenceTransformer", CountingEmbedder)
+    CountingEmbedder.tool_texts_encoded = 0
+    schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+    base = [{"tool_name": "alpha_tool", "description": "Tool for alpha query", "inputSchema": schema}]
+
+    first = router_module.UniversalMCPRouter(
+        model_name="dummy-cache2", config=router_module.RouterHyperparameters(cache_dir=str(tmp_path)))
+    first.ingest_server("test-server", base)
+    first.teardown()
+    assert CountingEmbedder.tool_texts_encoded == 1
+
+    grown = base + [{"tool_name": "beta_tool", "description": "Tool for beta query", "inputSchema": schema}]
+    second = router_module.UniversalMCPRouter(
+        model_name="dummy-cache2", config=router_module.RouterHyperparameters(cache_dir=str(tmp_path)))
+    second.ingest_server("test-server", grown)
+    second.teardown()
+    assert CountingEmbedder.tool_texts_encoded == 2  # only the NEW tool was encoded
+
+
 def test_singleton_release_is_reference_counted(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tearing down one router must not evict a model another live router shares."""
     monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)

@@ -163,3 +163,49 @@ async def test_failed_downstream_is_isolated(monkeypatch, tmp_path):
     assert "broken" in size["failed_servers"]          # bad server isolated + recorded
     fs = await _fn(srv.find_tools)("save some text to a file", k=1)
     assert fs[0]["function"]["name"] == "write_file"
+
+
+@pytest.mark.asyncio
+async def test_auto_rerank_enables_for_stock_encoder_at_threshold(monkeypatch, tmp_path):
+    """P0 auto-scale: rerank turns on automatically only when the user made no
+    explicit choice, the encoder is the stock default, and the catalog is large."""
+    import toolfinder.dynamic_faiss_router as router_module
+    import toolfinder.reranker as reranker_module
+
+    monkeypatch.setattr(router_module, "SentenceTransformer", FakeEmbedder)
+    import toolfinder.mcp_adapter as adapter
+
+    monkeypatch.setattr(adapter, "DynamicMCPClient", FakeClient)
+
+    class FakeCE:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def rank(self, query, documents):
+            return [(i, 1.0) for i in range(len(documents))]
+
+    monkeypatch.setattr(reranker_module, "CrossEncoderReranker", FakeCE)
+
+    config = tmp_path / "servers.json"
+    config.write_text(
+        '{"servers":[{"name":"filesystem","command":"x","args":[]},'
+        '{"name":"memory","command":"x","args":[]}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("TOOLFINDER_CONFIG", str(config))
+    monkeypatch.delenv("TOOLFINDER_RERANK", raising=False)
+    monkeypatch.delenv("TOOLFINDER_MODEL", raising=False)
+    monkeypatch.setenv("TOOLFINDER_SCALE_THRESHOLD", "2")  # the 2 fake tools cross it
+
+    srv = importlib.reload(importlib.import_module("toolfinder.mcp_server"))
+    monkeypatch.setattr(srv, "DynamicMCPClient", FakeClient)
+
+    await _fn(srv.catalog_size)()  # triggers _build
+    assert isinstance(srv._state["router"]._reranker, FakeCE)
+
+    # An explicit opt-out must win over auto-enable.
+    monkeypatch.setenv("TOOLFINDER_RERANK", "0")
+    srv2 = importlib.reload(importlib.import_module("toolfinder.mcp_server"))
+    monkeypatch.setattr(srv2, "DynamicMCPClient", FakeClient)
+    await _fn(srv2.catalog_size)()
+    assert srv2._state["router"]._reranker is None

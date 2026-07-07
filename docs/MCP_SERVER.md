@@ -204,6 +204,8 @@ The full set of evaluation scripts (cost, cache, selection accuracy, rerank, fin
 | `TOOLFINDER_RERANK` | off | set (`1`/`true`) to re-rank the bi-encoder shortlist with a cross-encoder — helps confusable catalogs, adds latency |
 | `TOOLFINDER_RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | CrossEncoder checkpoint used when reranking is on |
 | `TOOLFINDER_INDEX` | `flat` | vector index: `flat` (exact) / `hnsw` / `auto` (switches to HNSW above ~50k tools) — for very large catalogs |
+| `TOOLFINDER_CACHE_DIR` | off | persistent embedding cache dir — restarts/`refresh()` re-encode only new/changed tools (big cold-start win on large catalogs) |
+| `TOOLFINDER_SCALE_THRESHOLD` | `100` | catalog size at which rerank **auto-enables** (stock encoder only — it degrades fine-tuned ones; set `TOOLFINDER_RERANK=0` to opt out) |
 
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
 servers) rather than the single-server env vars — see the Run section above.
