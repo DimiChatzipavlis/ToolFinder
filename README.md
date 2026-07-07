@@ -153,9 +153,10 @@ The protections below are what the tool actually enforces (full threat model and
 - **E2 — Live tool-change.** ✅ Stdio downstreams emitting `notifications/tools/list_changed` now trigger a **debounced, incremental re-index of just that server** (other servers untouched; with the embedding cache only changed tools re-encode); `refresh(server=...)` does the same on demand. CI-tested (incremental replace, per-server refresh, notification path) — *caveat:* validated with fakes; many reference servers never emit the notification, so the manual per-server refresh remains the guaranteed path.
 - **P0/P1 — scale quality + persistence.** ✅ Measured encoder grid at 574 tools ([`eval_encoder_at_scale.py`](research/experiments/eval_encoder_at_scale.py): fine-tuned+rerank-off wins, R@1 0.40→0.583, R@5 0.933); rerank **auto-enables** above `TOOLFINDER_SCALE_THRESHOLD` for the stock encoder only; opt-in **persistent embedding cache** (`TOOLFINDER_CACHE_DIR`) makes restarts/`refresh()` re-encode only new/changed tools. See [docs/SCALABILITY.md](docs/SCALABILITY.md).
 
+- **R3 — Live multi-server validation.** 🟢 **Measured** ([`r3_live_multiserver.py`](research/experiments/r3_live_multiserver.py): 3 real servers, 36-tool union, 3 verified task families, 5 repeats/cell, Wilson CIs, gpt-4.1-mini). **The study caught two real defects** — a confusable-family routing miss (`create_entities` absent from the "store an entity" shortlist) and the abstention threshold returning empty `find_tools` results — **and the shipped fixes recovered them**: memory task 2/5 → **5/5 at 2.7× fewer tokens than baseline** (rerank auto-threshold lowered 100→25; `find_tools` is now best-effort while `route_and_call` keeps abstention). *Honest residuals:* the multi-step cross-server task stays 3/5 vs baseline 5/5 (weak model; CIs overlap at n=5), and no reference server emitted `tools/list_changed`, so E2's push path remains fake-validated. *Remaining for full R3:* larger n, more task families, a strong-model arm.
+
 ### Required for a production release (not yet)
 
-- **R3 — Live multi-server validation.** Real downstream servers + real tasks, with repeats and error bars (today: one task family, filesystem-only live execution, n=1, synthetic distractor catalogs). **The biggest credibility gap.**
 - **E4 — Exported metrics.** Structured/exported observability (today: `get_stats()` + logs).
 - **E5 — Stronger default encoder.** Ship or recommend a fine-tuned/stronger encoder (today: zero-shot MiniLM, modest on confusable catalogs).
 - **Poisoning mitigations.** Length cap / embedding-anomaly score / rerank were studied (in `research/`) but **not implemented** — needed before fronting untrusted downstream servers.
@@ -163,7 +164,7 @@ The protections below are what the tool actually enforces (full threat model and
 ### Next immediate steps
 
 1. **Release hygiene (before any public push):** rotate the API key that has sat in your local `.env`, confirm `.env` is untracked in every branch, add `CHANGELOG.md` + `CONTRIBUTING.md`, tag `v0.1.0`, and decide GitHub-only vs PyPI.
-2. **R3 — live multi-server study** with repeats/error bars — the single highest-value step toward "trustworthy in production" (and the place to validate E2's push path against a real notifying server).
+2. **Scale up R3** (first pass done — see above): larger n, more task families, a strong-model arm, and a downstream that actually emits `tools/list_changed` to validate E2's push path live.
 3. *Optional / research:* **E5** stronger default, **E4** exported metrics, learned categories (H1 extension), and the broader study (human-written queries, benchmark release) in [`research/`](research/README.md).
 
 ## Scope Notes

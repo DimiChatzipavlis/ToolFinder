@@ -519,16 +519,22 @@ class UniversalMCPRouter:
         self,
         query: str,
         k: int | None = None,
+        min_score: float | None = None,
     ) -> list[RouteResult]:
         """Route a query to the top-k matching tools.
 
         Args:
             query: The natural language query to route.
             k: Maximum number of results to return. Defaults to the configured candidate budget.
+            min_score: Override for the similarity threshold. `None` uses the
+                configured `min_cosine_similarity`; pass e.g. `-1.0` for
+                best-effort **discovery** (always return the nearest candidates —
+                appropriate for `find_tools`, where a human/agent inspects the
+                schemas; keep the threshold for *delegated execution*).
 
         Returns:
             List of matching `RouteResult` objects, best first. Returns an empty
-            list if no tools meet the configured similarity threshold. Use
+            list if no tools meet the effective threshold. Use
             `to_openai_tools()` to convert results into bindable schemas.
         """
         k = self.config.top_k_candidates if k is None else k
@@ -536,6 +542,7 @@ class UniversalMCPRouter:
             raise ValueError("k must be at least 1")
         if self.faiss_index.ntotal == 0:
             raise ValueError("router index is empty; ingest at least one server first")
+        threshold = self.config.min_cosine_similarity if min_score is None else min_score
 
         query_embedding = self._encode_query(query)
 
@@ -558,18 +565,18 @@ class UniversalMCPRouter:
                     margin,
                 )
 
-        if top_score < self.config.min_cosine_similarity:
+        if top_score < threshold:
             logger.debug(
-                "Rejected query %r (top_score=%.4f < min_cosine_similarity=%.2f)",
+                "Rejected query %r (top_score=%.4f < threshold=%.2f)",
                 query,
                 top_score,
-                self.config.min_cosine_similarity,
+                threshold,
             )
             return []
 
         scored: list[tuple[float, str, str, ToolSchema]] = []
         for score, index_id in zip(scores[0], indices[0], strict=True):
-            if index_id < 0 or float(score) < self.config.min_cosine_similarity:
+            if index_id < 0 or float(score) < threshold:
                 continue
             server_name, tool_name, schema = self.metadata[int(index_id)]
             scored.append((float(score), server_name, tool_name, schema))

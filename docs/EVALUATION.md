@@ -42,6 +42,7 @@ where it does **not** win.
 | `eval_gateway_vs_baseline.py` | gateway vs bind-all: success + tokens, 3 trials | api_arm, real fs task, N=15/60/120, gpt-4.1-mini | ~$0.13 | yes / repeated |
 | `eval_selection_at_scale.py` | selection accuracy + **bind feasibility** at scale | 574-tool pool, `regime4` held-out (24 q), N=60/250/574, gpt-4.1-mini | ~$0.10 | yes / small-n |
 | `eval_encoder_at_scale.py` | **P0**: which encoder config restores routing at scale | grid {stock, ft-github, ft-multiserver} × rerank × N, 60 held-out queries | **$0** | yes / deterministic |
+| `r3_live_multiserver.py` | **R3**: live multi-server study — success ± Wilson CIs, tokens mean±std | 3 real npx servers (36-tool union), 3 verified task families, 5 repeats/cell, gpt-4.1-mini; objective verification (disk + direct memory-graph queries) | ~$0.15 | yes / repeated |
 | `gateway_openapi_demo.py` | live OpenAPI gateway (ingest, route, dispatch) | Swagger Petstore spec over HTTP, OpenAPIClient | tiny | demonstration |
 | `gateway_heterogeneous_demo.py` | one gateway over **MCP + OpenAPI at once** | real filesystem MCP server + Petstore, on-disk `verify()` | tiny | demonstration |
 

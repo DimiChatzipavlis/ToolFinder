@@ -176,7 +176,9 @@ async def _build() -> None:
     # the user made no explicit choice, the encoder is the stock default, and
     # the union catalog is large.
     total_tools = sum(counts.values())
-    threshold = int(os.getenv("TOOLFINDER_SCALE_THRESHOLD", "100"))
+    # Default lowered 100 -> 25 after the R3 live study: a 36-tool multi-server
+    # catalog already showed confusable-family routing misses that rerank fixes.
+    threshold = int(os.getenv("TOOLFINDER_SCALE_THRESHOLD", "25"))
     if (os.getenv("TOOLFINDER_RERANK") is None and model_name == stock_model
             and total_tools >= threshold):
         router.enable_rerank()
@@ -330,8 +332,13 @@ def _record(query: str, chosen: str | None, server: str | None, score: float | N
                     "server": server, "score": score, "ms": duration_ms})
 
 
-def _route(query: str, k: int) -> tuple[list, float]:
+def _route(query: str, k: int, best_effort: bool = False) -> tuple[list, float]:
     """Route a query to the top-k tools; returns (matches, duration_ms).
+
+    `best_effort=True` bypasses the abstention threshold — used by `find_tools`
+    (pure discovery: the agent inspects the schemas and decides, so an empty
+    shortlist only makes it flail — an R3 live finding). `route_and_call` keeps
+    the threshold because it *executes* the routed tool.
 
     Flat search by default. When `TOOLFINDER_HIERARCHICAL` is set, use two-stage
     server-aware routing — pick the top `TOOLFINDER_ROUTE_SERVERS` servers (by
@@ -343,8 +350,10 @@ def _route(query: str, k: int) -> tuple[list, float]:
     if os.getenv("TOOLFINDER_HIERARCHICAL", "").strip().lower() in {"1", "true", "yes", "on"}:
         n_servers = max(1, int(os.getenv("TOOLFINDER_ROUTE_SERVERS", "2")))
         matches = router.route_top_k_hierarchical(query, k=k, n_servers=n_servers)
+        if not matches and best_effort:
+            matches = router.route_top_k(query, k=k, min_score=-1.0)
     else:
-        matches = router.route_top_k(query, k=k)
+        matches = router.route_top_k(query, k=k, min_score=-1.0 if best_effort else None)
     return matches, round((time.perf_counter() - start) * 1000.0, 1)
 
 
@@ -357,7 +366,7 @@ async def find_tools(query: str, k: int | None = None) -> list[dict]:
     stays small."""
     await _ensure_ready()
     top_k = k or int(os.getenv("TOOLFINDER_TOPK", "3"))
-    matches, duration_ms = _route(query, top_k)
+    matches, duration_ms = _route(query, top_k, best_effort=True)
     if matches:
         _record(query, matches[0].tool_name, matches[0].server_name,
                 round(matches[0].score, 4), duration_ms)

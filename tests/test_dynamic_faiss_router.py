@@ -66,6 +66,16 @@ def test_route_raises_when_no_match_above_threshold(monkeypatch: pytest.MonkeyPa
         router.route("unrelated request")
 
 
+def test_min_score_override_enables_best_effort_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    """R3 fix: discovery (find_tools) may bypass the abstention threshold — an
+    off-topic query still returns the nearest candidates instead of []."""
+    router = build_router(monkeypatch)
+
+    assert router.route_top_k("unrelated request", k=1) == []              # threshold abstains
+    best_effort = router.route_top_k("unrelated request", k=1, min_score=-1.0)
+    assert len(best_effort) == 1                                           # best-effort returns nearest
+
+
 def test_default_index_is_exact_flat(monkeypatch: pytest.MonkeyPatch) -> None:
     router = build_router(monkeypatch)
 

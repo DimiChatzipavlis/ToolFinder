@@ -54,10 +54,13 @@ and the prioritized plan, with each item tied to evidence in
   the remaining fix is **per-deployment fine-tuning on your own catalog**
   (measured 0.99 in-domain), so ship the fine-tune recipe. *Effort: M · Impact: high.*
 - ✅ *Shipped (data-narrowed):* rerank now **auto-enables** above
-  `TOOLFINDER_SCALE_THRESHOLD` (default 100 tools) — **only** when the encoder is
-  the stock default (it degrades fine-tuned bases) and only if the user made no
-  explicit `TOOLFINDER_RERANK` choice; hierarchical remains opt-in (recall
-  trade-off). Covered by `tests/test_mcp_server.py`.
+  `TOOLFINDER_SCALE_THRESHOLD` — **only** when the encoder is the stock default
+  (it degrades fine-tuned bases) and only if the user made no explicit
+  `TOOLFINDER_RERANK` choice; hierarchical remains opt-in (recall trade-off).
+  Covered by `tests/test_mcp_server.py`. *Default lowered 100 → 25 after the R3
+  live study:* a 36-tool catalog already produced a confusable-family routing
+  miss (`create_entities` absent from the "store an entity" shortlist) that
+  rerank fixes — recovering the live memory task from 2/5 to 5/5.
 
 **P1 — startup & persistence:**
 - ✅ **Persistent embedding cache shipped** (opt-in `TOOLFINDER_CACHE_DIR` /

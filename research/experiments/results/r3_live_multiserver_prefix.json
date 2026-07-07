@@ -1,0 +1,79 @@
+{
+ "model": "gpt-4.1-mini",
+ "repeats": 5,
+ "servers": {
+  "filesystem": true,
+  "memory": true,
+  "everything": true
+ },
+ "union_tools": 36,
+ "cells": {
+  "fs_write_read|baseline": {
+   "success": "5/5",
+   "rate": 1.0,
+   "wilson95": [
+    0.57,
+    1.0
+   ],
+   "tokens_mean": 7598,
+   "tokens_std": 0,
+   "turns_mean": 3
+  },
+  "fs_write_read|gateway": {
+   "success": "5/5",
+   "rate": 1.0,
+   "wilson95": [
+    0.57,
+    1.0
+   ],
+   "tokens_mean": 3326,
+   "tokens_std": 1435,
+   "turns_mean": 3.8
+  },
+  "memory_store|baseline": {
+   "success": "5/5",
+   "rate": 1.0,
+   "wilson95": [
+    0.57,
+    1.0
+   ],
+   "tokens_mean": 4913,
+   "tokens_std": 0,
+   "turns_mean": 2
+  },
+  "memory_store|gateway": {
+   "success": "2/5",
+   "rate": 0.4,
+   "wilson95": [
+    0.12,
+    0.77
+   ],
+   "tokens_mean": 4867,
+   "tokens_std": 4044,
+   "turns_mean": 6.4
+  },
+  "cross_fs_memory|baseline": {
+   "success": "5/5",
+   "rate": 1.0,
+   "wilson95": [
+    0.57,
+    1.0
+   ],
+   "tokens_mean": 5170,
+   "tokens_std": 0,
+   "turns_mean": 2
+  },
+  "cross_fs_memory|gateway": {
+   "success": "2/5",
+   "rate": 0.4,
+   "wilson95": [
+    0.12,
+    0.77
+   ],
+   "tokens_mean": 8848,
+   "tokens_std": 2704,
+   "turns_mean": 7.4
+  }
+ },
+ "list_changed_notifications": 0
+}

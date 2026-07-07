@@ -130,7 +130,7 @@ catalog. No host code changes — that interoperability is the point.
 
 | Tool | Signature | Returns | Use |
 |---|---|---|---|
-| `find_tools` | `find_tools(query: str, k: int = 3)` | top‑k downstream tool schemas | discovery — agent then calls `call_tool` |
+| `find_tools` | `find_tools(query: str, k: int = 3)` | top‑k downstream tool schemas | discovery — agent then calls `call_tool`. **Best-effort**: always returns the nearest candidates (the abstention threshold applies to `route_and_call`, which executes) |
 | `call_tool` | `call_tool(tool_name: str, arguments: dict)` | downstream result | execute a chosen tool |
 | `route_and_call` | `route_and_call(intent: str, arguments: dict)` | downstream result | **one‑hop**: route by intent and execute (lowest token cost, but **argument‑blind** — no schema shown; simple‑argument tools only) |
 | `catalog_size` | `catalog_size()` | `{"total_tools": N, "by_server": {…}}` | diagnostic |
@@ -205,7 +205,7 @@ The full set of evaluation scripts (cost, cache, selection accuracy, rerank, fin
 | `TOOLFINDER_RERANK_MODEL` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | CrossEncoder checkpoint used when reranking is on |
 | `TOOLFINDER_INDEX` | `flat` | vector index: `flat` (exact) / `hnsw` / `auto` (switches to HNSW above ~50k tools) — for very large catalogs |
 | `TOOLFINDER_CACHE_DIR` | off | persistent embedding cache dir — restarts/`refresh()` re-encode only new/changed tools (big cold-start win on large catalogs) |
-| `TOOLFINDER_SCALE_THRESHOLD` | `100` | catalog size at which rerank **auto-enables** (stock encoder only — it degrades fine-tuned ones; set `TOOLFINDER_RERANK=0` to opt out) |
+| `TOOLFINDER_SCALE_THRESHOLD` | `25` | catalog size at which rerank **auto-enables** (stock encoder only — it degrades fine-tuned ones; set `TOOLFINDER_RERANK=0` to opt out; default lowered from 100 after the R3 live study caught a routing miss at 36 tools) |
 | `TOOLFINDER_METRICS_FILE` | off | append structured JSONL events (`route`, `refresh`) for external metrics collection; `get_stats()` also reports uptime + route-latency p50/p95 |
 
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
