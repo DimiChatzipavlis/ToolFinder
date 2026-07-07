@@ -39,12 +39,21 @@ and the prioritized plan, with each item tied to evidence in
 ## The plan (prioritized by impact × effort)
 
 **P0 — selection quality at scale (highest value, attacks the measured bottleneck):**
-- **Per-deployment fine-tuned / domain encoder.** Measured to lift recall@1 to
-  ~0.99 in-domain (`eval_rerank_finetuned.py`). Ship a fine-tune recipe + the
-  `TOOLFINDER_MODEL` hook (already there). *Effort: M · Impact: high.*
-- **Auto-enable rerank + hierarchical above a tool-count threshold.** Both exist
-  opt-in today (`TOOLFINDER_RERANK`, `TOOLFINDER_HIERARCHICAL`); make them kick in
-  automatically for large catalogs. *Effort: S · Impact: medium-high.*
+🟡 **Measured** (`eval_encoder_at_scale.py`, 60 held-out-server queries, $0 local):
+- **Fine-tuned encoder + rerank OFF is the best config at every scale** — R@1 at
+  574 tools: stock 0.40 → stock+rerank 0.50 → **fine-tuned(multi-server) 0.583**,
+  with **recall@5 holding at 0.933** (so the `find_tools` top-5 pattern stays
+  reliable at scale even where exact top-1 degrades).
+- **Data-backed rule (holds at scale, matches the in-domain 2×2):** if you can
+  fine-tune → `TOOLFINDER_MODEL`=your encoder, rerank **off**; if you can't →
+  stock + `TOOLFINDER_RERANK=1` (rerank rescues stock, 0.40→0.50, but *hurts*
+  every fine-tuned base, 0.583→0.500).
+- **Honest limit:** no tested config fully restores R@1 at 574 (best 0.583) —
+  the remaining fix is **per-deployment fine-tuning on your own catalog**
+  (measured 0.99 in-domain), so ship the fine-tune recipe. *Effort: M · Impact: high.*
+- *Revised by the data:* auto-enable at a size threshold should apply **rerank
+  only when the encoder is the stock default** (it degrades fine-tuned bases);
+  hierarchical remains opt-in (recall trade-off). *Effort: S.*
 
 **P1 — startup & persistence:**
 - **Persistent embedding cache**, keyed by `(model, schema-hash)` — only re-embed
@@ -68,7 +77,9 @@ and the prioritized plan, with each item tied to evidence in
 ## How we'll prove each scales (validation plan)
 
 Each lands with a results JSON and honest scope (the [EVALUATION.md](EVALUATION.md) discipline):
-- **Quality:** re-run `eval_selection_at_scale.py` with a fine-tuned encoder + rerank → target a higher router R@1 at 574 (currently 0.46).
+- **Quality:** ✅ done — `eval_encoder_at_scale.py` (grid: 3 encoders × rerank × N).
+  Result: fine-tuned+rerank-off lifts R@1 at 574 from 0.40/0.50 to **0.583** with
+  R@5 **0.933**; full restoration needs per-deployment fine-tuning.
 - **Startup:** cold-start time with vs without the embedding cache at 10³ / 10⁴ tools.
 - **Throughput:** latency vs QPS with and without encode batching.
 

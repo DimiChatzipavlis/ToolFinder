@@ -1,0 +1,95 @@
+{
+ "n_queries": 60,
+ "grid": {
+  "stock|rerank=off|N=60": {
+   "recall@1": 0.667,
+   "recall@5": 0.933,
+   "mrr@5": 0.777
+  },
+  "stock|rerank=on|N=60": {
+   "recall@1": 0.783,
+   "recall@5": 0.95,
+   "mrr@5": 0.862
+  },
+  "ft-github|rerank=off|N=60": {
+   "recall@1": 0.817,
+   "recall@5": 0.967,
+   "mrr@5": 0.886
+  },
+  "ft-github|rerank=on|N=60": {
+   "recall@1": 0.8,
+   "recall@5": 0.933,
+   "mrr@5": 0.867
+  },
+  "ft-multisrv|rerank=off|N=60": {
+   "recall@1": 0.833,
+   "recall@5": 0.983,
+   "mrr@5": 0.906
+  },
+  "ft-multisrv|rerank=on|N=60": {
+   "recall@1": 0.783,
+   "recall@5": 0.933,
+   "mrr@5": 0.858
+  },
+  "stock|rerank=off|N=250": {
+   "recall@1": 0.433,
+   "recall@5": 0.8,
+   "mrr@5": 0.585
+  },
+  "stock|rerank=on|N=250": {
+   "recall@1": 0.683,
+   "recall@5": 0.933,
+   "mrr@5": 0.785
+  },
+  "ft-github|rerank=off|N=250": {
+   "recall@1": 0.7,
+   "recall@5": 0.95,
+   "mrr@5": 0.798
+  },
+  "ft-github|rerank=on|N=250": {
+   "recall@1": 0.683,
+   "recall@5": 0.917,
+   "mrr@5": 0.789
+  },
+  "ft-multisrv|rerank=off|N=250": {
+   "recall@1": 0.683,
+   "recall@5": 0.967,
+   "mrr@5": 0.808
+  },
+  "ft-multisrv|rerank=on|N=250": {
+   "recall@1": 0.683,
+   "recall@5": 0.95,
+   "mrr@5": 0.798
+  },
+  "stock|rerank=off|N=574": {
+   "recall@1": 0.4,
+   "recall@5": 0.7,
+   "mrr@5": 0.487
+  },
+  "stock|rerank=on|N=574": {
+   "recall@1": 0.5,
+   "recall@5": 0.867,
+   "mrr@5": 0.646
+  },
+  "ft-github|rerank=off|N=574": {
+   "recall@1": 0.567,
+   "recall@5": 0.917,
+   "mrr@5": 0.696
+  },
+  "ft-github|rerank=on|N=574": {
+   "recall@1": 0.5,
+   "recall@5": 0.883,
+   "mrr@5": 0.662
+  },
+  "ft-multisrv|rerank=off|N=574": {
+   "recall@1": 0.583,
+   "recall@5": 0.933,
+   "mrr@5": 0.725
+  },
+  "ft-multisrv|rerank=on|N=574": {
+   "recall@1": 0.5,
+   "recall@5": 0.917,
+   "mrr@5": 0.669
+  }
+ }
+}

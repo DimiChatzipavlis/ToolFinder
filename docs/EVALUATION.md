@@ -41,6 +41,7 @@ where it does **not** win.
 | `eval_rerank_finetuned.py` | fine-tune vs rerank vs both (2×2) | stock + fine-tuned MiniLM artifact, same 144 | **$0** | yes / deterministic |
 | `eval_gateway_vs_baseline.py` | gateway vs bind-all: success + tokens, 3 trials | api_arm, real fs task, N=15/60/120, gpt-4.1-mini | ~$0.13 | yes / repeated |
 | `eval_selection_at_scale.py` | selection accuracy + **bind feasibility** at scale | 574-tool pool, `regime4` held-out (24 q), N=60/250/574, gpt-4.1-mini | ~$0.10 | yes / small-n |
+| `eval_encoder_at_scale.py` | **P0**: which encoder config restores routing at scale | grid {stock, ft-github, ft-multiserver} × rerank × N, 60 held-out queries | **$0** | yes / deterministic |
 | `gateway_openapi_demo.py` | live OpenAPI gateway (ingest, route, dispatch) | Swagger Petstore spec over HTTP, OpenAPIClient | tiny | demonstration |
 | `gateway_heterogeneous_demo.py` | one gateway over **MCP + OpenAPI at once** | real filesystem MCP server + Petstore, on-disk `verify()` | tiny | demonstration |
 
