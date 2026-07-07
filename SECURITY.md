@@ -33,7 +33,7 @@ call time — never inlined in config or logged.
    expose it over a network without an external auth layer.
 2. **Tool-description poisoning.** A hostile downstream server could craft a tool
    description to attract unrelated queries. Mitigations (length cap, embedding
-   anomaly score, reranking) were *studied* (archived under `legacy/experiments/`)
+   anomaly score, reranking) were *studied* (archived under `research/experiments/`)
    but are **not implemented in the server** — treat untrusted downstream servers
    with caution.
 3. **Tool-name collisions.** If two downstream servers expose the same tool name,

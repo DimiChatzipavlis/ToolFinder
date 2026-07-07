@@ -13,8 +13,8 @@ find_tools + call_tool and completes a filesystem task through the union gateway
 success is verified on disk.
 
 Run:
-  python legacy/experiments/gateway_heterogeneous_demo.py          # Part A ($0)
-  python legacy/experiments/gateway_heterogeneous_demo.py --agent  # + Part B
+  python research/experiments/gateway_heterogeneous_demo.py          # Part A ($0)
+  python research/experiments/gateway_heterogeneous_demo.py --agent  # + Part B
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[0]))  # legacy/ — for `from experiments...`
+sys.path.insert(0, str(HERE.parents[0]))  # research/ — for `from experiments...`
 
 from experiments.bridge_ab import (  # noqa: E402
     TASK_TEMPLATE, load_dotenv, make_client_factory, mcp_to_openai, result_text, reset_sandbox, run_arm, tokens, verify,

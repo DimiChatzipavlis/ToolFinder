@@ -3,8 +3,8 @@
 This documents **what we evaluated, how, with which scripts, and how rigorous it
 is** — honestly, including where it is *not* yet production-grade. Every claim in
 the README maps to a reproducible script here. The evaluation code lives on the
-[`research`-branch / `legacy/`](../legacy/README.md) side of the repo
-(`legacy/experiments/`); the source under test ships in [`toolfinder/`](../toolfinder/README.md).
+[`research`-branch / `research/`](../research/README.md) side of the repo
+(`research/experiments/`); the source under test ships in [`toolfinder/`](../toolfinder/README.md).
 
 ## The question we set out to answer
 
@@ -30,7 +30,7 @@ where it does **not** win.
 
 ## Evaluation scripts at a glance
 
-| Script (`legacy/experiments/`) | What it measures | Uses | API $ | Objective / stable |
+| Script (`research/experiments/`) | What it measures | Uses | API $ | Objective / stable |
 | --- | --- | --- | --- | --- |
 | `bridge_ab.py` | A/B agent-loop harness (foundation) | tiktoken, OpenAI SDK, real filesystem MCP server, on-disk `verify()` | varies | yes / sampled |
 | `bridge_scaling.py` | tokens + success vs catalog size, 3 arms; router recall@1/@3 (free axis) | real fs tools + 574-tool distractor pool, FAISS router, GPT-5.4 | low | yes / n=1 |

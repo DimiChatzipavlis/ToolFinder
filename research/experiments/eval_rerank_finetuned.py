@@ -9,7 +9,7 @@ reranker** — measured on the same $0 retrieval eval, plus their combination.
 
 No LLM, no OpenAI tokens — selection quality is model-independent.
 
-Run:  python legacy/experiments/eval_rerank_finetuned.py
+Run:  python research/experiments/eval_rerank_finetuned.py
 """
 
 from __future__ import annotations

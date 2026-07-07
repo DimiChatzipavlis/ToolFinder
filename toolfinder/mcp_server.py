@@ -135,12 +135,15 @@ async def _build() -> None:
     index_type = os.getenv("TOOLFINDER_INDEX", "flat").strip().lower()
     if index_type not in {"flat", "hnsw", "auto"}:
         index_type = "flat"
+    stock_model = "sentence-transformers/all-MiniLM-L6-v2"
+    model_name = os.getenv("TOOLFINDER_MODEL") or stock_model
     router = UniversalMCPRouter(
-        model_name=os.getenv("TOOLFINDER_MODEL", "sentence-transformers/all-MiniLM-L6-v2"),
+        model_name=model_name,
         config=RouterHyperparameters(
             index_type=index_type,
             rerank=rerank,
             rerank_model=os.getenv("TOOLFINDER_RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            cache_dir=os.getenv("TOOLFINDER_CACHE_DIR") or None,
         ),
     )
     clients: dict[str, Any] = {}
@@ -164,6 +167,20 @@ async def _build() -> None:
         counts[name] = len(tools)
         for tool in tools:
             tool_to_server.setdefault(tool["tool_name"], name)
+    # P0 auto-scale (data-backed, eval_encoder_at_scale.py): rerank rescues the
+    # STOCK encoder on large confusable catalogs (R@1 0.40->0.50 at 574) but
+    # DEGRADES fine-tuned encoders (0.583->0.500) — so it auto-enables only when
+    # the user made no explicit choice, the encoder is the stock default, and
+    # the union catalog is large.
+    total_tools = sum(counts.values())
+    threshold = int(os.getenv("TOOLFINDER_SCALE_THRESHOLD", "100"))
+    if (os.getenv("TOOLFINDER_RERANK") is None and model_name == stock_model
+            and total_tools >= threshold):
+        router.enable_rerank()
+        logger.info(
+            "auto-enabled cross-encoder rerank (%d tools >= threshold %d, stock encoder); "
+            "set TOOLFINDER_RERANK=0 to opt out", total_tools, threshold,
+        )
     _state.update(clients=clients, specs=specs, router=router, tool_to_server=tool_to_server,
                   counts=counts, failed=failed)
     logger.info(

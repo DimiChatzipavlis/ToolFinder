@@ -1,4 +1,4 @@
-# legacy/ — Archived Material (not part of the MCP server)
+# research/ — Archived Material (not part of the MCP server)
 
 This folder holds everything that is **not** needed to run or develop the
 ToolFinder MCP server. It is kept for provenance and reproducibility, not as a

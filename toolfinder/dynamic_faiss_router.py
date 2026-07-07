@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import copy
 import gc
+import hashlib
 import json
 import logging
+import os
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 import faiss
@@ -58,6 +61,14 @@ class RouterHyperparameters(BaseModel):
     rerank_pool: int = Field(
         default=20,
         description="How many bi-encoder candidates to re-rank before truncating to k.",
+    )
+    cache_dir: str | None = Field(
+        default=None,
+        description=(
+            "Opt-in persistent embedding cache directory. Tool embeddings are stored "
+            "keyed by (model, schema-hash), so restarts and refresh() only re-encode "
+            "new or changed tools instead of the whole catalog."
+        ),
     )
 
 
@@ -149,7 +160,7 @@ class UniversalMCPRouter:
 
     Quality note: `model_name` defaults to a zero-shot checkpoint. The
     benchmark's best results come from fine-tuned weights (produced by the
-    archived pipeline under `legacy/experiments/`); pass a local artifact path
+    archived pipeline under `research/experiments/`); pass a local artifact path
     to `model_name` to load them. Zero-shot dense retrieval can underperform
     lexical search on in-domain catalogs.
     """
@@ -190,6 +201,88 @@ class UniversalMCPRouter:
             from toolfinder.reranker import CrossEncoderReranker
 
             self._reranker = CrossEncoderReranker(self.config.rerank_model, device=self.device)
+        # Optional persistent embedding cache (opt-in via config.cache_dir).
+        self._embedding_cache: dict[str, np.ndarray] | None = None
+        self._cache_path: Path | None = None
+        self._load_embedding_cache()
+
+    def enable_rerank(self, model_name: str | None = None) -> None:
+        """Turn on cross-encoder re-ranking after construction.
+
+        Used by the bridge's auto-scale logic (the catalog size is only known
+        after ingest). The cross-encoder itself still loads lazily on first use.
+        """
+        from toolfinder.reranker import CrossEncoderReranker
+
+        self.config.rerank = True
+        if model_name:
+            self.config.rerank_model = model_name
+        self._reranker = CrossEncoderReranker(self.config.rerank_model, device=self.device)
+
+    # --- persistent embedding cache -----------------------------------------
+
+    def _load_embedding_cache(self) -> None:
+        if not self.config.cache_dir:
+            return
+        slug = hashlib.sha256(self.model_name.encode("utf-8")).hexdigest()[:16]
+        self._cache_path = Path(self.config.cache_dir) / f"embeddings_{slug}.npz"
+        cache: dict[str, np.ndarray] = {}
+        if self._cache_path.exists():
+            try:
+                with np.load(self._cache_path) as archive:
+                    for key in archive.files:
+                        vector = np.asarray(archive[key], dtype=np.float32)
+                        if vector.shape == (self._embedding_dim,):
+                            cache[key] = vector
+            except Exception as exc:  # noqa: BLE001 - a corrupt cache must never block startup
+                logger.warning("embedding cache unreadable (%s); starting fresh: %s", self._cache_path, exc)
+                cache = {}
+        self._embedding_cache = cache
+        logger.info("embedding cache: %d vectors loaded from %s", len(cache), self._cache_path)
+
+    def _save_embedding_cache(self) -> None:
+        if self._cache_path is None or self._embedding_cache is None:
+            return
+        self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._cache_path.with_name(self._cache_path.stem + ".tmp.npz")
+        np.savez(tmp, **self._embedding_cache)
+        os.replace(tmp, self._cache_path)
+
+    def _encode_tool_texts(self, texts: list[str]) -> np.ndarray:
+        """L2-normalized embeddings for tool texts, consulting the persistent
+        cache when configured — only new/changed tools hit the encoder."""
+        out = np.zeros((len(texts), self._embedding_dim), dtype=np.float32)
+        cache = self._embedding_cache
+        hashes: list[str] | None = None
+        miss_idx = list(range(len(texts)))
+        if cache is not None:
+            hashes = [hashlib.sha256(t.encode("utf-8")).hexdigest() for t in texts]
+            miss_idx = []
+            for i, h in enumerate(hashes):
+                cached = cache.get(h)
+                if cached is not None:
+                    out[i] = cached
+                else:
+                    miss_idx.append(i)
+        if miss_idx:
+            model = self.model
+            if model is None:
+                raise RuntimeError("embedding model has been torn down")
+            with torch.inference_mode():
+                encoded = model.encode(
+                    [texts[i] for i in miss_idx],
+                    batch_size=self.batch_size,
+                    convert_to_numpy=True,
+                )
+            encoded = np.asarray(encoded, dtype=np.float32)
+            faiss.normalize_L2(encoded)
+            for j, i in enumerate(miss_idx):
+                out[i] = encoded[j]
+            if cache is not None and hashes is not None:
+                for i in miss_idx:
+                    cache[hashes[i]] = out[i].copy()
+                self._save_embedding_cache()
+        return out
 
     def _create_index(self, expected_size: int = 0) -> faiss.Index:
         """Allocate the FAISS index configured by `index_type`.
@@ -321,10 +414,6 @@ class UniversalMCPRouter:
         normalized_tools: list[ToolSchema] = []
         embedding_corpus: list[str] = []
 
-        model = self.model
-        if model is None:
-            raise RuntimeError("embedding model has been torn down")
-
         for raw_tool in tools_list:
             normalized_tool = {
                 "server_name": server_name,
@@ -335,15 +424,8 @@ class UniversalMCPRouter:
             normalized_tools.append(normalized_tool)
             embedding_corpus.append(self._minify_schema_for_embedding(normalized_tool))
 
-        with torch.inference_mode():
-            embeddings = model.encode(
-                embedding_corpus,
-                batch_size=self.batch_size,
-                convert_to_numpy=True,
-            )
-
-        embeddings = np.asarray(embeddings, dtype=np.float32)
-        faiss.normalize_L2(embeddings)
+        # Cache-aware encode: normalized vectors, only new/changed tools hit the model.
+        embeddings = self._encode_tool_texts(embedding_corpus)
 
         start_index = int(self.faiss_index.ntotal)
         self.faiss_index.add(embeddings)

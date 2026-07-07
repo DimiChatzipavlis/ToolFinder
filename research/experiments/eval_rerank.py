@@ -11,7 +11,7 @@ For each query we rank all 30 tools with rerank OFF (bi-encoder) and ON
 and MRR. A win means the reranker pulls the gold tool up; a tie is reported as a
 tie (null result), not spun.
 
-Run:  python legacy/experiments/eval_rerank.py
+Run:  python research/experiments/eval_rerank.py
 """
 
 from __future__ import annotations

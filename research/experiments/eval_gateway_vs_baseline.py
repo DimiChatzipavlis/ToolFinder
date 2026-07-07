@@ -13,8 +13,8 @@ total tokens, and mean model turns — so we can see whether the gateway actuall
 does better, and where (cost vs accuracy), rather than asserting it.
 
 Run (uses API_KEY from the repo-root .env):
-  python legacy/experiments/eval_gateway_vs_baseline.py
-  python legacy/experiments/eval_gateway_vs_baseline.py --model gpt-4.1-mini --sizes 15 60 120 --repeats 3
+  python research/experiments/eval_gateway_vs_baseline.py
+  python research/experiments/eval_gateway_vs_baseline.py --model gpt-4.1-mini --sizes 15 60 120 --repeats 3
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # legacy/
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # research/
 
 from experiments import paths  # noqa: E402
 from experiments.bridge_ab import load_dotenv, make_client_factory  # noqa: E402

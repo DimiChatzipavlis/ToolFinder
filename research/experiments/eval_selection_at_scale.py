@@ -15,8 +15,8 @@ a reason to wrap behind a gateway). Weak model (gpt-4.1-mini) on purpose: that i
 where "lost among many tools" actually bites.
 
 Run (uses API_KEY from the repo-root .env):
-  python legacy/experiments/eval_selection_at_scale.py
-  python legacy/experiments/eval_selection_at_scale.py --sizes 60 250 574 --queries 24
+  python research/experiments/eval_selection_at_scale.py
+  python research/experiments/eval_selection_at_scale.py --sizes 60 250 574 --queries 24
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ import random
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # legacy/
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # research/
 
 from experiments import paths  # noqa: E402
 from experiments.bridge_ab import load_dotenv, make_client_factory  # noqa: E402

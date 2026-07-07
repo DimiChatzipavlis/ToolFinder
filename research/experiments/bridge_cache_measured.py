@@ -18,8 +18,8 @@ Scoped to stay well under budget: baseline at N in {14,60,120}, find5 at {60,120
 Incremental save after every cell; MAX_TURNS bounds runaway loops.
 
 Run (key + model come from the repo-root .env: API_KEY + AGENT_MODEL):
-    python legacy/experiments/bridge_cache_measured.py
-    python legacy/experiments/bridge_cache_measured.py --sizes 60 120
+    python research/experiments/bridge_cache_measured.py
+    python research/experiments/bridge_cache_measured.py --sizes 60 120
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Imports: the experiments package lives one level up (legacy/experiments -> legacy).
+# Imports: the experiments package lives one level up (research/experiments -> research).
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from experiments import paths  # noqa: E402
@@ -53,7 +53,7 @@ from toolfinder import to_openai_tools  # noqa: E402
 from toolfinder.mcp_adapter import DynamicMCPClient  # noqa: E402
 
 # The TRUE repository root is two levels above this file (…/ToolFinder), not
-# paths.REPO_ROOT (which now points at legacy/ after the repo restructure).
+# paths.REPO_ROOT (which now points at research/ after the repo restructure).
 TRUE_ROOT = Path(__file__).resolve().parents[2]
 
 BASELINE_SIZES = [14, 60, 120]

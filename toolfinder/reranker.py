@@ -15,7 +15,7 @@ This is the practical form of "specialize selection to the current catalog"
 top-1 is unreliable (confusable / out-of-domain catalogs, weak agent models); on
 distinct catalogs where recall@1 is already ~1.0 it adds cost for no gain.
 
-Measured (GitHub-MCP, 144 unseen queries; `legacy/experiments/eval_rerank.py`):
+Measured (GitHub-MCP, 144 unseen queries; `research/experiments/eval_rerank.py`):
 enabling rerank lifts router recall@1 0.56 → 0.85 and MRR 0.71 → 0.91.
 
 Caveat: a **fine-tuned** bi-encoder scores higher on its own (recall@1 ~0.99),

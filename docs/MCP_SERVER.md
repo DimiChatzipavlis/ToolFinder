@@ -23,7 +23,7 @@ Measured on the filesystem server (create → edit → read a file), GPT‑5.4 a
 agent, catalog padded with real distractor tools from a 574‑tool multi‑server
 pool. **Every configuration completed the task (100% success).** Numbers are
 total task tokens. The full study (code, data, figures) is archived under
-`legacy/experiments/`.
+`research/experiments/`.
 
 | Catalog size N | Baseline (all tools bound) | `find_tools`+`call_tool` | `route_and_call` (single) |
 |---|---|---|---|
@@ -43,7 +43,7 @@ total task tokens. The full study (code, data, figures) is archived under
   **recall@1 = 1.0 even with the correct tool buried among 386 distractors.**
 
 > **Cost caveat (honest — modeled + measured).** The table is *uncached* token totals.
-> A cache-aware re-scoring (`legacy/experiments/bridge_cache_aware.py` →
+> A cache-aware re-scoring (`research/experiments/bridge_cache_aware.py` →
 > `results/bridge_cache_aware.json`) models prompt caching from the per-turn
 > structure: the baseline's tool block is a cached **read** on later turns, but
 > the bridge arms' ~330-token prefix is below the ~1024-token cache floor and
@@ -62,7 +62,7 @@ select in‑context. For a handful of distinct tools and a strong model, bind th
 directly — the bridge adds overhead for no accuracy gain (though `route_and_call`
 still saves tokens even there).
 
-*Measured (`legacy/experiments/bridge_selection_accuracy.py`):* on 8 forced
+*Measured (`research/experiments/bridge_selection_accuracy.py`):* on 8 forced
 single-tool probes the router selects correctly at **100%** at every catalog
 size, while a weak model (`gpt-4.1-mini`) manages only **62–75%** and strong
 `gpt-5.4` **88–100%** — the accuracy benefit of routing is real for weak models
@@ -185,7 +185,7 @@ A config entry's `type` selects the transport:
 
 ## How the token numbers were measured
 
-The cost figures are **API-reported**, not estimated. `legacy/experiments/bridge_scaling.py` runs the agent loop and sums `usage.prompt_tokens` / `completion_tokens` per turn for each arm (bind-all-N / `find_tools`+`call_tool` / `route_and_call`) at several catalog sizes N; the deterministic per-turn schema weight is counted with `tiktoken`. `bridge_cache_measured.py` then logs the API's `cached_tokens` to re-score under prompt caching (see the *Cost caveat* above). Honest scope: **n=1, one task family, filesystem-only live execution, synthetic distractor catalogs, GPT‑5.4** — the *shapes* are robust, the statistics are not yet publication-grade (repeats/error bars are the R3 step).
+The cost figures are **API-reported**, not estimated. `research/experiments/bridge_scaling.py` runs the agent loop and sums `usage.prompt_tokens` / `completion_tokens` per turn for each arm (bind-all-N / `find_tools`+`call_tool` / `route_and_call`) at several catalog sizes N; the deterministic per-turn schema weight is counted with `tiktoken`. `bridge_cache_measured.py` then logs the API's `cached_tokens` to re-score under prompt caching (see the *Cost caveat* above). Honest scope: **n=1, one task family, filesystem-only live execution, synthetic distractor catalogs, GPT‑5.4** — the *shapes* are robust, the statistics are not yet publication-grade (repeats/error bars are the R3 step).
 
 The full set of evaluation scripts (cost, cache, selection accuracy, rerank, fine-tune, live gateway, and the at-scale feasibility test), what each does inside, the source code they exercise, and an honest production-grade-rigor assessment are in **[EVALUATION.md](EVALUATION.md)**.
 
@@ -217,11 +217,11 @@ catalogs. See the README's "Choosing the embedding model" for the trade-offs.
 
 ## Figures
 
-The full study (code, data, and figures) is archived under `legacy/experiments/`.
-Reproduce the bridge figures from there: `python legacy/experiments/bridge_scaling.py --free-only`
-(no API), then `python legacy/experiments/bridge_scaling.py --api-sizes 14 60 120`
-(needs an OpenAI key in `legacy/experiments/.env` as `API_KEY` + `AGENT_MODEL`),
-then `python legacy/experiments/bridge_figures.py`.
+The full study (code, data, and figures) is archived under `research/experiments/`.
+Reproduce the bridge figures from there: `python research/experiments/bridge_scaling.py --free-only`
+(no API), then `python research/experiments/bridge_scaling.py --api-sizes 14 60 120`
+(needs an OpenAI key in `research/experiments/.env` as `API_KEY` + `AGENT_MODEL`),
+then `python research/experiments/bridge_figures.py`.
 
 ---
 
@@ -248,7 +248,7 @@ then `python legacy/experiments/bridge_figures.py`.
 - live multi-server validation at scale, with repeats/error bars (today: one task family, filesystem-only, n=1);
 - exported/structured metrics (today: logs + `get_stats()`);
 - stronger/fine-tuned default encoder (today: zero-shot MiniLM);
-- description-poisoning mitigations (studied in `legacy/`, not implemented);
+- description-poisoning mitigations (studied in `research/`, not implemented);
 - PyPI publish.
 
 See the repo [README "Roadmap & release readiness"](../README.md#roadmap--release-readiness) for the full checklist and next immediate steps.

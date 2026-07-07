@@ -29,5 +29,5 @@ include = ["toolfinder*"]
 
 [tool.ruff]
 line-length = 120
-# legacy/ is archived research material, not maintained as part of the tool.
-extend-exclude = ["legacy"]
+# research/ is archived research material, not maintained as part of the tool.
+extend-exclude = ["research"]

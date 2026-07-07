@@ -17,8 +17,8 @@ Part B (--agent, a few cents of gpt-4.1-mini):
     routing + executing through ToolFinder (rerank on). Reports tokens/turns.
 
 Run:
-  python legacy/experiments/gateway_openapi_demo.py            # Part A only ($0)
-  python legacy/experiments/gateway_openapi_demo.py --agent    # + Part B (small API)
+  python research/experiments/gateway_openapi_demo.py            # Part A only ($0)
+  python research/experiments/gateway_openapi_demo.py --agent    # + Part B (small API)
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[0]))  # legacy/ — for `from experiments...`
+sys.path.insert(0, str(HERE.parents[0]))  # research/ — for `from experiments...`
 
 from experiments.bridge_ab import load_dotenv, make_client_factory, run_arm, tokens  # noqa: E402
 from toolfinder import UniversalMCPRouter, to_openai_tools  # noqa: E402

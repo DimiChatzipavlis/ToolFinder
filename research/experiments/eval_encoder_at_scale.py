@@ -15,7 +15,7 @@ training* — the honest generalization setting). Metrics: recall@1/@5 and MRR@5
 Deterministic (fixed encoders, fixed seed for distractor sampling): re-runs
 reproduce exactly.
 
-Run:  python legacy/experiments/eval_encoder_at_scale.py
+Run:  python research/experiments/eval_encoder_at_scale.py
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[0]))  # legacy/
+sys.path.insert(0, str(HERE.parents[0]))  # research/
 
 from experiments import paths  # noqa: E402
 from experiments.eval_selection_at_scale import build_catalog, load_data  # noqa: E402

@@ -40,11 +40,11 @@ llm_tools = to_openai_tools(results)            # OpenAI-style bindable schemas
 - **Exact search by default.** Query *encoding* (~tens of ms) dominates
   retrieval (<1 ms below 10⁵ vectors); approximate indexes buy nothing at MCP
   catalog sizes and cost exactness. Benchmarked in the archived study under
-  `legacy/experiments/`.
+  `research/experiments/`.
 - **Type-stable routing API.** `route_top_k` always returns `RouteResult`;
   format conversion is an explicit function, not hidden state.
 - **Abstention over force-routing.** The threshold's operating points are
   measured (risk-coverage / AUROC) in the archived study under
-  `legacy/experiments/`, not guessed. Schemas get `additionalProperties: false`
+  `research/experiments/`, not guessed. Schemas get `additionalProperties: false`
   injected at ingest.
 - **Security posture:** see [SECURITY.md](../SECURITY.md).

@@ -18,8 +18,8 @@ models, which matches the honest story that for strong models the bridge's value
 is cost, not accuracy. A null result (no degradation) is reported as such.
 
 Run (key from repo-root .env; strong model = AGENT_MODEL):
-    python legacy/experiments/bridge_selection_accuracy.py
-    python legacy/experiments/bridge_selection_accuracy.py --weak gpt-4.1-mini --sizes 14 60 120
+    python research/experiments/bridge_selection_accuracy.py
+    python research/experiments/bridge_selection_accuracy.py --weak gpt-4.1-mini --sizes 14 60 120
 """
 
 from __future__ import annotations

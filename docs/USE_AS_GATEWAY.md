@@ -174,7 +174,7 @@ total_tools: 23   by_server: { filesystem: 14, memory: 9 }   failed_servers: {}
 
 - Validated **live**: filesystem + memory under one gateway (23 tools → host binds
   6), and a real filesystem MCP server **+** an OpenAPI API simultaneously
-  (`legacy/experiments/gateway_heterogeneous_demo.py`). The SQL/git entries above
+  (`research/experiments/gateway_heterogeneous_demo.py`). The SQL/git entries above
   are configuration **examples** — confirm them with your actual servers.
 - Routing quality depends on the embedding model; for confusable/domain catalogs
   enable `TOOLFINDER_RERANK` or point `TOOLFINDER_MODEL` at a fine-tuned encoder.
