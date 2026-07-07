@@ -70,9 +70,16 @@ and the prioritized plan, with each item tied to evidence in
   and a cold-vs-warm startup benchmark at 10³/10⁴ tools.
 
 **P2 — live updates (E2):**
-- Subscribe to downstream `tools/list_changed`; **incrementally** add/remove tools
-  in the router (it already supports per-server ingest) instead of a full rebuild.
-  *Effort: M · Impact: needed for long-running, mutating deployments.*
+- ✅ **Shipped.** Stdio downstreams that emit `notifications/tools/list_changed`
+  now trigger a **debounced incremental refresh** of just that server (the stdio
+  client surfaces notifications via an `on_notification` hook; previously they
+  were silently dropped). `refresh(server=...)` does the same on demand, and the
+  router's `reingest_server` replaces one server's vectors **without re-encoding
+  the others** (plus the P1 cache: only changed tools hit the encoder). Covered
+  by CI tests (incremental replace, per-server refresh, notification path).
+  *Honest scope:* validated with fakes in CI; many reference MCP servers don't
+  emit `list_changed` at all, so the manual per-server refresh is the guaranteed
+  path. OpenAPI downstreams have no push channel (poll/refresh explicitly).
 
 **P3 — throughput & ops:**
 - Query-embedding cache + encode batching; optionally a separate embedding service;

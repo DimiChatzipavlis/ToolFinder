@@ -11,6 +11,7 @@ import os
 import shutil
 import uuid
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -98,6 +99,10 @@ class DynamicMCPClient:
         self._startup_lock = asyncio.Lock()
         self._closed = False
         self._started = False
+        # Optional hook for server-initiated JSON-RPC notifications (messages
+        # without an id), e.g. `notifications/tools/list_changed`. Called as
+        # on_notification(method, params) from the stdout reader task.
+        self.on_notification: Callable[[str, JsonDict], None] | None = None
 
     @property
     def stderr_tail(self) -> list[str]:
@@ -149,6 +154,18 @@ class DynamicMCPClient:
                 len(self._tools_cache),
             )
             return copy.deepcopy(self._tools_cache)
+
+    async def refresh_tools(self) -> list[NormalizedTool]:
+        """Drop the cached tool list and re-fetch it from the live server.
+
+        Used after a `tools/list_changed` notification (or an explicit per-server
+        refresh) — the process keeps running; only `tools/list` is re-issued.
+        """
+        if not self._started:
+            return await self.initialize_and_get_tools()
+        self._tools_cache = await self._list_tools()
+        logger.info("%s: tool list refreshed (%d tools)", self.server_name, len(self._tools_cache))
+        return copy.deepcopy(self._tools_cache)
 
     async def start(self) -> None:
         """Start and initialize the MCP server process once."""
@@ -471,6 +488,16 @@ class DynamicMCPClient:
                         future = self._pending_requests.pop(request_id, None)
                     if future is not None and not future.done():
                         future.set_result(message)
+                elif isinstance(message.get("method"), str):
+                    # Server-initiated notification (no id) — e.g. tools/list_changed.
+                    callback = self.on_notification
+                    if callback is not None:
+                        try:
+                            callback(str(message["method"]), message.get("params") or {})
+                        except Exception:  # noqa: BLE001 - a handler bug must not kill the reader
+                            logger.exception("%s: notification handler failed", self.server_name)
+                    else:
+                        logger.debug("%s: unhandled notification %s", self.server_name, message["method"])
         except Exception as exc:
             await self._fail_pending_requests(exc)
             raise

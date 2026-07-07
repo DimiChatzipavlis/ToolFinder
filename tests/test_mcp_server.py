@@ -166,6 +166,46 @@ async def test_failed_downstream_is_isolated(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_per_server_refresh_is_incremental(server, monkeypatch):
+    """P2: refresh(server=...) re-lists one server and re-indexes it while the
+    other server stays untouched."""
+    changed = [{"server_name": "memory", "tool_name": "store_note",
+                "description": "remember a note in memory",
+                "inputSchema": {"type": "object", "properties": {}}}]
+    monkeypatch.setitem(FakeClient.INVENTORY, "memory", changed)
+
+    result = await _fn(server.refresh)("memory")
+
+    assert result == {"refreshed": "memory", "tools": 1, "total_tools": 2}
+    hit = await _fn(server.find_tools)("remember this note", k=1)
+    assert hit[0]["function"]["name"] == "store_note"          # new tool routes
+    missing = await _fn(server.call_tool)("create_entity", {})
+    assert "error" in missing                                  # old tool unmapped
+    fs = await _fn(server.find_tools)("save some text to a file", k=1)
+    assert fs[0]["function"]["name"] == "write_file"           # filesystem untouched
+
+
+@pytest.mark.asyncio
+async def test_list_changed_notification_triggers_refresh(server, monkeypatch):
+    """P2 push path: a tools/list_changed notification from a downstream schedules
+    a debounced incremental refresh of that server."""
+    await _fn(server.catalog_size)()  # ensure built + handlers wired
+    client = server._state["clients"]["memory"]
+    assert client.on_notification is not None  # bridge wired the hook
+
+    changed = [{"server_name": "memory", "tool_name": "store_note",
+                "description": "remember a note in memory",
+                "inputSchema": {"type": "object", "properties": {}}}]
+    monkeypatch.setitem(FakeClient.INVENTORY, "memory", changed)
+
+    client.on_notification("notifications/tools/list_changed", {})
+    await server._state["refresh_tasks"]["memory"]
+
+    hit = await _fn(server.find_tools)("remember this note", k=1)
+    assert hit[0]["function"]["name"] == "store_note"
+
+
+@pytest.mark.asyncio
 async def test_auto_rerank_enables_for_stock_encoder_at_threshold(monkeypatch, tmp_path):
     """P0 auto-scale: rerank turns on automatically only when the user made no
     explicit choice, the encoder is the stock default, and the catalog is large."""

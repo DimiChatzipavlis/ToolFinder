@@ -183,6 +183,13 @@ async def _build() -> None:
         )
     _state.update(clients=clients, specs=specs, router=router, tool_to_server=tool_to_server,
                   counts=counts, failed=failed)
+    # E2: subscribe to push-based tool changes. Stdio MCP clients surface
+    # server-initiated notifications via `on_notification`; a tools/list_changed
+    # triggers a debounced incremental refresh of just that server. (OpenAPI
+    # downstreams have no push channel — refresh them explicitly.)
+    for name, client in clients.items():
+        if hasattr(client, "on_notification"):
+            client.on_notification = _make_notification_handler(name)
     logger.info(
         "ToolFinder bridge ready: %s/%s servers, %s tools%s",
         len(clients), len(clients) + len(failed), sum(counts.values()),
@@ -196,6 +203,60 @@ async def _ensure_ready() -> None:
     async with _init_lock:
         if _state["router"] is None:
             await _build()
+
+
+def _rebuild_tool_map() -> None:
+    """Recompute tool_name -> server from the router's live metadata
+    (insertion order preserved, so name collisions stay first-wins)."""
+    router = _state["router"]
+    mapping: dict[str, str] = {}
+    for index_id in sorted(router.metadata):
+        owner, tool_name, _ = router.metadata[index_id]
+        mapping.setdefault(tool_name, owner)
+    _state["tool_to_server"] = mapping
+
+
+async def _refresh_server(server: str) -> dict[str, Any]:
+    """Incrementally refresh ONE downstream server: re-list its tools and
+    re-index just that server (others untouched; with the embedding cache only
+    new/changed tools are re-encoded)."""
+    client = _state["clients"].get(server)
+    if client is None:
+        return {"error": f"unknown server '{server}'. Configured: {sorted(_state['clients'])}"}
+    try:
+        if hasattr(client, "refresh_tools"):
+            tools = await client.refresh_tools()
+        else:  # e.g. OpenAPI downstream — re-fetch the spec
+            tools = await client.initialize_and_get_tools()
+    except Exception as exc:  # noqa: BLE001 - downstream may have died; try a respawn once
+        logger.warning("refresh of %r failed (%s); attempting reconnect", server, exc)
+        retry = await _reconnect(server)
+        if retry is None:
+            return {"error": f"could not refresh '{server}': {exc}"}
+        tools = await retry.initialize_and_get_tools()
+    _state["router"].reingest_server(server, tools)
+    _state["counts"][server] = len(tools)
+    _rebuild_tool_map()
+    logger.info("incrementally refreshed %r: %d tools", server, len(tools))
+    return {"refreshed": server, "tools": len(tools), "total_tools": sum(_state["counts"].values())}
+
+
+def _make_notification_handler(server: str):
+    """Debounced handler for downstream `tools/list_changed` notifications:
+    schedules one incremental refresh per server at a time."""
+
+    def handler(method: str, params: dict[str, Any]) -> None:
+        del params
+        if method != "notifications/tools/list_changed":
+            return
+        tasks: dict[str, asyncio.Task] = _state.setdefault("refresh_tasks", {})
+        existing = tasks.get(server)
+        if existing is not None and not existing.done():
+            return  # a refresh for this server is already in flight
+        logger.info("tools/list_changed from %r — scheduling incremental refresh", server)
+        tasks[server] = asyncio.create_task(_refresh_server(server))
+
+    return handler
 
 
 async def _reconnect(server: str) -> DynamicMCPClient | None:
@@ -328,9 +389,14 @@ async def get_stats() -> dict[str, Any]:
 
 
 @mcp.tool
-async def refresh() -> dict[str, Any]:
-    """Re-spawn all downstream servers and rebuild the index — call after a
-    downstream server's tool list changes."""
+async def refresh(server: str | None = None) -> dict[str, Any]:
+    """Re-index after downstream tool changes. With `server`, refresh just that
+    one incrementally (fast — other servers stay live and are not re-encoded);
+    without arguments, re-spawn everything and rebuild. Note: stdio servers that
+    emit `tools/list_changed` are refreshed automatically."""
+    await _ensure_ready()
+    if server:
+        return await _refresh_server(server)
     for client in _state["clients"].values():
         try:
             await client.close()

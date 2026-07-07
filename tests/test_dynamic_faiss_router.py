@@ -227,6 +227,31 @@ def test_hierarchical_rejects_invalid_n_servers(monkeypatch: pytest.MonkeyPatch)
         router.route_top_k_hierarchical("alpha thing", k=1, n_servers=0)
 
 
+def test_reingest_server_replaces_only_that_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P2: reingest one server incrementally — its removed tool disappears, its
+    new tool routes, and the other server's tools are untouched."""
+    router = build_multi_server_router(monkeypatch)
+    schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+    assert router.route_top_k("cross query", k=1)[0].tool_name == "b_one"
+
+    count = router.reingest_server("beta", [
+        {"tool_name": "b_two", "description": "beta two", "inputSchema": schema},
+    ])
+
+    assert count == 1
+    assert len(router.metadata) == 3  # 2 alpha + 1 beta
+    top = router.route_top_k("cross query", k=1)[0]
+    assert top.tool_name != "b_one"          # removed tool is gone from routing
+    assert top.server_name == "alpha"        # nearest remaining candidate
+    assert router.route_top_k("alpha thing", k=1)[0].tool_name == "a_one"  # alpha intact
+
+
+def test_remove_server_unknown_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
+    router = build_multi_server_router(monkeypatch)
+    assert router.remove_server("nope") == 0
+    assert len(router.metadata) == 4
+
+
 class FakeReranker:
     """Reverses the bi-encoder order, to prove the router actually applies it."""
 

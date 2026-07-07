@@ -444,6 +444,43 @@ class UniversalMCPRouter:
 
         return len(normalized_tools)
 
+    def remove_server(self, server_name: str) -> int:
+        """Drop one server's tools from the live index — **without re-encoding**
+        any other server (the retained embedding matrix is sliced and the FAISS
+        index rebuilt from it, which is adds-only and sub-millisecond at MCP
+        catalog sizes).
+
+        Returns the number of tools removed (0 if the server is unknown).
+        """
+        if server_name not in self._server_to_ids:
+            return 0
+        keep = [i for i in sorted(self.metadata) if self.metadata[i][0] != server_name]
+        removed = len(self.metadata) - len(keep)
+        self._embeddings = (
+            self._embeddings[keep]
+            if keep
+            else np.zeros((0, self._embedding_dim), dtype=np.float32)
+        )
+        self.metadata = {new_id: self.metadata[old_id] for new_id, old_id in enumerate(keep)}
+        server_ids: dict[str, list[int]] = {}
+        for new_id, (owner, _, _) in self.metadata.items():
+            server_ids.setdefault(owner, []).append(new_id)
+        self._server_to_ids = server_ids
+        self._server_centroids = None
+        self.faiss_index = self._create_index(expected_size=len(keep))
+        if keep:
+            self.faiss_index.add(self._embeddings)
+        return removed
+
+    def reingest_server(self, server_name: str, tools_list: list[ToolSchema]) -> int:
+        """Incrementally replace one server's tools after a change (e.g. a
+        `tools/list_changed` notification): remove its old vectors, ingest the
+        new list. Other servers are untouched, and with `cache_dir` configured
+        only genuinely new/changed tools hit the encoder.
+        """
+        self.remove_server(server_name)
+        return self.ingest_server(server_name, tools_list)
+
     def route_top_k(
         self,
         query: str,
