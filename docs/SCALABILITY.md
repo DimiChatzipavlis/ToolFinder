@@ -82,11 +82,21 @@ and the prioritized plan, with each item tied to evidence in
   path. OpenAPI downstreams have no push channel (poll/refresh explicitly).
 
 **P3 — throughput & ops:**
-- Query-embedding cache + encode batching; optionally a separate embedding service;
-  concurrency caps. *Effort: M.*
-- **E4 — exported/structured metrics** (beyond `get_stats()`). *Effort: S.*
-- Memory: drop the retained matrix when hierarchical is off; quantized / mmap index
-  for very large catalogs. *Effort: M.*
+- ✅ **Query-embedding LRU cache shipped** (`RouterHyperparameters.query_cache_size`,
+  default 256): identical repeated queries (agent retries, common intents) skip
+  the encoder — and encoding dominates route latency. Deterministic, so results
+  are byte-identical; CI-tested.
+- ✅ **E4 shipped (v0.1 form):** `get_stats()` now reports `uptime_s` and
+  `route_latency_ms` (n/p50/p95/max, 500-sample window), every recent route
+  carries its latency, and `TOOLFINDER_METRICS_FILE` appends **structured JSONL
+  events** (`route`, `refresh`) for external collection. CI-tested. *Deferred:*
+  a native Prometheus/OTel exporter.
+- *Open:* single-pass encode batching across servers at startup; concurrency
+  caps under high QPS.
+- *Memory (revised):* the retained embedding matrix is now **load-bearing** for
+  P2 incremental updates (reingest slices it), so "drop it when hierarchical is
+  off" is retired; very-large-catalog memory work means mmap/quantized indexes.
+  *Effort: M.*
 
 ## How we'll prove each scales (validation plan)
 

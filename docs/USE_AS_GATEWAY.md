@@ -151,6 +151,7 @@ total_tools: 23   by_server: { filesystem: 14, memory: 9 }   failed_servers: {}
 | `TOOLFINDER_INDEX` | vector index for very large catalogs: `flat` (default, exact) / `hnsw` / `auto` |
 | `TOOLFINDER_CACHE_DIR` | persistent embedding cache — restarts and `refresh()` only re-encode new/changed tools |
 | `TOOLFINDER_SCALE_THRESHOLD` | catalog size at which rerank auto-enables on the stock encoder (default 100; `TOOLFINDER_RERANK=0` opts out) |
+| `TOOLFINDER_METRICS_FILE` | JSONL metrics export (route/refresh events); `get_stats()` reports uptime + latency p50/p95 |
 
 ## 7. Resilience & diagnostics
 
@@ -160,7 +161,10 @@ total_tools: 23   by_server: { filesystem: 14, memory: 9 }   failed_servers: {}
   CI test: `tests/test_mcp_server.py::test_failed_downstream_is_isolated`).
 - **Concurrent startup:** all downstream servers spawn and handshake in parallel;
   ingest order stays deterministic (first-wins on tool-name collisions).
-- After a downstream's tool list changes, call `refresh()` to re-index.
+- **Live tool changes:** stdio servers that emit `tools/list_changed` are
+  re-indexed **automatically** (incrementally — other servers untouched). For
+  servers that don't emit it (or OpenAPI entries), call `refresh("name")` for a
+  fast per-server re-index, or `refresh()` for a full rebuild.
 
 ## Troubleshooting
 

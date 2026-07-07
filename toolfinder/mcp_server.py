@@ -32,6 +32,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from collections import Counter, deque
 from pathlib import Path
 from typing import Any
@@ -56,6 +57,8 @@ _state: dict[str, Any] = {
     "routes": 0,            # total routing decisions
     "by_tool": Counter(),   # chosen tool -> count
     "recent": deque(maxlen=50),
+    "latencies": deque(maxlen=500),  # routing latency samples (ms)
+    "started_at": None,     # epoch seconds when the bridge came up
 }
 _init_lock = asyncio.Lock()
 
@@ -190,6 +193,8 @@ async def _build() -> None:
     for name, client in clients.items():
         if hasattr(client, "on_notification"):
             client.on_notification = _make_notification_handler(name)
+    if _state["started_at"] is None:
+        _state["started_at"] = time.time()
     logger.info(
         "ToolFinder bridge ready: %s/%s servers, %s tools%s",
         len(clients), len(clients) + len(failed), sum(counts.values()),
@@ -238,6 +243,7 @@ async def _refresh_server(server: str) -> dict[str, Any]:
     _state["counts"][server] = len(tools)
     _rebuild_tool_map()
     logger.info("incrementally refreshed %r: %d tools", server, len(tools))
+    _export_metric({"event": "refresh", "server": server, "tools": len(tools)})
     return {"refreshed": server, "tools": len(tools), "total_tools": sum(_state["counts"].values())}
 
 
@@ -297,16 +303,35 @@ async def _dispatch(server: str, tool_name: str, arguments: dict[str, Any]) -> A
             return {"error": f"downstream '{server}' failed after reconnect: {exc2}"}
 
 
-def _record(query: str, chosen: str | None, server: str | None, score: float | None) -> None:
+def _export_metric(event: dict[str, Any]) -> None:
+    """Append one structured event to TOOLFINDER_METRICS_FILE (JSONL), if set.
+    Queries are truncated (same policy as get_stats); failures never break routing."""
+    path = os.getenv("TOOLFINDER_METRICS_FILE")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"ts": round(time.time(), 3), **event}) + "\n")
+    except OSError as exc:
+        logger.warning("metrics export to %s failed: %s", path, exc)
+
+
+def _record(query: str, chosen: str | None, server: str | None, score: float | None,
+            duration_ms: float | None = None) -> None:
     _state["routes"] += 1
     if chosen:
         _state["by_tool"][chosen] += 1
-    _state["recent"].append({"query": query[:120], "tool": chosen, "server": server, "score": score})
-    logger.info("route %r -> %s@%s (score=%s)", query[:80], chosen, server, score)
+    if duration_ms is not None:
+        _state["latencies"].append(duration_ms)
+    _state["recent"].append({"query": query[:120], "tool": chosen, "server": server,
+                             "score": score, "ms": duration_ms})
+    logger.info("route %r -> %s@%s (score=%s, %sms)", query[:80], chosen, server, score, duration_ms)
+    _export_metric({"event": "route", "query": query[:120], "tool": chosen,
+                    "server": server, "score": score, "ms": duration_ms})
 
 
-def _route(query: str, k: int) -> list:
-    """Route a query to the top-k tools.
+def _route(query: str, k: int) -> tuple[list, float]:
+    """Route a query to the top-k tools; returns (matches, duration_ms).
 
     Flat search by default. When `TOOLFINDER_HIERARCHICAL` is set, use two-stage
     server-aware routing — pick the top `TOOLFINDER_ROUTE_SERVERS` servers (by
@@ -314,10 +339,13 @@ def _route(query: str, k: int) -> list:
     multi-server catalogs and bounds the search at large scale; not a latency win.
     """
     router = _state["router"]
+    start = time.perf_counter()
     if os.getenv("TOOLFINDER_HIERARCHICAL", "").strip().lower() in {"1", "true", "yes", "on"}:
         n_servers = max(1, int(os.getenv("TOOLFINDER_ROUTE_SERVERS", "2")))
-        return router.route_top_k_hierarchical(query, k=k, n_servers=n_servers)
-    return router.route_top_k(query, k=k)
+        matches = router.route_top_k_hierarchical(query, k=k, n_servers=n_servers)
+    else:
+        matches = router.route_top_k(query, k=k)
+    return matches, round((time.perf_counter() - start) * 1000.0, 1)
 
 
 @mcp.tool
@@ -329,9 +357,10 @@ async def find_tools(query: str, k: int | None = None) -> list[dict]:
     stays small."""
     await _ensure_ready()
     top_k = k or int(os.getenv("TOOLFINDER_TOPK", "3"))
-    matches = _route(query, top_k)
+    matches, duration_ms = _route(query, top_k)
     if matches:
-        _record(query, matches[0].tool_name, matches[0].server_name, round(matches[0].score, 4))
+        _record(query, matches[0].tool_name, matches[0].server_name,
+                round(matches[0].score, 4), duration_ms)
     return to_openai_tools(matches)
 
 
@@ -356,12 +385,12 @@ async def route_and_call(intent: str, arguments: dict[str, Any]) -> Any:
     for schema-heavy tools prefer `find_tools` + `call_tool`, which surfaces the
     schema before execution."""
     await _ensure_ready()
-    matches = _route(intent, 1)
+    matches, duration_ms = _route(intent, 1)
     if not matches:
-        _record(intent, None, None, None)
+        _record(intent, None, None, None, duration_ms)
         return {"error": f"no downstream tool matched intent: {intent!r}"}
     chosen = matches[0]
-    _record(intent, chosen.tool_name, chosen.server_name, round(chosen.score, 4))
+    _record(intent, chosen.tool_name, chosen.server_name, round(chosen.score, 4), duration_ms)
     return await _dispatch(chosen.server_name, chosen.tool_name, arguments or {})
 
 
@@ -380,11 +409,21 @@ async def catalog_size() -> dict[str, Any]:
 async def get_stats() -> dict[str, Any]:
     """Routing observability: total routes, most-selected tools, recent decisions."""
     await _ensure_ready()
+    latencies = sorted(_state["latencies"])
+
+    def pct(p: float) -> float | None:
+        if not latencies:
+            return None
+        return latencies[min(len(latencies) - 1, int(p * len(latencies)))]
+
     return {
         "total_routes": _state["routes"],
         "top_tools": dict(_state["by_tool"].most_common(10)),
         "recent": list(_state["recent"])[-10:],
         "failed_servers": dict(_state.get("failed", {})),
+        "uptime_s": round(time.time() - _state["started_at"], 1) if _state["started_at"] else None,
+        "route_latency_ms": {"n": len(latencies), "p50": pct(0.50), "p95": pct(0.95),
+                             "max": latencies[-1] if latencies else None},
     }
 
 

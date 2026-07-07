@@ -341,6 +341,32 @@ def test_embedding_cache_encodes_only_new_tools(monkeypatch: pytest.MonkeyPatch,
     assert CountingEmbedder.tool_texts_encoded == 2  # only the NEW tool was encoded
 
 
+def test_query_embedding_lru_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """P3: identical repeated queries must not re-hit the encoder (results unchanged)."""
+
+    class QueryCountingEmbedder(DummySentenceTransformer):
+        query_encodes = 0
+
+        def encode(self, texts, batch_size=None, convert_to_numpy=True):
+            QueryCountingEmbedder.query_encodes += sum('"tool_name"' not in t for t in texts)
+            return super().encode(texts, batch_size, convert_to_numpy)
+
+    monkeypatch.setattr(router_module, "SentenceTransformer", QueryCountingEmbedder)
+    QueryCountingEmbedder.query_encodes = 0
+    router = router_module.UniversalMCPRouter(model_name="dummy-qcache")
+    router.ingest_server("test-server", [
+        {"tool_name": "alpha_tool", "description": "Tool for alpha query",
+         "inputSchema": {"type": "object", "properties": {}}},
+    ])
+
+    first = router.route_top_k("alpha query", k=1)
+    second = router.route_top_k("alpha query", k=1)
+
+    assert QueryCountingEmbedder.query_encodes == 1  # second call served from LRU
+    assert [r.tool_name for r in first] == [r.tool_name for r in second]
+    router.teardown()
+
+
 def test_singleton_release_is_reference_counted(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tearing down one router must not evict a model another live router shares."""
     monkeypatch.setattr(router_module, "SentenceTransformer", DummySentenceTransformer)

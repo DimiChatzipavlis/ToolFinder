@@ -58,6 +58,7 @@ class FakeClient:
         del command, args, env, kwargs
         self.server_name = server_name
         self.calls = []
+        self.on_notification = None  # same hook contract as DynamicMCPClient
 
     async def initialize_and_get_tools(self):
         return [dict(t) for t in self.INVENTORY[self.server_name]]
@@ -163,6 +164,32 @@ async def test_failed_downstream_is_isolated(monkeypatch, tmp_path):
     assert "broken" in size["failed_servers"]          # bad server isolated + recorded
     fs = await _fn(srv.find_tools)("save some text to a file", k=1)
     assert fs[0]["function"]["name"] == "write_file"
+
+
+@pytest.mark.asyncio
+async def test_get_stats_reports_latency_and_uptime(server):
+    """P3/E4: stats expose uptime and route-latency percentiles."""
+    await _fn(server.route_and_call)("write a file", {"path": "x"})
+    stats = await _fn(server.get_stats)()
+    assert stats["uptime_s"] is not None and stats["uptime_s"] >= 0
+    lat = stats["route_latency_ms"]
+    assert lat["n"] >= 1 and lat["p50"] is not None and lat["p95"] is not None
+    assert stats["recent"][-1]["ms"] is not None  # per-route latency recorded
+
+
+@pytest.mark.asyncio
+async def test_metrics_file_export(server, monkeypatch, tmp_path):
+    """P3/E4: TOOLFINDER_METRICS_FILE gets structured JSONL route events."""
+    metrics_file = tmp_path / "metrics.jsonl"
+    monkeypatch.setenv("TOOLFINDER_METRICS_FILE", str(metrics_file))
+
+    await _fn(server.route_and_call)("write a file", {"path": "x"})
+
+    lines = [ln for ln in metrics_file.read_text(encoding="utf-8").splitlines() if ln]
+    events = [__import__("json").loads(ln) for ln in lines]
+    route_events = [e for e in events if e["event"] == "route"]
+    assert route_events and route_events[-1]["tool"] == "write_file"
+    assert "ts" in route_events[-1] and "ms" in route_events[-1]
 
 
 @pytest.mark.asyncio

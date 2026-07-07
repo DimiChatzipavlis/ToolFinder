@@ -15,7 +15,7 @@ ToolFinder ships as an **early-stage, research-backed v0.1**: clean, unit-tested
 | Area | ✅ Ready in v0.1 | 🔜 Needed for production |
 | --- | --- | --- |
 | Routing | exact FAISS flat (default), opt-in HNSW, opt-in server-aware hierarchical, threshold abstention | — |
-| Bridge | multi-server union + dispatch (**MCP and OpenAPI**), env-based downstream auth, one-shot reconnect, `get_stats` | push-based `tools/list_changed`; exported metrics |
+| Bridge | multi-server union + dispatch (**MCP and OpenAPI**), env-based downstream auth, one-shot reconnect, **push-based `tools/list_changed` auto re-index**, per-server `refresh`, `get_stats` | exported metrics; live validation against a notifying server |
 | Evidence | cost modeled **and** measured; top-5 + selection accuracy measured | live multi-server at scale; repeats/error bars |
 | Quality | any open encoder; **opt-in cross-encoder rerank**; honest defaults | stronger/fine-tuned default; poisoning mitigations |
 | Packaging | `pip install`, `toolfinder-mcp`, MIT, CI (lint+tests) | PyPI; CHANGELOG/CONTRIBUTING; integration tests |
@@ -150,9 +150,11 @@ The protections below are what the tool actually enforces (full threat model and
 - **G1 — OpenAPI gateway + downstream auth.** ✅ Downstream entries can be REST APIs described by an OpenAPI 3.x spec (`type: "openapi"`), routed identically to MCP servers; auth (bearer / API-key header or query) is resolved from environment variables. [`toolfinder/openapi_adapter.py`](toolfinder/openapi_adapter.py). **Validated live** ([`research/experiments/gateway_openapi_demo.py`](research/experiments/gateway_openapi_demo.py)): pointed at the public Swagger Petstore, ToolFinder ingested all **19 operations under one gateway**, and a `gpt-4.1-mini` agent binding **only** ToolFinder's 2 tools discovered + routed to the right operation in 3 turns — the 19-op catalog stayed inside ToolFinder (**20× smaller bound context**, 2712 → 135 tokens). With the reranker (Q1) on, live routing improved 3/5 → 4/5 on confusable intents. **Heterogeneous union validated** ([`gateway_heterogeneous_demo.py`](research/experiments/gateway_heterogeneous_demo.py)): one ToolFinder fronting a **real filesystem MCP server (14 tools) + the Petstore OpenAPI (19 tools) at once** routed cross-source 5/5, and a `gpt-4.1-mini` agent (only 2 tools bound) completed a filesystem task **verified on disk** — a real successful execution through the union (32.5× context reduction).
 - **Q1 — Cross-encoder reranker (opt-in).** ✅ The practical form of the review's "specialize selection" idea — **no per-change retraining**: a stock cross-encoder re-scores the bi-encoder's top-k shortlist jointly (`TOOLFINDER_RERANK`; `RouterHyperparameters.rerank`). **Measured (local, $0 API):** on the confusable GitHub-MCP catalog (144 unseen queries) it lifts router **recall@1 0.56 → 0.85** and MRR 0.71 → 0.91 (56 queries improved, 8 worse) — [`toolfinder/reranker.py`](toolfinder/reranker.py), eval [`research/experiments/eval_rerank.py`](research/experiments/eval_rerank.py). Opt-in: it adds latency and only helps the hard case (on distinct catalogs the bi-encoder is already ~1.0). **But fine-tuning the bi-encoder is stronger** (recall@1 **0.99** on the same eval — [`eval_rerank_finetuned.py`](research/experiments/eval_rerank_finetuned.py)), and reranking a *fine-tuned* base with the stock cross-encoder **hurts** (0.99 → 0.85 — the cross-encoder overrides the better base). So the two are **alternatives, not a stack**: fine-tune when you have labels/GPU; use the reranker as the **no-training fallback** for a weak/stock encoder. (The 0.99 is on `regime1`/shared-template queries — likely optimistic; the template-disjoint split would be lower.)
 
+- **E2 — Live tool-change.** ✅ Stdio downstreams emitting `notifications/tools/list_changed` now trigger a **debounced, incremental re-index of just that server** (other servers untouched; with the embedding cache only changed tools re-encode); `refresh(server=...)` does the same on demand. CI-tested (incremental replace, per-server refresh, notification path) — *caveat:* validated with fakes; many reference servers never emit the notification, so the manual per-server refresh remains the guaranteed path.
+- **P0/P1 — scale quality + persistence.** ✅ Measured encoder grid at 574 tools ([`eval_encoder_at_scale.py`](research/experiments/eval_encoder_at_scale.py): fine-tuned+rerank-off wins, R@1 0.40→0.583, R@5 0.933); rerank **auto-enables** above `TOOLFINDER_SCALE_THRESHOLD` for the stock encoder only; opt-in **persistent embedding cache** (`TOOLFINDER_CACHE_DIR`) makes restarts/`refresh()` re-encode only new/changed tools. See [docs/SCALABILITY.md](docs/SCALABILITY.md).
+
 ### Required for a production release (not yet)
 
-- **E2 — Live tool-change.** Push-based `tools/list_changed` subscription with auto re-index (today: one-shot reconnect + manual `refresh()`).
 - **R3 — Live multi-server validation.** Real downstream servers + real tasks, with repeats and error bars (today: one task family, filesystem-only live execution, n=1, synthetic distractor catalogs). **The biggest credibility gap.**
 - **E4 — Exported metrics.** Structured/exported observability (today: `get_stats()` + logs).
 - **E5 — Stronger default encoder.** Ship or recommend a fine-tuned/stronger encoder (today: zero-shot MiniLM, modest on confusable catalogs).
@@ -161,9 +163,8 @@ The protections below are what the tool actually enforces (full threat model and
 ### Next immediate steps
 
 1. **Release hygiene (before any public push):** rotate the API key that has sat in your local `.env`, confirm `.env` is untracked in every branch, add `CHANGELOG.md` + `CONTRIBUTING.md`, tag `v0.1.0`, and decide GitHub-only vs PyPI.
-2. **R3 — live multi-server study** with repeats/error bars — the single highest-value step toward "trustworthy in production."
-3. **E2 — push-based tool-change** (auto re-index).
-4. *Optional / research:* **E5** stronger default, **E4** exported metrics, learned categories (H1 extension), and the broader study (human-written queries, benchmark release) in [`research/`](research/README.md).
+2. **R3 — live multi-server study** with repeats/error bars — the single highest-value step toward "trustworthy in production" (and the place to validate E2's push path against a real notifying server).
+3. *Optional / research:* **E5** stronger default, **E4** exported metrics, learned categories (H1 extension), and the broader study (human-written queries, benchmark release) in [`research/`](research/README.md).
 
 ## Scope Notes
 

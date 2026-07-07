@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import threading
+from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,6 +69,14 @@ class RouterHyperparameters(BaseModel):
             "Opt-in persistent embedding cache directory. Tool embeddings are stored "
             "keyed by (model, schema-hash), so restarts and refresh() only re-encode "
             "new or changed tools instead of the whole catalog."
+        ),
+    )
+    query_cache_size: int = Field(
+        default=256,
+        description=(
+            "LRU cache of query embeddings (query encoding dominates route latency; "
+            "identical repeated queries — e.g. agent retries — skip the encoder). "
+            "0 disables. Safe: embeddings are deterministic, so results are identical."
         ),
     )
 
@@ -205,6 +214,30 @@ class UniversalMCPRouter:
         self._embedding_cache: dict[str, np.ndarray] | None = None
         self._cache_path: Path | None = None
         self._load_embedding_cache()
+        # In-memory LRU of query embeddings (see config.query_cache_size).
+        self._query_cache: OrderedDict[str, np.ndarray] = OrderedDict()
+
+    def _encode_query(self, query: str) -> np.ndarray:
+        """Normalized query embedding with a small LRU cache — identical repeated
+        queries (agent retries, common intents) skip the encoder entirely."""
+        cap = self.config.query_cache_size
+        if cap > 0:
+            cached = self._query_cache.get(query)
+            if cached is not None:
+                self._query_cache.move_to_end(query)
+                return cached
+        model = self.model
+        if model is None:
+            raise RuntimeError("embedding model has been torn down")
+        with torch.inference_mode():
+            embedding = model.encode([query], convert_to_numpy=True)
+        embedding = np.asarray(embedding, dtype=np.float32)
+        faiss.normalize_L2(embedding)
+        if cap > 0:
+            self._query_cache[query] = embedding
+            while len(self._query_cache) > cap:
+                self._query_cache.popitem(last=False)
+        return embedding
 
     def enable_rerank(self, model_name: str | None = None) -> None:
         """Turn on cross-encoder re-ranking after construction.
@@ -324,6 +357,7 @@ class UniversalMCPRouter:
         self.metadata.clear()
         self._staged_tools.clear()
         self._reset_hierarchical_state()
+        self._query_cache.clear()
 
         if self.model is not None:
             del self.model
@@ -503,15 +537,7 @@ class UniversalMCPRouter:
         if self.faiss_index.ntotal == 0:
             raise ValueError("router index is empty; ingest at least one server first")
 
-        model = self.model
-        if model is None:
-            raise RuntimeError("embedding model has been torn down")
-
-        with torch.inference_mode():
-            query_embedding = model.encode([query], convert_to_numpy=True)
-
-        query_embedding = np.asarray(query_embedding, dtype=np.float32)
-        faiss.normalize_L2(query_embedding)
+        query_embedding = self._encode_query(query)
 
         # When reranking, retrieve a larger bi-encoder pool to re-score; otherwise just k.
         pool = max(k, self.config.rerank_pool) if self._reranker is not None else k
@@ -623,15 +649,7 @@ class UniversalMCPRouter:
         if self.faiss_index.ntotal == 0:
             raise ValueError("router index is empty; ingest at least one server first")
 
-        model = self.model
-        if model is None:
-            raise RuntimeError("embedding model has been torn down")
-
-        with torch.inference_mode():
-            query_embedding = model.encode([query], convert_to_numpy=True)
-        query_embedding = np.asarray(query_embedding, dtype=np.float32)
-        faiss.normalize_L2(query_embedding)
-        query_vector = query_embedding[0]
+        query_vector = self._encode_query(query)[0]
 
         candidate_ids = self._select_server_candidate_ids(query_vector, n_servers)
         if not candidate_ids:

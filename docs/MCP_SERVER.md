@@ -135,7 +135,7 @@ catalog. No host code changes — that interoperability is the point.
 | `route_and_call` | `route_and_call(intent: str, arguments: dict)` | downstream result | **one‑hop**: route by intent and execute (lowest token cost, but **argument‑blind** — no schema shown; simple‑argument tools only) |
 | `catalog_size` | `catalog_size()` | `{"total_tools": N, "by_server": {…}}` | diagnostic |
 | `get_stats` | `get_stats()` | recent routing decisions + per-tool counts | observability |
-| `refresh` | `refresh()` | re-spawns downstream servers and re-indexes | after a downstream's tools change |
+| `refresh` | `refresh(server: str \| None = None)` | with `server`: incremental re-index of that server only; without: full re-spawn + rebuild | after a downstream's tools change (stdio servers emitting `tools/list_changed` refresh **automatically**) |
 
 `find_tools` and `route_and_call` route across the **union** of all configured
 servers; `call_tool` and `route_and_call` dispatch execution to the server that
@@ -206,6 +206,7 @@ The full set of evaluation scripts (cost, cache, selection accuracy, rerank, fin
 | `TOOLFINDER_INDEX` | `flat` | vector index: `flat` (exact) / `hnsw` / `auto` (switches to HNSW above ~50k tools) — for very large catalogs |
 | `TOOLFINDER_CACHE_DIR` | off | persistent embedding cache dir — restarts/`refresh()` re-encode only new/changed tools (big cold-start win on large catalogs) |
 | `TOOLFINDER_SCALE_THRESHOLD` | `100` | catalog size at which rerank **auto-enables** (stock encoder only — it degrades fine-tuned ones; set `TOOLFINDER_RERANK=0` to opt out) |
+| `TOOLFINDER_METRICS_FILE` | off | append structured JSONL events (`route`, `refresh`) for external metrics collection; `get_stats()` also reports uptime + route-latency p50/p95 |
 
 For more than one downstream server, use `TOOLFINDER_CONFIG` (a JSON file listing
 servers) rather than the single-server env vars — see the Run section above.
@@ -246,7 +247,7 @@ then `python research/experiments/bridge_figures.py`.
 
 **Needed for a production release (not yet):**
 
-- push-based `tools/list_changed` subscription, auto re-index (today: manual `refresh()`);
+- ~~push-based `tools/list_changed` subscription~~ → **shipped**: notifications trigger a debounced incremental per-server re-index (CI-tested with fakes; downstreams that never emit it still need `refresh(server=...)`);
 - live multi-server validation at scale, with repeats/error bars (today: one task family, filesystem-only, n=1);
 - exported/structured metrics (today: logs + `get_stats()`);
 - stronger/fine-tuned default encoder (today: zero-shot MiniLM);
